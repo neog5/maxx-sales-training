@@ -104,13 +104,14 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         <div className="tp-label">{course.code} · Assessment results</div>
         <h1 className="tp-display" style={{ fontSize: 24, fontWeight: 700, margin: "6px 0 24px" }}>Results</h1>
 
-        <div className="tp-card" style={{ padding: 26, display: "flex", alignItems: "center", gap: 30, marginBottom: 16 }}>
-          <Dial pct={result.score} size={120} color={result.passed ? "var(--accent)" : "var(--danger)"} label={`${result.score}%`} sub="score" />
-          <div>
-            <span className="tp-badge" style={{ background: result.passed ? "var(--accent-dim)" : "var(--danger-dim)", color: result.passed ? "var(--accent)" : "var(--danger)" }}>
+        <div className={`tp-card assessment-result-card ${result.passed ? "is-passed" : "is-failed"}`}>
+          <Dial pct={result.score} size={120} color={result.passed ? "var(--success)" : "var(--danger)"} label={`${result.score}%`} sub="score" />
+          <div className="assessment-result-card__copy">
+            <span className="tp-badge" style={{ background: result.passed ? "var(--success-dim)" : "var(--danger-dim)", color: result.passed ? "var(--success)" : "var(--danger)" }}>
               {result.passed ? "Passed" : "Not passed"}
             </span>
-            <div style={{ fontSize: 14, marginTop: 10, color: "var(--dim)" }}>
+            <h2 className="tp-display">{result.passed ? "Course complete" : "Keep building your knowledge"}</h2>
+            <div className="assessment-result-card__detail">
               {result.graded.filter((g) => g.is_correct).length} of {result.graded.length} correct · threshold {course.pass_threshold}%
             </div>
             {!result.passed && (
@@ -126,7 +127,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         <div className="tp-label" style={{ marginBottom: 10 }}>Question review</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {result.graded.map((q, qi) => (
-            <div key={q.id} className="tp-card" style={{ padding: 18, borderColor: q.is_correct ? "var(--border)" : "rgba(242,104,92,.3)" }}>
+            <div key={q.id} className={`tp-card assessment-review-card ${q.is_correct ? "is-correct" : "is-wrong"}`}>
               <div style={{ display: "flex", gap: 10 }}>
                 <span className="tp-mono" style={{ color: "var(--faint)", fontSize: 12 }}>{String(qi + 1).padStart(2, "0")}</span>
                 <div style={{ flex: 1 }}>

@@ -636,6 +636,14 @@ body {
 .assessment-option__radio { display: grid; place-items: center; flex: 0 0 auto; width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 50%; background: #fff; }
 .assessment-option__radio i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .assessment-options .tp-opt.sel .assessment-option__radio { border-color: var(--accent); }
+.assessment-result-card { position: relative; overflow: hidden; display: flex; align-items: center; gap: 30px; margin-bottom: 22px; padding: 28px; border-radius: 18px; }
+.assessment-result-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--danger); }
+.assessment-result-card.is-passed::before { background: var(--success); }
+.assessment-result-card__copy { min-width: 0; }
+.assessment-result-card__copy h2 { margin: 10px 0 5px; color: var(--surface); font-size: 21px; }
+.assessment-result-card__detail { color: var(--dim); font-size: 13px; }
+.assessment-review-card { position: relative; padding: 20px; border-radius: 15px; }
+.assessment-review-card.is-wrong { border-color: rgba(201,76,67,.28); }
 
 @media (max-width: 900px) {
   .courses-hero { grid-template-columns: 1fr; gap: 28px; }
@@ -674,6 +682,11 @@ body {
   .assessment-question { grid-template-columns: 28px 1fr; gap: 7px; }
   .assessment-options { margin-left: 0; }
   .assessment-card { padding: 18px; }
+  .assessment-result-card { align-items: flex-start; flex-direction: column; gap: 20px; padding: 22px; }
+  .assessment-result-card > :first-child { align-self: center; }
+  .assessment-result-card__copy { width: 100%; text-align: center; }
+  .assessment-result-card__copy h2 { font-size: 19px; }
+  .assessment-review-card { padding: 17px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
