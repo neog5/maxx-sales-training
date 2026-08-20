@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Dial from "@/components/Dial";
+import { AssessmentSkeleton } from "@/components/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 
 // Options ship shuffled per question so the correct answer isn't always in the same slot.
@@ -94,7 +95,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
   }
 
   if (loading) {
-    return <div style={{ textAlign: "center", padding: 80, color: "var(--faint)" }}>Loading questions…</div>;
+    return <AssessmentSkeleton showNav={false} />;
   }
 
   if (result) {

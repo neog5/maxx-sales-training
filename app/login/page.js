@@ -15,21 +15,30 @@ export default function LoginPage() {
 
   async function submit(e) {
     e.preventDefault();
+    if (loading) return;
+
     setError("");
     setLoading(true);
-    if (mode === "signin") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-      else { router.push("/courses"); router.refresh(); }
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { full_name: fullName } },
-      });
-      if (error) setError(error.message);
-      else { router.push("/courses"); router.refresh(); }
+    try {
+      const { error } = mode === "signin"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({
+            email, password,
+            options: { data: { full_name: fullName } },
+          });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push("/courses");
+      router.refresh();
+    } catch {
+      setError("Unable to connect. Please try again.");
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
@@ -63,8 +72,8 @@ export default function LoginPage() {
             <input className="tp-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
           </div>
           {error && <div style={{ color: "var(--danger)", fontSize: 12.5 }}>{error}</div>}
-          <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} style={{ marginTop: 4 }}>
-            {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+          <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} aria-busy={loading} style={{ marginTop: 4 }}>
+            {loading ? "Loading…" : mode === "signin" ? "Sign in" : "Create account"}
           </button>
         </form>
 

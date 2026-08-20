@@ -46,6 +46,8 @@ A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, c
 
 Sign up through the app. The database trigger creates a `profiles` row with the `rep` role. In the Supabase Table Editor, change that profile's role to `admin`, then refresh the app. Admins can open `/admin`, upload course PDFs, and edit question banks.
 
+If the database was created before profile role editing was added, run `supabase/profile-role-policy.sql` once in the Supabase SQL Editor. Without this policy, Supabase RLS blocks admins from updating another person's role.
+
 If email confirmation is enabled in Supabase Auth, confirm the new account before signing in. For a frictionless local demo, adjust that setting in the Supabase dashboard.
 
 ## Useful commands

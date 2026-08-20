@@ -15,12 +15,20 @@ export default function RoleEditor({ profileId, initialRole }) {
     setSaving(true);
     setMessage("");
     const supabase = createClient();
-    const { error } = await supabase.from("profiles").update({ role }).eq("id", profileId);
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ role })
+      .eq("id", profileId)
+      .select("role")
+      .maybeSingle();
 
     if (error) {
-      setMessage(error.message);
+      setMessage(`Role could not be updated: ${error.message}`);
+    } else if (!data) {
+      setMessage("Role update was blocked by database permissions. Apply supabase/profile-role-policy.sql to this Supabase project.");
     } else {
-      setSavedRole(role);
+      setRole(data.role);
+      setSavedRole(data.role);
       setMessage("Role updated.");
       router.refresh();
     }

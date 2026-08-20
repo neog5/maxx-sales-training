@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import Skeleton from "@/components/Skeleton";
 import PdfReader from "./PdfReader";
 
 export default function ReadingGateClient({ course, userId }) {
@@ -12,6 +13,7 @@ export default function ReadingGateClient({ course, userId }) {
   const [paused, setPaused] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [readingQuestions, setReadingQuestions] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
   const [answeredIds, setAnsweredIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeQuestion, setActiveQuestion] = useState(null);
@@ -31,7 +33,10 @@ export default function ReadingGateClient({ course, userId }) {
         setSessionId(session?.id);
       }
     });
-    supabase.rpc("get_reading_questions", { p_course_id: course.id, p_count: 3 }).then(({ data }) => setReadingQuestions(data || []));
+    supabase.rpc("get_reading_questions", { p_course_id: course.id, p_count: 3 }).then(({ data }) => {
+      setReadingQuestions(data || []);
+      setQuestionsLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -61,22 +66,11 @@ export default function ReadingGateClient({ course, userId }) {
     setPaused(false);
   }
 
-  const pct = Math.round((elapsed / total) * 100);
   return (
     <div className="tp-fade-in" style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 24px 40px" }}>
       <Link href="/courses" className="tp-btn tp-btn-ghost" style={{ marginBottom: 14, padding: "6px 12px", display: "inline-block", textDecoration: "none" }}>← Back to courses</Link>
       <div className="tp-label">{course.code} · Step 01</div>
       <h1 className="tp-display" style={{ fontSize: 26, fontWeight: 700, margin: "6px 0 14px" }}>{course.title}</h1>
-
-      <div className="tp-card reading-progress">
-        <div className="reading-progress__info">
-          <span className="tp-badge" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>{pct}% read</span>
-          <span style={{ color: "var(--dim)" }}>{Math.max(0, total - elapsed)}s remaining</span>
-        </div>
-        <div className="reading-progress__bar" role="progressbar" aria-label="Reading time" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
-          <span style={{ width: `${pct}%` }} />
-        </div>
-      </div>
 
       <div className="reading-workspace">
         <section>
@@ -91,6 +85,18 @@ export default function ReadingGateClient({ course, userId }) {
 
         <aside className="reading-question-panel">
           <div className="tp-card reading-question-card">
+            {questionsLoading ? (
+              <div className="reading-question-skeleton" aria-busy="true" aria-label="Loading reading questions">
+                <Skeleton style={{ width: "72%", height: 12, marginBottom: 24 }} />
+                <Skeleton style={{ width: 106, height: 21, borderRadius: 999, marginBottom: 14 }} />
+                <Skeleton style={{ width: "95%", height: 42, marginBottom: 16 }} />
+                <Skeleton style={{ width: "100%", height: 43, marginBottom: 8 }} />
+                <Skeleton style={{ width: "100%", height: 43, marginBottom: 8 }} />
+                <Skeleton style={{ width: "100%", height: 43 }} />
+                <span className="tp-sr-only" role="status">Loading reading questions…</span>
+              </div>
+            ) : <>
+            <div style={{ color: "var(--faint)", fontSize: 12, marginBottom: 12 }}>{answeredIds.length}/{readingQuestions.length} reading questions completed</div>
             {activeQuestion ? (
               <div className="tp-fade-in">
                 <div className="tp-badge" style={{ background: "var(--warn-dim)", color: "var(--warn)", marginBottom: 12 }}>Reading question · page {activeQuestion.page_number}</div>
@@ -110,11 +116,12 @@ export default function ReadingGateClient({ course, userId }) {
             ) : (
               <div className="tp-fade-in"><div className="tp-label" style={{ marginBottom: 8 }}>Reading questions</div><div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--dim)" }}>{readingQuestions.length ? "Keep scrolling through the PDF. This panel will change when you reach the next question." : "No reading questions have been added for this course."}</div></div>
             )}
+            </>}
           </div>
         </aside>
       </div>
 
-      <div className="reading-footer"><span style={{ color: "var(--faint)", fontSize: 12.5 }}>{answeredIds.length}/{readingQuestions.length} reading questions completed</span><button className="tp-btn tp-btn-primary" disabled={!done} onClick={proceed}>{done ? "Start assessment →" : elapsed < total ? `Continue reading… ${total - elapsed}s left` : `Complete ${readingQuestions.length - answeredIds.length} reading question${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}`}</button></div>
+      <div className="reading-footer"><button className="tp-btn tp-btn-primary" disabled={!done} onClick={proceed}>{done ? "Start assessment →" : elapsed < total ? `Continue reading… ${total - elapsed}s left` : `Complete ${readingQuestions.length - answeredIds.length} reading question${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}`}</button></div>
       <style jsx>{`
         .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
         .reading-question-panel { position: sticky; top: 18px; }
