@@ -24,7 +24,13 @@ export default function ReadingGateClient({ course, userId }) {
   const done = elapsed >= total && answeredIds.length === readingQuestions.length;
 
   useEffect(() => {
-    supabase.from("reading_sessions").insert({ user_id: userId, course_id: course.id }).select().single().then(({ data }) => setSessionId(data?.id));
+    supabase.from("reading_sessions").select("id").eq("user_id", userId).eq("course_id", course.id).eq("checkpoint_passed", false).order("started_at", { ascending: false }).limit(1).maybeSingle().then(async ({ data }) => {
+      if (data?.id) setSessionId(data.id);
+      else {
+        const { data: session } = await supabase.from("reading_sessions").insert({ user_id: userId, course_id: course.id }).select().single();
+        setSessionId(session?.id);
+      }
+    });
     supabase.rpc("get_reading_questions", { p_course_id: course.id, p_count: 3 }).then(({ data }) => setReadingQuestions(data || []));
   }, []);
 
@@ -63,9 +69,13 @@ export default function ReadingGateClient({ course, userId }) {
       <h1 className="tp-display" style={{ fontSize: 26, fontWeight: 700, margin: "6px 0 14px" }}>{course.title}</h1>
 
       <div className="tp-card reading-progress">
-        <span className="tp-badge" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>{pct}% read</span>
-        <span style={{ color: "var(--dim)" }}>{Math.max(0, total - elapsed)}s remaining</span>
-        <span className="reading-progress__hint">Questions appear as you reach their PDF page.</span>
+        <div className="reading-progress__info">
+          <span className="tp-badge" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>{pct}% read</span>
+          <span style={{ color: "var(--dim)" }}>{Math.max(0, total - elapsed)}s remaining</span>
+        </div>
+        <div className="reading-progress__bar" role="progressbar" aria-label="Reading time" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
+          <span style={{ width: `${pct}%` }} />
+        </div>
       </div>
 
       <div className="reading-workspace">
@@ -80,7 +90,27 @@ export default function ReadingGateClient({ course, userId }) {
         </section>
 
         <aside className="reading-question-panel">
-          {activeQuestion ? <div className="tp-card tp-fade-in" style={{ padding: 20 }}><div className="tp-badge" style={{ background: "var(--warn-dim)", color: "var(--warn)", marginBottom: 12 }}>Reading question · page {activeQuestion.page_number}</div><div style={{ fontSize: 14.5, marginBottom: 16, lineHeight: 1.5 }}>{activeQuestion.question_text}</div><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{activeQuestion.options.map((option, index) => <button key={index} className={`tp-opt ${selectedAnswer === index ? "sel" : ""}`} disabled={answerChecked} onClick={() => setSelectedAnswer(index)} style={{ textAlign: "left" }}><span style={{ fontSize: 13.5 }}>{option}</span></button>)}</div>{answerChecked && <div style={{ fontSize: 12.5, lineHeight: 1.5, color: selectedAnswer === activeQuestion.correct_index ? "var(--accent)" : "var(--faint)", marginTop: 14 }}>{selectedAnswer === activeQuestion.correct_index ? "Correct. " : `Correct answer: ${activeQuestion.options[activeQuestion.correct_index]}. `}{activeQuestion.explanation}</div>}<div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button className="tp-btn tp-btn-primary" disabled={selectedAnswer === undefined} onClick={() => answerChecked ? continueReading() : setAnswerChecked(true)}>{answerChecked ? "Continue reading" : "Check answer"}</button></div></div> : <div className="tp-card" style={{ padding: 20 }}><div className="tp-label" style={{ marginBottom: 8 }}>Reading questions</div><div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--dim)" }}>{readingQuestions.length ? "Keep scrolling through the PDF. The next question will appear when you reach its assigned page." : "No reading questions have been added for this course."}</div></div>}
+          <div className="tp-card reading-question-card">
+            {activeQuestion ? (
+              <div className="tp-fade-in">
+                <div className="tp-badge" style={{ background: "var(--warn-dim)", color: "var(--warn)", marginBottom: 12 }}>Reading question · page {activeQuestion.page_number}</div>
+                <div style={{ fontSize: 14.5, marginBottom: 16, lineHeight: 1.5 }}>{activeQuestion.question_text}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {activeQuestion.options.map((option, index) => {
+                    const isCorrect = answerChecked && index === activeQuestion.correct_index;
+                    const isWrong = answerChecked && selectedAnswer === index && !isCorrect;
+                    return <button key={index} className={`tp-opt ${!answerChecked && selectedAnswer === index ? "sel" : ""} ${isCorrect ? "is-correct" : ""} ${isWrong ? "is-wrong" : ""}`} disabled={answerChecked} onClick={() => setSelectedAnswer(index)} style={{ textAlign: "left" }}><span style={{ fontSize: 13.5 }}>{option}</span>{isCorrect && <span className="answer-mark">✓</span>}{isWrong && <span className="answer-mark">×</span>}</button>;
+                  })}
+                </div>
+                {answerChecked && <div className={selectedAnswer === activeQuestion.correct_index ? "answer-feedback is-correct" : "answer-feedback is-wrong"}>{selectedAnswer === activeQuestion.correct_index ? "Correct. " : "That answer is incorrect. "}{activeQuestion.explanation}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button className="tp-btn tp-btn-primary" disabled={selectedAnswer === undefined} onClick={() => answerChecked ? continueReading() : setAnswerChecked(true)}>{answerChecked ? "Continue reading" : "Check answer"}</button></div>
+              </div>
+            ) : answeredIds.length === readingQuestions.length && readingQuestions.length > 0 ? (
+              <div className="reading-question-complete tp-fade-in"><div className="reading-question-complete__icon">✓</div><div className="tp-display">Reading questions completed</div><p>You answered all {readingQuestions.length} reading checkpoints.</p></div>
+            ) : (
+              <div className="tp-fade-in"><div className="tp-label" style={{ marginBottom: 8 }}>Reading questions</div><div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--dim)" }}>{readingQuestions.length ? "Keep scrolling through the PDF. This panel will change when you reach the next question." : "No reading questions have been added for this course."}</div></div>
+            )}
+          </div>
         </aside>
       </div>
 
@@ -88,6 +118,7 @@ export default function ReadingGateClient({ course, userId }) {
       <style jsx>{`
         .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
         .reading-question-panel { position: sticky; top: 18px; }
+        .reading-question-card { padding: 20px; min-height: 190px; }
         @media (max-width: 820px) {
           .reading-workspace { grid-template-columns: 1fr; }
           .reading-question-panel { position: static; }

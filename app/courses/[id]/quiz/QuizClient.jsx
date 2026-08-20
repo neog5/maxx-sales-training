@@ -100,7 +100,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
   if (result) {
     return (
       <div className="assessment-page tp-fade-in">
-        <div className="tp-label">{course.code} · Step 03</div>
+        <div className="tp-label">{course.code} · Assessment results</div>
         <h1 className="tp-display" style={{ fontSize: 24, fontWeight: 700, margin: "6px 0 24px" }}>Results</h1>
 
         <div className="tp-card" style={{ padding: 26, display: "flex", alignItems: "center", gap: 30, marginBottom: 16 }}>
@@ -130,10 +130,13 @@ export default function QuizClient({ course, userId, lastAttempt }) {
                 <span className="tp-mono" style={{ color: "var(--faint)", fontSize: 12 }}>{String(qi + 1).padStart(2, "0")}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13.5, marginBottom: 8 }}>{q.question_text}</div>
-                  <div style={{ fontSize: 13, color: q.is_correct ? "var(--accent)" : "var(--danger)", marginBottom: 4 }}>
-                    Your answer: {q.options[q.selected_index]}
+                  <div className="review-options">
+                    {q.options.map((option, index) => {
+                      const isCorrect = index === q.correct_index;
+                      const isWrongSelection = index === q.selected_index && !q.is_correct;
+                      return <div key={index} className={`review-option ${isCorrect ? "is-correct" : ""} ${isWrongSelection ? "is-wrong" : ""}`}><span>{option}</span>{isCorrect && <strong>Correct</strong>}{isWrongSelection && <strong>Your answer</strong>}</div>;
+                    })}
                   </div>
-                  {!q.is_correct && <div style={{ fontSize: 13, color: "var(--dim)", marginBottom: 8 }}>Correct answer: {q.options[q.correct_index]}</div>}
                   <div style={{ fontSize: 12.5, color: "var(--faint)", background: "var(--surface2)", padding: "8px 10px", borderRadius: 7, lineHeight: 1.5 }}>{q.explanation}</div>
                 </div>
               </div>

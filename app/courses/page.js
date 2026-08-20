@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import TopNav from "@/components/TopNav";
+import CourseCardClient from "./CourseCardClient";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
@@ -13,6 +13,10 @@ export default async function CoursesPage() {
     .eq("user_id", user.id)
     .eq("status", "completed")
     .order("submitted_at", { ascending: false });
+  const { data: readingSessions } = await supabase
+    .from("reading_sessions")
+    .select("course_id, checkpoint_passed")
+    .eq("user_id", user.id);
 
   const byCourse = {};
   (attempts || []).forEach((a) => { (byCourse[a.course_id] = byCourse[a.course_id] || []).push(a); });
@@ -32,27 +36,16 @@ export default async function CoursesPage() {
         <div className="course-list">
           {(courses || []).map((c) => {
             const hist = byCourse[c.id] || [];
-            const lastPass = hist.find((h) => h.passed);
+            const courseSessions = (readingSessions || []).filter((session) => session.course_id === c.id);
             return (
-              <div key={c.id} className="tp-card course-card">
-                <div>
-                  <div className="course-card__meta">
-                    <span className="tp-mono" style={{ fontSize: 11, color: "var(--faint)" }}>{c.code}</span>
-                    {lastPass ? (
-                      <span className="tp-badge" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>Passed · {lastPass.score}%</span>
-                    ) : hist.length ? (
-                      <span className="tp-badge" style={{ background: "var(--danger-dim)", color: "var(--danger)" }}>Not yet passed</span>
-                    ) : (
-                      <span className="tp-badge" style={{ background: "var(--surface3)", color: "var(--dim)" }}>Not started</span>
-                    )}
-                  </div>
-                  <div className="tp-display course-card__title">{c.title}</div>
-                  <div className="course-card__description">{c.description}</div>
-                </div>
-                <Link href={`/courses/${c.id}/read`} className="tp-btn tp-btn-primary course-card__action">
-                  {hist.length ? "Retake" : "Begin"} →
-                </Link>
-              </div>
+              <CourseCardClient
+                key={c.id}
+                course={c}
+                userId={user.id}
+                initiallyEnrolled={courseSessions.length > 0}
+                readingComplete={courseSessions.some((session) => session.checkpoint_passed)}
+                history={hist}
+              />
             );
           })}
           {(!courses || courses.length === 0) && (
