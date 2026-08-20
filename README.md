@@ -77,6 +77,7 @@ app/
   courses/[id]/read/      PDF reader and page checkpoints
   courses/[id]/quiz/      randomized quiz and results
   admin/                  dashboard
+  admin/people/           searchable team directory and performance overview
   admin/courses/          course and PDF creation
   admin/questions/        question bank CRUD
 components/               shared UI components

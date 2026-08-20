@@ -196,6 +196,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .course-step.is-locked { opacity: .58; background: var(--surface2); }
 
 .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 30px; }
+.metric-grid--admin { grid-template-columns: repeat(4, 1fr); }
 .metric-card { position: relative; overflow: hidden; padding: 21px; }
 .metric-card::after { content: ""; position: absolute; width: 72px; height: 72px; right: -27px; bottom: -31px; border-radius: 50%; background: var(--accent-dim); }
 .metric-value { font-size: 32px; font-weight: 600; margin-top: 8px; }
@@ -205,6 +206,60 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .attempt-table__row:last-child { border-bottom: 0; }
 .profile-link { color: var(--text); font-weight: 600; text-decoration-color: var(--accent-line); text-underline-offset: 3px; }
 .profile-link:hover { color: var(--accent); }
+
+.admin-insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 30px; }
+.section-heading-row { min-height: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.section-heading-row > span, .section-heading-link { color: var(--faint); font-size: 10.5px; }
+.section-heading-link { text-underline-offset: 3px; }
+.section-heading-link:hover { color: var(--accent); }
+.attention-list, .course-performance-list { height: 100%; overflow: hidden; }
+.attention-list__item, .course-performance-list__item { min-height: 61px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 15px; border-bottom: 1px solid #EDF2F7; text-decoration: none; }
+.attention-list__item:last-child, .course-performance-list__item:last-child { border-bottom: 0; }
+.attention-list__item:hover { background: #FAFBFD; }
+.attention-list__item strong, .attention-list__item small, .course-performance-list__item strong, .course-performance-list__item small { display: block; }
+.attention-list__item strong, .course-performance-list__item strong { overflow: hidden; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.attention-list__item small, .course-performance-list__item small { margin-top: 2px; color: var(--faint); font-size: 10.5px; }
+.attention-list__item > .tp-mono { color: var(--danger); font-size: 13px; }
+.course-performance-list__scores { flex: 0 0 auto; text-align: right; }
+.course-performance-list__scores strong { color: var(--accent); }
+.admin-insight-empty { min-height: 122px; display: grid; place-items: center; padding: 24px; color: var(--faint); font-size: 12.5px; text-align: center; }
+
+.people-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.people-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.people-summary span { padding: 7px 10px; border: 1px solid var(--border); border-radius: 999px; background: #FFFFFF; color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.people-summary strong { color: var(--text); }
+.directory-toolbar { display: grid; grid-template-columns: minmax(240px, 1.5fr) repeat(3, minmax(130px, .65fr)); gap: 10px; padding: 14px; }
+.directory-search { position: relative; }
+.directory-search__icon { position: absolute; z-index: 1; top: 50%; left: 13px; color: var(--faint); font-size: 20px; line-height: 1; transform: translateY(-52%); pointer-events: none; }
+.directory-search .tp-input { padding-left: 38px; }
+.directory-result-count { margin: 12px 2px 9px; color: var(--faint); font-size: 11.5px; }
+.people-table { overflow: hidden; }
+.people-table__body { max-height: 560px; overflow-y: auto; }
+.people-table__head, .people-table__row { display: grid; grid-template-columns: minmax(180px, 1.6fr) .65fr 1.1fr .55fr .65fr .9fr .5fr; gap: 12px; padding: 13px 16px; align-items: center; }
+.people-table__head { border-bottom: 1px solid var(--border); color: var(--faint); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; }
+.people-table__row { min-height: 66px; border-bottom: 1px solid #EDF2F7; font-size: 12.5px; }
+.people-table__row:last-child { border-bottom: 0; }
+.people-table__row:hover { background: #FAFBFD; }
+.people-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.people-identity > span:last-child { min-width: 0; }
+.people-identity .profile-link, .people-identity small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.people-identity small { margin-top: 2px; color: var(--faint); font-size: 10.5px; }
+.people-avatar { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--accent-dim); color: var(--accent); font-size: 12px; font-weight: 800; }
+.role-badge { color: var(--dim); background: var(--surface2); }
+.role-badge--admin { color: var(--accent); background: var(--accent-dim); }
+.training-status { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.training-status > span { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.training-status--on-track > span { background: var(--success); }
+.training-status--needs-attention > span { background: var(--danger); }
+.training-status--not-started > span { background: var(--faint); }
+.people-last-active { color: var(--faint); font-size: 11.5px; }
+.people-performance span, .people-performance small { display: block; }
+.people-performance small { margin-top: 1px; color: var(--faint); font-size: 9.5px; }
+.people-view-link { padding: 7px 11px; text-decoration: none; }
+.directory-empty { min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 28px; color: var(--faint); text-align: center; }
+.directory-empty strong { color: var(--text); }
+.directory-empty span { font-size: 12.5px; }
+.directory-empty .tp-btn { margin-top: 7px; }
 
 .profile-summary { padding: 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .profile-summary__identity { display: flex; align-items: center; gap: 16px; min-width: 0; }
@@ -284,8 +339,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .course-card__action { width: 100%; text-align: center; }
   .course-steps { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: 1fr; gap: 10px; }
+  .admin-insight-grid { grid-template-columns: 1fr; gap: 24px; }
   .attempt-table__head, .attempt-table__row { grid-template-columns: 1.2fr 1fr .7fr; gap: 8px; padding: 12px 14px; }
   .attempt-table__head > :nth-child(2), .attempt-table__head > :nth-child(5), .attempt-table__row > :nth-child(2), .attempt-table__row > :nth-child(5) { display: none; }
+  .people-heading { align-items: flex-start; flex-direction: column; }
+  .people-summary { justify-content: flex-start; }
+  .directory-toolbar { grid-template-columns: 1fr 1fr; }
+  .directory-search { grid-column: 1 / -1; }
+  .people-table__head, .people-table__row { grid-template-columns: minmax(150px, 1.5fr) 1fr .55fr; gap: 8px; padding: 12px 14px; }
+  .people-table__head > :nth-child(2), .people-table__head > :nth-child(4), .people-table__head > :nth-child(5), .people-table__head > :nth-child(6),
+  .people-table__row > :nth-child(2), .people-table__row > :nth-child(4), .people-table__row > :nth-child(5), .people-table__row > :nth-child(6) { display: none; }
+  .people-view-link { width: 100%; }
   .profile-summary { align-items: stretch; flex-direction: column; padding: 19px; }
   .role-editor { align-items: stretch; flex-direction: column; }
   .role-editor .tp-input { width: 100%; }
@@ -325,6 +389,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .skeleton-table-row--profile > :nth-child(4) { display: none; }
   .skeleton-role-editor { width: 100%; }
   .skeleton-add-button, .skeleton-form-button { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .directory-toolbar { grid-template-columns: 1fr; }
+  .directory-search { grid-column: auto; }
+  .people-summary span { flex: 1 1 auto; text-align: center; }
 }
 
 @media (max-width: 820px) {
