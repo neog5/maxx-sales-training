@@ -60,12 +60,15 @@ export default function TopNav({ profile }) {
             </button>
             {menuOpen && (
               <div className="site-nav__menu" role="menu">
-                <div className="site-nav__menu-name">{profile?.full_name || "User"}</div>
+                <div className="site-nav__menu-name">
+                  <span>{profile?.full_name || "User"}</span>
+                  <small>{profile?.role === "admin" ? "Administrator" : "Sales representative"}</small>
+                </div>
                 <Link href={`/profile/${profile?.id}`} className="site-nav__menu-link" role="menuitem" onClick={() => setMenuOpen(false)}>
-                  View profile
+                  <span aria-hidden="true">○</span> View profile
                 </Link>
                 <button type="button" className="site-nav__menu-link is-signout" role="menuitem" onClick={signOut}>
-                  Sign out
+                  <span aria-hidden="true">↗</span> Sign out
                 </button>
               </div>
             )}

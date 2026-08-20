@@ -34,6 +34,6 @@ cross join (values
   ('main_test', null, 'What is the strongest meeting close?', '["We will be in touch", "Let me know if you have questions", "Agree on an owner and date for the next action", "Review every feature again"]', 2, 'A named owner and date turn interest into a concrete next step.'),
   ('main_test', null, 'When should you introduce a product capability?', '["Before learning anything about the customer", "When it addresses a stated need", "Only after discussing price", "Whenever there is silence"]', 1, 'Capabilities are most relevant after discovery identifies a need they can address.'),
   ('main_test', null, 'What should a concise follow-up message include?', '["Only a thank-you", "A full product manual", "The agreed goals, decisions, and next steps", "New claims not discussed in the meeting"]', 2, 'A useful follow-up preserves alignment on what matters and what happens next.')
-as q(question_type, page_number, question_text, options, correct_index, explanation);
+) as q(question_type, page_number, question_text, options, correct_index, explanation);
 
 commit;

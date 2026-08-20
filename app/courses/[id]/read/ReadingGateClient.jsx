@@ -24,6 +24,8 @@ export default function ReadingGateClient({ course, userId }) {
   const orderedQuestions = useMemo(() => [...readingQuestions].sort((a, b) => a.page_number - b.page_number), [readingQuestions]);
   const unanswered = orderedQuestions.find((q) => !answeredIds.includes(q.id));
   const done = elapsed >= total && answeredIds.length === readingQuestions.length;
+  const timeProgress = total ? Math.min(100, Math.round((elapsed / total) * 100)) : 100;
+  const questionProgress = questionsLoading ? 0 : readingQuestions.length ? Math.round((answeredIds.length / readingQuestions.length) * 100) : 100;
 
   useEffect(() => {
     supabase.from("reading_sessions").select("id").eq("user_id", userId).eq("course_id", course.id).eq("checkpoint_passed", false).order("started_at", { ascending: false }).limit(1).maybeSingle().then(async ({ data }) => {
@@ -67,14 +69,19 @@ export default function ReadingGateClient({ course, userId }) {
   }
 
   return (
-    <div className="tp-fade-in" style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 24px 40px" }}>
-      <Link href="/courses" className="tp-btn tp-btn-ghost" style={{ marginBottom: 14, padding: "6px 12px", display: "inline-block", textDecoration: "none" }}>← Back to courses</Link>
-      <div className="tp-label">{course.code} · Step 01</div>
-      <h1 className="tp-display" style={{ fontSize: 26, fontWeight: 700, margin: "6px 0 14px" }}>{course.title}</h1>
+    <main className="reading-shell tp-fade-in">
+      <Link href="/courses" className="tp-btn tp-btn-ghost back-link">← Back to courses</Link>
+      <header className="reading-header">
+        <div>
+          <div className="tp-label">{course.code} · Step 01</div>
+          <h1 className="tp-display">{course.title}</h1>
+        </div>
+        <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> Assessment</div>
+      </header>
 
       <div className="reading-workspace">
         <section>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div className="reader-heading">
             <span className="tp-label">PDF reader</span>
             <span style={{ fontSize: 12.5, color: "var(--dim)" }}>Viewing page {currentPage}</span>
           </div>
@@ -84,6 +91,23 @@ export default function ReadingGateClient({ course, userId }) {
         </section>
 
         <aside className="reading-question-panel">
+          <div className="tp-card reading-status-card">
+            <div className="reading-status-card__heading">
+              <div>
+                <span className="tp-label">Your progress</span>
+                <strong className="tp-display">{done ? "Ready" : paused ? "Checkpoint" : "Reading"}</strong>
+              </div>
+              <span className="reading-status-card__percent">{Math.round((timeProgress + questionProgress) / 2)}%</span>
+            </div>
+            <div className="reading-progress-row">
+              <div><span>Reading time</span><b>{timeProgress}%</b></div>
+              <div className="reading-progress-track"><span style={{ width: `${timeProgress}%` }} /></div>
+            </div>
+            <div className="reading-progress-row">
+              <div><span>Checkpoints</span><b>{answeredIds.length}/{readingQuestions.length}</b></div>
+              <div className="reading-progress-track"><span style={{ width: `${questionProgress}%` }} /></div>
+            </div>
+          </div>
           <div className="tp-card reading-question-card">
             {questionsLoading ? (
               <div className="reading-question-skeleton" aria-busy="true" aria-label="Loading reading questions">
@@ -121,16 +145,19 @@ export default function ReadingGateClient({ course, userId }) {
         </aside>
       </div>
 
-      <div className="reading-footer"><button className="tp-btn tp-btn-primary" disabled={!done} onClick={proceed}>{done ? "Start assessment →" : elapsed < total ? `Continue reading… ${total - elapsed}s left` : `Complete ${readingQuestions.length - answeredIds.length} reading question${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}`}</button></div>
+      <div className="reading-footer">
+        <span>{done ? "All requirements complete" : "Complete the reading requirements to unlock your assessment."}</span>
+        <button className="tp-btn tp-btn-primary" disabled={!done} onClick={proceed}>{done ? "Start assessment →" : elapsed < total ? `Continue reading · ${total - elapsed}s left` : `Complete ${readingQuestions.length - answeredIds.length} checkpoint${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}`}</button>
+      </div>
       <style jsx>{`
         .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
-        .reading-question-panel { position: sticky; top: 18px; }
+        .reading-question-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 12px; }
         .reading-question-card { padding: 20px; min-height: 190px; }
         @media (max-width: 820px) {
           .reading-workspace { grid-template-columns: 1fr; }
           .reading-question-panel { position: static; }
         }
       `}</style>
-    </div>
+    </main>
   );
 }

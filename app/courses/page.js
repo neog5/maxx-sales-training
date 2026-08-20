@@ -20,21 +20,38 @@ export default async function CoursesPage() {
 
   const byCourse = {};
   (attempts || []).forEach((a) => { (byCourse[a.course_id] = byCourse[a.course_id] || []).push(a); });
+  const activeCourses = courses || [];
+  const passedCourseIds = new Set((attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id));
+  const readingCompleteIds = new Set((readingSessions || []).filter((session) => session.checkpoint_passed).map((session) => session.course_id));
+  const firstName = profile?.full_name?.trim()?.split(/\s+/)[0] || "there";
 
   return (
     <div>
       <TopNav profile={profile} />
-      <main className="tp-page tp-page-narrow tp-fade-in">
-        <div className="page-heading">
-          <div className="tp-label">Assigned training</div>
-          <h1 className="tp-display">Your courses</h1>
-          <p>
-          Complete the reading, then pass the assessment. Questions are drawn fresh from the bank each attempt.
-          </p>
+      <main className="tp-page courses-page tp-fade-in">
+        <section className="courses-hero">
+          <div className="courses-hero__copy">
+            <div className="tp-label">Learning hub</div>
+            <h1 className="tp-display">Welcome back, {firstName}.</h1>
+            <p>Build product confidence at your pace. Read the material, complete the checkpoints, and pass each assessment.</p>
+          </div>
+          <div className="courses-hero__summary" aria-label="Training summary">
+            <div><strong className="tp-display">{activeCourses.length}</strong><span>Courses</span></div>
+            <div><strong className="tp-display">{readingCompleteIds.size}</strong><span>Readings done</span></div>
+            <div><strong className="tp-display">{passedCourseIds.size}</strong><span>Passed</span></div>
+          </div>
+        </section>
+
+        <div className="section-heading">
+          <div>
+            <div className="tp-label">Assigned training</div>
+            <h2 className="tp-display">Your courses</h2>
+          </div>
+          <span>{passedCourseIds.size} of {activeCourses.length} complete</span>
         </div>
 
         <div className="course-list">
-          {(courses || []).map((c) => {
+          {activeCourses.map((c, index) => {
             const hist = byCourse[c.id] || [];
             const courseSessions = (readingSessions || []).filter((session) => session.course_id === c.id);
             return (
@@ -45,6 +62,7 @@ export default async function CoursesPage() {
                 initiallyEnrolled={courseSessions.length > 0}
                 readingComplete={courseSessions.some((session) => session.checkpoint_passed)}
                 history={hist}
+                index={index}
               />
             );
           })}

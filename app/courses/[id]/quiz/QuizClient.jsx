@@ -104,13 +104,14 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         <div className="tp-label">{course.code} · Assessment results</div>
         <h1 className="tp-display" style={{ fontSize: 24, fontWeight: 700, margin: "6px 0 24px" }}>Results</h1>
 
-        <div className="tp-card" style={{ padding: 26, display: "flex", alignItems: "center", gap: 30, marginBottom: 16 }}>
-          <Dial pct={result.score} size={120} color={result.passed ? "var(--accent)" : "var(--danger)"} label={`${result.score}%`} sub="score" />
-          <div>
-            <span className="tp-badge" style={{ background: result.passed ? "var(--accent-dim)" : "var(--danger-dim)", color: result.passed ? "var(--accent)" : "var(--danger)" }}>
+        <div className={`tp-card assessment-result-card ${result.passed ? "is-passed" : "is-failed"}`}>
+          <Dial pct={result.score} size={120} color={result.passed ? "var(--success)" : "var(--danger)"} label={`${result.score}%`} sub="score" />
+          <div className="assessment-result-card__copy">
+            <span className="tp-badge" style={{ background: result.passed ? "var(--success-dim)" : "var(--danger-dim)", color: result.passed ? "var(--success)" : "var(--danger)" }}>
               {result.passed ? "Passed" : "Not passed"}
             </span>
-            <div style={{ fontSize: 14, marginTop: 10, color: "var(--dim)" }}>
+            <h2 className="tp-display">{result.passed ? "Course complete" : "Keep building your knowledge"}</h2>
+            <div className="assessment-result-card__detail">
               {result.graded.filter((g) => g.is_correct).length} of {result.graded.length} correct · threshold {course.pass_threshold}%
             </div>
             {!result.passed && (
@@ -126,7 +127,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         <div className="tp-label" style={{ marginBottom: 10 }}>Question review</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {result.graded.map((q, qi) => (
-            <div key={q.id} className="tp-card" style={{ padding: 18, borderColor: q.is_correct ? "var(--border)" : "rgba(242,104,92,.3)" }}>
+            <div key={q.id} className={`tp-card assessment-review-card ${q.is_correct ? "is-correct" : "is-wrong"}`}>
               <div style={{ display: "flex", gap: 10 }}>
                 <span className="tp-mono" style={{ color: "var(--faint)", fontSize: 12 }}>{String(qi + 1).padStart(2, "0")}</span>
                 <div style={{ flex: 1 }}>
@@ -146,7 +147,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         </div>
 
         <div style={{ marginTop: 24 }}>
-          <Link href="/courses" className="tp-btn tp-btn-ghost" style={{ textDecoration: "none" }}>← Back to courses</Link>
+          <Link href="/courses" className="tp-btn tp-btn-ghost back-link">← Back to courses</Link>
         </div>
       </div>
     );
@@ -154,39 +155,41 @@ export default function QuizClient({ course, userId, lastAttempt }) {
 
   return (
     <div className="assessment-page tp-fade-in">
-      <div className="tp-label">{course.code} · Step 02</div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "6px 0 4px" }}>
-        <h1 className="tp-display" style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Assessment</h1>
-        <span className="tp-mono" style={{ fontSize: 12, color: "var(--faint)" }}>{Object.keys(answers).length}/{questions.length} answered</span>
-      </div>
-      <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 28 }}>
-        5 main-test questions, drawn server-side from this course. Order and options are shuffled each attempt.
-      </p>
+      <Link href="/courses" className="tp-btn tp-btn-ghost back-link">← Back to courses</Link>
+      <header className="assessment-header">
+        <div className="tp-label">{course.code} · Step 02</div>
+        <div className="assessment-header__title">
+          <h1 className="tp-display">Assessment</h1>
+          <span className="tp-mono">{Object.keys(answers).length}/{questions.length} answered</span>
+        </div>
+        <div className="assessment-progress" aria-label={`${Object.keys(answers).length} of ${questions.length} questions answered`}>
+          <span style={{ width: `${questions.length ? (Object.keys(answers).length / questions.length) * 100 : 0}%` }} />
+        </div>
+        <p>Choose the best answer for each question. You can change selections before submitting.</p>
+      </header>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div className="assessment-list">
         {questions.map((q, qi) => (
-          <div key={q.id} className="tp-card assessment-card">
-            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-              <span className="tp-mono" style={{ color: "var(--faint)", fontSize: 12.5 }}>{String(qi + 1).padStart(2, "0")}</span>
-              <div>
-                <div style={{ fontSize: 14.5, marginTop: 8, lineHeight: 1.5 }}>{q.question_text}</div>
-              </div>
+          <section key={q.id} className="tp-card assessment-card" aria-labelledby={`question-${q.id}`}>
+            <div className="assessment-question">
+              <span className="assessment-question__number">{String(qi + 1).padStart(2, "0")}</span>
+              <h2 id={`question-${q.id}`}>{q.question_text}</h2>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginLeft: 30 }}>
+            <div className="assessment-options" role="group" aria-labelledby={`question-${q.id}`}>
               {q.shuffled.map((opt) => (
-                <div
+                <button
+                  type="button"
                   key={opt.origIdx}
                   className={`tp-opt ${answers[q.id] === opt.origIdx ? "sel" : ""}`}
+                  aria-pressed={answers[q.id] === opt.origIdx}
                   onClick={() => setAnswers((a) => ({ ...a, [q.id]: opt.origIdx }))}
                 >
-                  <div style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${answers[q.id] === opt.origIdx ? "var(--accent)" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {answers[q.id] === opt.origIdx && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }} />}
-                  </div>
-                  <span style={{ fontSize: 13.5 }}>{opt.text}</span>
-                </div>
+                  <span className="assessment-option__radio">{answers[q.id] === opt.origIdx && <i />}</span>
+                  <span>{opt.text}</span>
+                </button>
               ))}
             </div>
-          </div>
+          </section>
         ))}
       </div>
 
