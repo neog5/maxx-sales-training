@@ -45,14 +45,24 @@ export default function LoginPage() {
     <main className="login-page">
       <div className="login-card tp-fade-in">
         <section className="login-brand">
-          <img src="/maxx-ortho-logo.webp" alt="Maxx Orthopedics" />
+          <div className="login-brand__top">
+            <img src="/maxx-ortho-logo.webp" alt="Maxx Orthopedics" />
+            <span>Learning portal</span>
+          </div>
           <div>
             <div className="login-brand__eyebrow">Rep enablement portal</div>
-            <h1 className="tp-display">Maxx Orthopedics<br />Sales Training</h1>
-            <p>Build product confidence, complete assigned learning, and demonstrate your knowledge.</p>
+            <h1 className="tp-display">Knowledge that moves with you.</h1>
+            <p>Focused product learning, practical checkpoints, and clear progress—all in one place.</p>
+            <div className="login-brand__features" aria-label="Portal benefits">
+              <span><b>✓</b> Self-paced learning</span>
+              <span><b>✓</b> Immediate feedback</span>
+              <span><b>✓</b> Progress tracking</span>
+            </div>
           </div>
+          <div className="login-brand__footer">Maxx Orthopedics · Sales enablement</div>
         </section>
         <section className="login-form">
+          <div className="login-form__eyebrow">Secure access</div>
           <h2 className="tp-display">{mode === "signin" ? "Welcome back" : "Create your account"}</h2>
           <p className="login-form__intro">{mode === "signin" ? "Sign in to continue your assigned training." : "Set up your account to begin training."}</p>
 
@@ -60,16 +70,16 @@ export default function LoginPage() {
           {mode === "signup" && (
             <div>
               <div className="tp-label" style={{ marginBottom: 6 }}>Full name</div>
-              <input className="tp-input" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+              <input className="tp-input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Smith" autoComplete="name" required />
             </div>
           )}
           <div>
             <div className="tp-label" style={{ marginBottom: 6 }}>Email</div>
-            <input className="tp-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input className="tp-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" required />
           </div>
           <div>
             <div className="tp-label" style={{ marginBottom: 6 }}>Password</div>
-            <input className="tp-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <input className="tp-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} />
           </div>
           {error && <div style={{ color: "var(--danger)", fontSize: 12.5 }}>{error}</div>}
           <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} aria-busy={loading} style={{ marginTop: 4 }}>
@@ -79,13 +89,10 @@ export default function LoginPage() {
 
         <div style={{ marginTop: 16, fontSize: 12.5, color: "var(--faint)", textAlign: "center" }}>
           {mode === "signin" ? (
-            <>No account? <span style={{ color: "var(--accent)", cursor: "pointer" }} onClick={() => setMode("signup")}>Create one</span></>
+            <>New to the portal? <button type="button" className="login-mode-switch" onClick={() => setMode("signup")}>Create an account</button></>
           ) : (
-            <>Already have an account? <span style={{ color: "var(--accent)", cursor: "pointer" }} onClick={() => setMode("signin")}>Sign in</span></>
+            <>Already have an account? <button type="button" className="login-mode-switch" onClick={() => setMode("signin")}>Sign in</button></>
           )}
-        </div>
-        <div style={{ marginTop: 10, fontSize: 11, color: "var(--faint)", textAlign: "center" }}>
-          New accounts default to the "rep" role. Promote to admin via the <span className="tp-mono">profiles</span> table in Supabase.
         </div>
         </section>
       </div>
