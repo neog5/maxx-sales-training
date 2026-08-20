@@ -1,0 +1,17 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+
+# Local environment files (keep the documented template)
+.env*
+!.env.local.example
+
+# Logs and local tooling
+*.log
+.DS_Store
+.vercel/
+coverage/
+
+# Generated PDF QA files
+tmp/
