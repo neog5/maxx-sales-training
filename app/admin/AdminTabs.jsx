@@ -13,6 +13,14 @@ export default function AdminTabs({ active }) {
         Dashboard
       </Link>
       <Link
+        href="/admin/people"
+        className="tp-btn"
+        aria-current={active === "people" ? "page" : undefined}
+        style={{ color: active === "people" ? "var(--text)" : "var(--faint)", textDecoration: "none" }}
+      >
+        People
+      </Link>
+      <Link
         href="/admin/questions"
         className="tp-btn"
         aria-current={active === "bank" ? "page" : undefined}

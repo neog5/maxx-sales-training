@@ -132,8 +132,8 @@ export function AdminDashboardSkeleton() {
     <AdminFrame>
       <main className="tp-page">
         <PageHeadingSkeleton />
-        <div className="metric-grid">
-          {[0, 1, 2].map((item) => <div className="tp-card metric-card skeleton-metric" key={item}><Skeleton className="skeleton-metric-label" /><Skeleton className="skeleton-metric-value" /></div>)}
+        <div className="metric-grid metric-grid--admin">
+          {[0, 1, 2, 3].map((item) => <div className="tp-card metric-card skeleton-metric" key={item}><Skeleton className="skeleton-metric-label" /><Skeleton className="skeleton-metric-value" /></div>)}
         </div>
         <Skeleton className="skeleton-table-label" />
         <div className="tp-card skeleton-table">
