@@ -82,8 +82,8 @@ export default function ReadingGateClient({ course, userId }) {
       <div className="reading-workspace">
         <section>
           <div className="reader-heading">
-            <span className="tp-label">PDF reader</span>
-            <span style={{ fontSize: 12.5, color: "var(--dim)" }}>Viewing page {currentPage}</span>
+            <span className="tp-label">Course document</span>
+            <span style={{ fontSize: 12, color: "var(--faint)", textAlign: "right" }}>Scroll to reach each reading checkpoint</span>
           </div>
           <div className="tp-card" style={{ padding: 0, overflow: "hidden" }}>
             <PdfReader url={course.pdf_url} title={course.title} onPageChange={setCurrentPage} />
@@ -153,7 +153,7 @@ export default function ReadingGateClient({ course, userId }) {
         .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
         .reading-question-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 12px; }
         .reading-question-card { padding: 20px; min-height: 190px; }
-        @media (max-width: 820px) {
+        @media (max-width: 1100px) {
           .reading-workspace { grid-template-columns: 1fr; }
           .reading-question-panel { position: static; }
         }
