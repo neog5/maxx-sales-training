@@ -374,6 +374,13 @@ body {
 }
 .tp-btn-primary:hover:not(:disabled) { box-shadow: 0 11px 25px rgba(204,111,24,.29); }
 .tp-btn-ghost { background: rgba(255,255,255,.75); }
+.back-link {
+  min-height: 34px;
+  margin-bottom: 16px;
+  padding: 7px 12px;
+  line-height: 1;
+  text-decoration: none;
+}
 .tp-input {
   min-height: 44px;
   border-radius: 10px;

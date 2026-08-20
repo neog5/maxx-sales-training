@@ -68,7 +68,7 @@ export default function ReadingGateClient({ course, userId }) {
 
   return (
     <div className="tp-fade-in" style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 24px 40px" }}>
-      <Link href="/courses" className="tp-btn tp-btn-ghost" style={{ marginBottom: 14, padding: "6px 12px", display: "inline-block", textDecoration: "none" }}>← Back to courses</Link>
+      <Link href="/courses" className="tp-btn tp-btn-ghost back-link">← Back to courses</Link>
       <div className="tp-label">{course.code} · Step 01</div>
       <h1 className="tp-display" style={{ fontSize: 26, fontWeight: 700, margin: "6px 0 14px" }}>{course.title}</h1>
 

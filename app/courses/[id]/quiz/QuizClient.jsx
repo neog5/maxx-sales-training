@@ -146,7 +146,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         </div>
 
         <div style={{ marginTop: 24 }}>
-          <Link href="/courses" className="tp-btn tp-btn-ghost" style={{ textDecoration: "none" }}>← Back to courses</Link>
+          <Link href="/courses" className="tp-btn tp-btn-ghost back-link">← Back to courses</Link>
         </div>
       </div>
     );
