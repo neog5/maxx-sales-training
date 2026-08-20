@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import TopNav from "@/components/TopNav";
 import AdminTabs from "./AdminTabs";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -55,7 +56,7 @@ export default async function AdminPage() {
           <div className="tp-scroll" style={{ maxHeight: 400, overflowY: "auto" }}>
             {(attempts || []).map((a) => (
               <div key={a.id} className="attempt-table__row">
-                <div>{a.profiles?.full_name}</div>
+                <div><Link className="profile-link" href={`/profile/${a.user_id}`}>{a.profiles?.full_name}</Link></div>
                 <div style={{ color: "var(--dim)" }}>{a.courses?.title}</div>
                 <div className="tp-mono">{a.score}%</div>
                 <div>

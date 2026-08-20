@@ -104,6 +104,9 @@ create policy "profiles_select_own_or_admin" on public.profiles for select to au
 create policy "profiles_update_own" on public.profiles for update to authenticated
   using (id = (select auth.uid()))
   with check (id = (select auth.uid()));
+create policy "profiles_update_admin" on public.profiles for update to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create or replace function public.prevent_profile_privilege_escalation()
 returns trigger

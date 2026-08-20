@@ -5,6 +5,7 @@ import QuestionBankClient from "./QuestionBankClient";
 import { redirect } from "next/navigation";
 
 export default async function QuestionsPage({ searchParams }) {
+  const { course } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
@@ -19,7 +20,7 @@ export default async function QuestionsPage({ searchParams }) {
       <div className="admin-nav tp-fade-in">
         <AdminTabs active="bank" />
       </div>
-      <QuestionBankClient courses={courses || []} initialQuestions={questions || []} initialCourseId={searchParams?.course} />
+      <QuestionBankClient courses={courses || []} initialQuestions={questions || []} initialCourseId={course} />
     </div>
   );
 }

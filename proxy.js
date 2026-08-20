@@ -24,7 +24,7 @@ export async function proxy(request) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
-  const isProtected = ["/courses", "/admin"].some((path) => request.nextUrl.pathname.startsWith(path));
+  const isProtected = ["/courses", "/admin", "/profile"].some((path) => request.nextUrl.pathname.startsWith(path));
 
   if (!user && isProtected) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -37,5 +37,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/courses/:path*", "/admin/:path*", "/login"],
+  matcher: ["/courses/:path*", "/admin/:path*", "/profile/:path*", "/login"],
 };

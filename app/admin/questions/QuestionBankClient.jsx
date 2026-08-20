@@ -120,7 +120,6 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
         {courses.map((c) => (
           <button
             key={c.id}
-            style={{ color: courseId === c.id ? "#FFFFFF" : "var(--faint)" }}
             className={`tp-btn ${courseId === c.id ? "is-selected" : ""}`}
             onClick={() => { setCourseId(c.id); setDraft(null); setEditingId(null); setFormError(""); }}
           >
