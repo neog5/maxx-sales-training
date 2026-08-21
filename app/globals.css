@@ -208,11 +208,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .profile-link:hover { color: var(--accent); }
 
 .admin-insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 30px; }
+.admin-insight-grid > section { display: flex; min-width: 0; flex-direction: column; }
+.attempt-log-section { margin-top: 12px; }
+.attempt-log-section__heading { margin-bottom: 10px; }
 .section-heading-row { min-height: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .section-heading-row > span, .section-heading-link { color: var(--faint); font-size: 10.5px; }
 .section-heading-link { text-underline-offset: 3px; }
 .section-heading-link:hover { color: var(--accent); }
-.attention-list, .course-performance-list { height: 100%; overflow: hidden; }
+.attention-list, .course-performance-list { flex: 1; overflow: hidden; }
 .attention-list__item, .course-performance-list__item { min-height: 61px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 15px; border-bottom: 1px solid #EDF2F7; text-decoration: none; }
 .attention-list__item:last-child, .course-performance-list__item:last-child { border-bottom: 0; }
 .attention-list__item:hover { background: #FAFBFD; }

@@ -10,17 +10,19 @@ export default async function AdminPage() {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (profile?.role !== "admin") redirect("/courses");
 
-  const [{ data: attempts }, { count: learnerCount }] = await Promise.all([
+  const [{ data: attempts }, { data: people }] = await Promise.all([
     supabase
       .from("quiz_attempts")
-      .select("id, score, passed, submitted_at, status, user_id, course_id, profiles(full_name, role), courses(title, code)")
+      .select("id, score, passed, submitted_at, status, user_id, course_id, courses(title, code)")
       .eq("status", "completed")
       .order("submitted_at", { ascending: false }),
     supabase
       .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "rep"),
+      .select("id, full_name, role"),
   ]);
+
+  const personById = new Map((people || []).map((person) => [person.id, person]));
+  const learnerCount = people?.length || 0;
 
   const total = attempts?.length || 0;
   const passRate = total ? Math.round((attempts.filter((a) => a.passed).length / total) * 100) : 0;
@@ -28,7 +30,7 @@ export default async function AdminPage() {
 
   const latestAttemptByLearner = new Map();
   for (const attempt of attempts || []) {
-    if (attempt.profiles?.role === "rep" && !latestAttemptByLearner.has(attempt.user_id)) {
+    if (personById.has(attempt.user_id) && !latestAttemptByLearner.has(attempt.user_id)) {
       latestAttemptByLearner.set(attempt.user_id, attempt);
     }
   }
@@ -74,7 +76,7 @@ export default async function AdminPage() {
         <div className="metric-grid metric-grid--admin">
           <div className="tp-card metric-card">
             <div className="tp-label">Learners</div>
-            <div className="tp-mono metric-value">{learnerCount || 0}</div>
+            <div className="tp-mono metric-value">{learnerCount}</div>
           </div>
           <div className="tp-card metric-card">
             <div className="tp-label">Total attempts</div>
@@ -100,7 +102,7 @@ export default async function AdminPage() {
               {needsAttention.slice(0, 4).map((attempt) => (
                 <Link href={`/profile/${attempt.user_id}`} className="attention-list__item" key={attempt.user_id}>
                   <span>
-                    <strong>{attempt.profiles?.full_name || "Team member"}</strong>
+                    <strong>{personById.get(attempt.user_id)?.full_name || "Team member"}</strong>
                     <small>{attempt.courses?.title || "Course"}</small>
                   </span>
                   <span className="tp-mono">{attempt.score}%</span>
@@ -133,28 +135,30 @@ export default async function AdminPage() {
           </section>
         </div>
 
-        <div className="tp-label" style={{ marginBottom: 10 }}>Attempt log</div>
-        <div className="tp-card" style={{ overflow: "hidden" }}>
-          <div className="attempt-table__head">
-            <div>Rep</div><div>Course</div><div>Score</div><div>Status</div><div>Date</div>
-          </div>
-          <div className="tp-scroll" style={{ maxHeight: 400, overflowY: "auto" }}>
-            {(attempts || []).map((a) => (
-              <div key={a.id} className="attempt-table__row">
-                <div><Link className="profile-link" href={`/profile/${a.user_id}`}>{a.profiles?.full_name}</Link></div>
-                <div style={{ color: "var(--dim)" }}>{a.courses?.title}</div>
-                <div className="tp-mono">{a.score}%</div>
-                <div>
-                  <span className="tp-badge" style={{ background: a.passed ? "var(--accent-dim)" : "var(--danger-dim)", color: a.passed ? "var(--accent)" : "var(--danger)" }}>
-                    {a.passed ? "Passed" : "Failed"}
-                  </span>
+        <section className="attempt-log-section">
+          <div className="tp-label attempt-log-section__heading">Attempt log</div>
+          <div className="tp-card" style={{ overflow: "hidden" }}>
+            <div className="attempt-table__head">
+              <div>Learner</div><div>Course</div><div>Score</div><div>Status</div><div>Date</div>
+            </div>
+            <div className="tp-scroll" style={{ maxHeight: 400, overflowY: "auto" }}>
+              {(attempts || []).map((a) => (
+                <div key={a.id} className="attempt-table__row">
+                  <div><Link className="profile-link" href={`/profile/${a.user_id}`}>{personById.get(a.user_id)?.full_name || "Team member"}</Link></div>
+                  <div style={{ color: "var(--dim)" }}>{a.courses?.title}</div>
+                  <div className="tp-mono">{a.score}%</div>
+                  <div>
+                    <span className="tp-badge" style={{ background: a.passed ? "var(--accent-dim)" : "var(--danger-dim)", color: a.passed ? "var(--accent)" : "var(--danger)" }}>
+                      {a.passed ? "Passed" : "Failed"}
+                    </span>
+                  </div>
+                  <div style={{ color: "var(--faint)", fontSize: 12 }}>{new Date(a.submitted_at).toLocaleDateString()}</div>
                 </div>
-                <div style={{ color: "var(--faint)", fontSize: 12 }}>{new Date(a.submitted_at).toLocaleDateString()}</div>
-              </div>
-            ))}
-            {total === 0 && <div style={{ padding: 20, color: "var(--faint)", fontSize: 13 }}>No completed attempts yet.</div>}
+              ))}
+              {total === 0 && <div style={{ padding: 20, color: "var(--faint)", fontSize: 13 }}>No completed attempts yet.</div>}
+            </div>
           </div>
-        </div>
+        </section>
       </main>
     </div>
   );
