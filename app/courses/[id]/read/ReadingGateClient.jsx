@@ -6,6 +6,15 @@ import { createClient } from "@/lib/supabase/client";
 import Skeleton from "@/components/Skeleton";
 import PdfReader from "./PdfReader";
 
+function shuffleOptions(question) {
+  const shuffled = question.options.map((text, originalIndex) => ({ text, originalIndex }));
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  return { ...question, shuffled };
+}
+
 export default function ReadingGateClient({ course, userId }) {
   const supabase = createClient();
   const router = useRouter();
@@ -36,7 +45,7 @@ export default function ReadingGateClient({ course, userId }) {
       }
     });
     supabase.rpc("get_reading_questions", { p_course_id: course.id, p_count: 3 }).then(({ data }) => {
-      setReadingQuestions(data || []);
+      setReadingQuestions((data || []).map(shuffleOptions));
       setQuestionsLoading(false);
     });
   }, []);
@@ -126,10 +135,10 @@ export default function ReadingGateClient({ course, userId }) {
                 <div className="tp-badge" style={{ background: "var(--warn-dim)", color: "var(--warn)", marginBottom: 12 }}>Reading question · page {activeQuestion.page_number}</div>
                 <div style={{ fontSize: 14.5, marginBottom: 16, lineHeight: 1.5 }}>{activeQuestion.question_text}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {activeQuestion.options.map((option, index) => {
-                    const isCorrect = answerChecked && index === activeQuestion.correct_index;
-                    const isWrong = answerChecked && selectedAnswer === index && !isCorrect;
-                    return <button key={index} className={`tp-opt ${!answerChecked && selectedAnswer === index ? "sel" : ""} ${isCorrect ? "is-correct" : ""} ${isWrong ? "is-wrong" : ""}`} disabled={answerChecked} onClick={() => setSelectedAnswer(index)} style={{ textAlign: "left" }}><span style={{ fontSize: 13.5 }}>{option}</span>{isCorrect && <span className="answer-mark">✓</span>}{isWrong && <span className="answer-mark">×</span>}</button>;
+                  {activeQuestion.shuffled.map((option) => {
+                    const isCorrect = answerChecked && option.originalIndex === activeQuestion.correct_index;
+                    const isWrong = answerChecked && selectedAnswer === option.originalIndex && !isCorrect;
+                    return <button key={option.originalIndex} className={`tp-opt ${!answerChecked && selectedAnswer === option.originalIndex ? "sel" : ""} ${isCorrect ? "is-correct" : ""} ${isWrong ? "is-wrong" : ""}`} disabled={answerChecked} onClick={() => setSelectedAnswer(option.originalIndex)} style={{ textAlign: "left" }}><span style={{ fontSize: 13.5 }}>{option.text}</span>{isCorrect && <span className="answer-mark">✓</span>}{isWrong && <span className="answer-mark">×</span>}</button>;
                   })}
                 </div>
                 {answerChecked && <div className={selectedAnswer === activeQuestion.correct_index ? "answer-feedback is-correct" : "answer-feedback is-wrong"}>{selectedAnswer === activeQuestion.correct_index ? "Correct. " : "That answer is incorrect. "}{activeQuestion.explanation}</div>}

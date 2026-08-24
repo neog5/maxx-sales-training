@@ -1,9 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 function emptyDraft(courseId) {
   return { course_id: courseId, question_type: "main_test", page_number: null, question_text: "", options: ["", "", "", ""], correct_index: 0, explanation: "" };
+}
+
+function generationCount(value, minimum, maximum, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
 }
 
 function QuestionEditor({ draft, setDraft, editing, saving, formError, onSave, onCancel }) {
@@ -59,7 +64,66 @@ function QuestionEditor({ draft, setDraft, editing, saving, formError, onSave, o
   );
 }
 
-export default function QuestionBankClient({ courses, initialQuestions, initialCourseId }) {
+function SuggestionPanel({ questions, selected, loading, importing, error, counts, onToggle, onSelectAll, onClear, onGenerate, onImport }) {
+  if (loading) {
+    return (
+      <section className="tp-card suggestion-panel suggestion-panel--loading" aria-live="polite">
+        <div className="suggestion-spinner" />
+        <div><strong>Generating suggestions…</strong><span>Preparing {counts.reading} reading question{counts.reading === 1 ? "" : "s"} and {counts.main} main question{counts.main === 1 ? "" : "s"}. This may take a few minutes.</span></div>
+      </section>
+    );
+  }
+
+  if (!questions?.length) {
+    return error ? (
+      <section className="tp-card suggestion-panel">
+        <div className="suggestion-panel__header"><div><div className="tp-label">Question suggestions</div><h2>Suggestions need another try</h2><p>{error}</p></div><button className="tp-btn tp-btn-primary" onClick={onGenerate}>Try again</button></div>
+      </section>
+    ) : null;
+  }
+
+  return (
+    <section className="tp-card suggestion-panel" aria-label="Question suggestions">
+      <div className="suggestion-panel__header">
+        <div><div className="tp-label">Question suggestions</div><h2>Review suggested questions</h2><p>Select the accurate, relevant questions to add. Nothing is saved until you confirm.</p></div>
+        <button className="tp-btn tp-btn-ghost" onClick={onGenerate} disabled={importing}>Regenerate</button>
+      </div>
+      <div className="suggestion-toolbar">
+        <strong>{selected.size} of {questions.length} selected</strong>
+        <div><button type="button" onClick={onSelectAll}>Select all</button><button type="button" onClick={onClear}>Clear</button></div>
+      </div>
+      <div className="suggestion-list">
+        {questions.map((question, index) => {
+          const isSelected = selected.has(index);
+          const isTrueFalse = question.options.length === 2 && question.options[0] === "True" && question.options[1] === "False";
+          return (
+            <label key={`${question.question_type}-${index}`} className={`suggestion-item ${isSelected ? "is-selected" : ""}`}>
+              <input type="checkbox" checked={isSelected} onChange={() => onToggle(index)} />
+              <div className="suggestion-item__body">
+                <div className="suggestion-item__meta">
+                  <span className="tp-badge">{question.question_type === "reading_test" ? `Reading · p. ${question.page_number}` : "Main test"}</span>
+                  {isTrueFalse && <span className="tp-badge">True / False</span>}
+                </div>
+                <strong>{question.question_text}</strong>
+                <div className="suggestion-options">
+                  {question.options.map((option, optionIndex) => <span key={optionIndex} className={optionIndex === question.correct_index ? "is-answer" : ""}>{option}{optionIndex === question.correct_index ? " ✓" : ""}</span>)}
+                </div>
+                <p><b>Why:</b> {question.explanation}</p>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      {error && <div className="suggestion-error">{error}</div>}
+      <div className="suggestion-panel__footer">
+        <span>Unselected questions will be discarded.</span>
+        <button className="tp-btn tp-btn-primary" onClick={onImport} disabled={importing || selected.size === 0}>{importing ? "Adding questions…" : `Add ${selected.size} selected question${selected.size === 1 ? "" : "s"}`}</button>
+      </div>
+    </section>
+  );
+}
+
+export default function QuestionBankClient({ courses, initialQuestions, initialCourseId, autoSuggest = false, initialGenerationCounts = {} }) {
   const supabase = createClient();
   const [courseId, setCourseId] = useState(courses.some((course) => course.id === initialCourseId) ? initialCourseId : courses[0]?.id);
   const [questions, setQuestions] = useState(initialQuestions);
@@ -67,8 +131,68 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [suggestions, setSuggestions] = useState(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState(new Set());
+  const [generating, setGenerating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [suggestionError, setSuggestionError] = useState("");
+  const [generationCounts, setGenerationCounts] = useState({
+    reading: generationCount(initialGenerationCounts.reading, 1, 10, 5),
+    main: generationCount(initialGenerationCounts.main, 5, 30, 10),
+  });
+  const autoSuggestStarted = useRef(false);
 
   const filtered = questions.filter((q) => q.course_id === courseId);
+
+  async function generateSuggestions() {
+    if (!courseId) return;
+    setGenerating(true);
+    setSuggestionError("");
+    setSuggestions(null);
+    setSelectedSuggestions(new Set());
+    try {
+      const response = await fetch("/api/admin/question-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId, readingCount: Number(generationCounts.reading), mainCount: Number(generationCounts.main) }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not generate question suggestions.");
+      setSuggestions(payload.questions);
+      setSelectedSuggestions(new Set(payload.questions.map((_, index) => index)));
+    } catch (error) {
+      setSuggestionError(error.message || "Could not generate question suggestions.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!autoSuggestStarted.current && autoSuggest && courseId) {
+      autoSuggestStarted.current = true;
+      generateSuggestions();
+    }
+  }, [autoSuggest, courseId]);
+
+  async function importSuggestions() {
+    const chosen = suggestions
+      .filter((_, index) => selectedSuggestions.has(index))
+      .map((question) => ({ ...question, course_id: courseId }));
+    if (!chosen.length) return;
+
+    setImporting(true);
+    setSuggestionError("");
+    const { data, error } = await supabase.from("questions").insert(chosen).select();
+    if (error) {
+      console.error("Could not add selected question suggestions", error);
+      setSuggestionError("We couldn’t add the selected questions. Please try again.");
+    } else {
+      setQuestions((current) => [...current, ...(data || [])]);
+      setSuggestions(null);
+      setSelectedSuggestions(new Set());
+    }
+    setImporting(false);
+  }
 
   async function saveDraft() {
     if (!draft.question_text.trim() || draft.options.length < 2 || draft.options.some((o) => !o.trim())) {
@@ -121,12 +245,35 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
           <button
             key={c.id}
             className={`tp-btn ${courseId === c.id ? "is-selected" : ""}`}
-            onClick={() => { setCourseId(c.id); setDraft(null); setEditingId(null); setFormError(""); }}
+            onClick={() => { setCourseId(c.id); setDraft(null); setEditingId(null); setFormError(""); setSuggestions(null); setSelectedSuggestions(new Set()); setSuggestionError(""); }}
           >
             {c.code} <span style={{ opacity: 0.6 }}>({questions.filter((q) => q.course_id === c.id && q.question_type === "main_test").length} main · {questions.filter((q) => q.course_id === c.id && q.question_type === "reading_test").length} reading)</span>
           </button>
         ))}
       </div>
+
+      {!suggestions && !generating && !suggestionError && courses.find((course) => course.id === courseId)?.pdf_url && (
+        <div className="suggestion-launch">
+          <span>Generate from this course’s PDF</span>
+          <label><b>Reading</b><input className="tp-input" type="number" min="1" max="10" value={generationCounts.reading} onChange={(event) => setGenerationCounts((current) => ({ ...current, reading: event.target.value }))} /></label>
+          <label><b>Main test</b><input className="tp-input" type="number" min="5" max="30" value={generationCounts.main} onChange={(event) => setGenerationCounts((current) => ({ ...current, main: event.target.value }))} /></label>
+          <button className="tp-btn tp-btn-ghost" onClick={generateSuggestions}>Generate recommendations</button>
+        </div>
+      )}
+
+      <SuggestionPanel
+        questions={suggestions}
+        selected={selectedSuggestions}
+        loading={generating}
+        importing={importing}
+        error={suggestionError}
+        counts={{ reading: Number(generationCounts.reading), main: Number(generationCounts.main) }}
+        onToggle={(index) => setSelectedSuggestions((current) => { const next = new Set(current); if (next.has(index)) next.delete(index); else next.add(index); return next; })}
+        onSelectAll={() => setSelectedSuggestions(new Set(suggestions.map((_, index) => index)))}
+        onClear={() => setSelectedSuggestions(new Set())}
+        onGenerate={generateSuggestions}
+        onImport={importSuggestions}
+      />
 
       {filtered.filter((q) => q.question_type === "main_test").length < 5 && (
         <div className="notice">

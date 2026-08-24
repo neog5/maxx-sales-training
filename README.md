@@ -7,6 +7,7 @@ A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, c
 - Node.js 20.9 or newer
 - npm
 - A Supabase project
+- An OpenRouter API key (for AI-generated question recommendations)
 
 ## Local setup
 
@@ -30,9 +31,12 @@ A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, c
    ```dotenv
    NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   OPENROUTER_API_KEY=your-openrouter-api-key
    ```
 
-   These two values are intentionally exposed to the browser. Security depends on Supabase Row Level Security; never put a service-role key or another private credential in a `NEXT_PUBLIC_*` variable.
+   The two `NEXT_PUBLIC_*` values are intentionally exposed to the browser. `OPENROUTER_API_KEY` is server-only and must never use the `NEXT_PUBLIC_` prefix. Security depends on Supabase Row Level Security; never put a service-role key or another private credential in a `NEXT_PUBLIC_*` variable.
+
+   Question generation always sends PDFs as base64 file attachments so models can consider diagrams and other page imagery as well as text. It defaults to the zero-usage-cost `nvidia/nemotron-3-ultra-550b-a55b:free` model and OpenRouter’s free `cloudflare-ai` PDF parser. Pinning this model provides enough output capacity for complete question sets and avoids random free-router choices with small output limits. Free models still have lower rate limits and variable availability. Override `OPENROUTER_MODEL` for a more consistent paid model, or set `OPENROUTER_PDF_ENGINE=mistral-ocr` for stronger paid OCR of scanned documents.
 
 4. Start the app:
 
