@@ -136,10 +136,10 @@ export async function POST(request) {
   if (courseError || !course) return NextResponse.json({ error: "Course not found." }, { status: 404 });
   if (!course.pdf_url) return NextResponse.json({ error: "Upload a PDF before generating questions." }, { status: 400 });
   if (!publicCoursePdfUrl(course.pdf_url)) {
-    return NextResponse.json({ error: "Question generation only supports PDFs uploaded to the course PDF bucket." }, { status: 400 });
+    return NextResponse.json({ error: "This course’s PDF is not available for suggestions. Re-upload it and try again." }, { status: 400 });
   }
   if (!process.env.OPENROUTER_API_KEY) {
-    return NextResponse.json({ error: "OpenRouter question generation is not configured." }, { status: 503 });
+    return NextResponse.json({ error: "Question suggestions are not configured. Contact the app administrator." }, { status: 503 });
   }
 
   const model = process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
@@ -182,7 +182,7 @@ Return only one valid JSON object with no Markdown or commentary. Use exactly th
     const payload = await openRouterResponse.json();
     if (!openRouterResponse.ok) {
       console.error("OpenRouter question generation failed", openRouterResponse.status, payload?.error?.message);
-      return NextResponse.json({ error: "OpenRouter could not read this visual PDF with the configured parser. Try again or configure Mistral OCR." }, { status: 502 });
+      return NextResponse.json({ error: "We couldn’t create suggestions from this PDF. Please try again." }, { status: 502 });
     }
 
     try {

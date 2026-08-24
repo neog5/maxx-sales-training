@@ -76,7 +76,7 @@ export default function CourseFormClient() {
       <div className="tp-form-heading">
         <div className="tp-label">Admin workspace</div>
         <h1 className="tp-display">Add a course</h1>
-        <p>Upload the training PDF now. AI will recommend reading and assessment questions for you to review on the next screen.</p>
+        <p>Upload the training PDF now. We’ll prepare reading and assessment questions for you to review on the next screen.</p>
       </div>
 
       <form className="tp-card tp-form-card" onSubmit={createCourse}>

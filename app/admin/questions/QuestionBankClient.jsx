@@ -69,7 +69,7 @@ function SuggestionPanel({ questions, selected, loading, importing, error, count
     return (
       <section className="tp-card suggestion-panel suggestion-panel--loading" aria-live="polite">
         <div className="suggestion-spinner" />
-        <div><strong>OpenRouter is reading the course PDF…</strong><span>Creating {counts.reading} reading question{counts.reading === 1 ? "" : "s"} and {counts.main} main question{counts.main === 1 ? "" : "s"}. This can take up to a minute.</span></div>
+        <div><strong>Generating suggestions…</strong><span>Preparing {counts.reading} reading question{counts.reading === 1 ? "" : "s"} and {counts.main} main question{counts.main === 1 ? "" : "s"}. This may take a few minutes.</span></div>
       </section>
     );
   }
@@ -77,15 +77,15 @@ function SuggestionPanel({ questions, selected, loading, importing, error, count
   if (!questions?.length) {
     return error ? (
       <section className="tp-card suggestion-panel">
-        <div className="suggestion-panel__header"><div><div className="tp-label">AI recommendations</div><h2>Question generation needs another try</h2><p>{error}</p></div><button className="tp-btn tp-btn-primary" onClick={onGenerate}>Try again</button></div>
+        <div className="suggestion-panel__header"><div><div className="tp-label">Question suggestions</div><h2>Suggestions need another try</h2><p>{error}</p></div><button className="tp-btn tp-btn-primary" onClick={onGenerate}>Try again</button></div>
       </section>
     ) : null;
   }
 
   return (
-    <section className="tp-card suggestion-panel" aria-label="AI question recommendations">
+    <section className="tp-card suggestion-panel" aria-label="Question suggestions">
       <div className="suggestion-panel__header">
-        <div><div className="tp-label">AI recommendations</div><h2>Review suggested questions</h2><p>Select the accurate, relevant questions to add. Nothing is saved until you confirm.</p></div>
+        <div><div className="tp-label">Question suggestions</div><h2>Review suggested questions</h2><p>Select the accurate, relevant questions to add. Nothing is saved until you confirm.</p></div>
         <button className="tp-btn tp-btn-ghost" onClick={onGenerate} disabled={importing}>Regenerate</button>
       </div>
       <div className="suggestion-toolbar">
@@ -157,11 +157,11 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
         body: JSON.stringify({ courseId, readingCount: Number(generationCounts.reading), mainCount: Number(generationCounts.main) }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not generate question recommendations.");
+      if (!response.ok) throw new Error(payload.error || "Could not generate question suggestions.");
       setSuggestions(payload.questions);
       setSelectedSuggestions(new Set(payload.questions.map((_, index) => index)));
     } catch (error) {
-      setSuggestionError(error.message || "Could not generate question recommendations.");
+      setSuggestionError(error.message || "Could not generate question suggestions.");
     } finally {
       setGenerating(false);
     }
@@ -184,7 +184,8 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
     setSuggestionError("");
     const { data, error } = await supabase.from("questions").insert(chosen).select();
     if (error) {
-      setSuggestionError(error.message);
+      console.error("Could not add selected question suggestions", error);
+      setSuggestionError("We couldn’t add the selected questions. Please try again.");
     } else {
       setQuestions((current) => [...current, ...(data || [])]);
       setSuggestions(null);
