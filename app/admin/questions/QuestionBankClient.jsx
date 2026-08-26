@@ -136,16 +136,21 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
   const [generating, setGenerating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [suggestionError, setSuggestionError] = useState("");
+  const [mutationError, setMutationError] = useState("");
   const [generationCounts, setGenerationCounts] = useState({
     reading: generationCount(initialGenerationCounts.reading, 1, 10, 5),
     main: generationCount(initialGenerationCounts.main, 5, 30, 10),
   });
   const autoSuggestStarted = useRef(false);
+  const generationRequest = useRef(null);
 
   const filtered = questions.filter((q) => q.course_id === courseId);
 
   async function generateSuggestions() {
     if (!courseId) return;
+    generationRequest.current?.abort();
+    const controller = new AbortController();
+    generationRequest.current = controller;
     setGenerating(true);
     setSuggestionError("");
     setSuggestions(null);
@@ -155,16 +160,35 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courseId, readingCount: Number(generationCounts.reading), mainCount: Number(generationCounts.main) }),
+        signal: controller.signal,
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not generate question suggestions.");
       setSuggestions(payload.questions);
       setSelectedSuggestions(new Set(payload.questions.map((_, index) => index)));
     } catch (error) {
+      if (error.name === "AbortError") return;
       setSuggestionError(error.message || "Could not generate question suggestions.");
     } finally {
-      setGenerating(false);
+      if (generationRequest.current === controller) {
+        generationRequest.current = null;
+        setGenerating(false);
+      }
     }
+  }
+
+  function selectCourse(nextCourseId) {
+    generationRequest.current?.abort();
+    generationRequest.current = null;
+    setGenerating(false);
+    setCourseId(nextCourseId);
+    setDraft(null);
+    setEditingId(null);
+    setFormError("");
+    setMutationError("");
+    setSuggestions(null);
+    setSelectedSuggestions(new Set());
+    setSuggestionError("");
   }
 
   useEffect(() => {
@@ -173,6 +197,8 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
       generateSuggestions();
     }
   }, [autoSuggest, courseId]);
+
+  useEffect(() => () => generationRequest.current?.abort(), []);
 
   async function importSuggestions() {
     const chosen = suggestions
@@ -204,6 +230,7 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
       return;
     }
     setFormError("");
+    setMutationError("");
     setSaving(true);
     let saved = false;
     if (editingId) {
@@ -229,7 +256,12 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
   }
 
   async function deleteQuestion(id) {
-    await supabase.from("questions").delete().eq("id", id);
+    setMutationError("");
+    const { error } = await supabase.from("questions").delete().eq("id", id);
+    if (error) {
+      setMutationError("We couldn’t delete that question. Please try again.");
+      return;
+    }
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   }
 
@@ -245,12 +277,14 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
           <button
             key={c.id}
             className={`tp-btn ${courseId === c.id ? "is-selected" : ""}`}
-            onClick={() => { setCourseId(c.id); setDraft(null); setEditingId(null); setFormError(""); setSuggestions(null); setSelectedSuggestions(new Set()); setSuggestionError(""); }}
+            onClick={() => selectCourse(c.id)}
           >
             {c.code} <span style={{ opacity: 0.6 }}>({questions.filter((q) => q.course_id === c.id && q.question_type === "main_test").length} main · {questions.filter((q) => q.course_id === c.id && q.question_type === "reading_test").length} reading)</span>
           </button>
         ))}
       </div>
+
+      {mutationError && <div className="notice" role="alert">{mutationError}</div>}
 
       {!suggestions && !generating && !suggestionError && courses.find((course) => course.id === courseId)?.pdf_url && (
         <div className="suggestion-launch">

@@ -28,6 +28,8 @@ export default function ReadingGateClient({ course, userId }) {
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(undefined);
   const [answerChecked, setAnswerChecked] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [progressError, setProgressError] = useState("");
 
   const total = course.read_seconds;
   const orderedQuestions = useMemo(() => [...readingQuestions].sort((a, b) => a.page_number - b.page_number), [readingQuestions]);
@@ -35,16 +37,26 @@ export default function ReadingGateClient({ course, userId }) {
   const done = elapsed >= total && answeredIds.length === readingQuestions.length;
   const timeProgress = total ? Math.min(100, Math.round((elapsed / total) * 100)) : 100;
   const questionProgress = questionsLoading ? 0 : readingQuestions.length ? Math.round((answeredIds.length / readingQuestions.length) * 100) : 100;
+  const answerIsCorrect = selectedAnswer === activeQuestion?.correct_index;
 
   useEffect(() => {
-    supabase.from("reading_sessions").select("id").eq("user_id", userId).eq("course_id", course.id).eq("checkpoint_passed", false).order("started_at", { ascending: false }).limit(1).maybeSingle().then(async ({ data }) => {
+    supabase.from("reading_sessions").select("id").eq("user_id", userId).eq("course_id", course.id).eq("checkpoint_passed", false).order("started_at", { ascending: false }).limit(1).maybeSingle().then(async ({ data, error }) => {
+      if (error) {
+        setProgressError("We couldn’t start your reading session. Refresh the page to try again.");
+        return;
+      }
       if (data?.id) setSessionId(data.id);
       else {
-        const { data: session } = await supabase.from("reading_sessions").insert({ user_id: userId, course_id: course.id }).select().single();
+        const { data: session, error: insertError } = await supabase.from("reading_sessions").insert({ user_id: userId, course_id: course.id }).select().single();
+        if (insertError) {
+          setProgressError("We couldn’t start your reading session. Refresh the page to try again.");
+          return;
+        }
         setSessionId(session?.id);
       }
     });
-    supabase.rpc("get_reading_questions", { p_course_id: course.id, p_count: 3 }).then(({ data }) => {
+    supabase.rpc("get_reading_questions", { p_course_id: course.id, p_count: 3 }).then(({ data, error }) => {
+      if (error) setProgressError("We couldn’t load the reading checkpoints. Refresh the page to try again.");
       setReadingQuestions((data || []).map(shuffleOptions));
       setQuestionsLoading(false);
     });
@@ -66,15 +78,34 @@ export default function ReadingGateClient({ course, userId }) {
   }, [activeQuestion, unanswered, currentPage]);
 
   async function proceed() {
-    if (sessionId) await supabase.from("reading_sessions").update({ checkpoint_passed: true, completed_at: new Date().toISOString() }).eq("id", sessionId);
+    if (!sessionId || completing) return;
+    setCompleting(true);
+    setProgressError("");
+    const { error } = await supabase.from("reading_sessions").update({ checkpoint_passed: true, completed_at: new Date().toISOString() }).eq("id", sessionId);
+    if (error) {
+      setProgressError("We couldn’t save your reading progress. Please try again.");
+      setCompleting(false);
+      return;
+    }
     router.push(`/courses/${course.id}/quiz`);
   }
 
   function continueReading() {
-    if (!answerChecked) return;
+    if (!answerChecked || selectedAnswer !== activeQuestion.correct_index) return;
     setAnsweredIds((ids) => [...ids, activeQuestion.id]);
     setActiveQuestion(null);
     setPaused(false);
+  }
+
+  function retryQuestion() {
+    setSelectedAnswer(undefined);
+    setAnswerChecked(false);
+  }
+
+  function handleAnswerAction() {
+    if (!answerChecked) setAnswerChecked(true);
+    else if (answerIsCorrect) continueReading();
+    else retryQuestion();
   }
 
   return (
@@ -142,7 +173,7 @@ export default function ReadingGateClient({ course, userId }) {
                   })}
                 </div>
                 {answerChecked && <div className={selectedAnswer === activeQuestion.correct_index ? "answer-feedback is-correct" : "answer-feedback is-wrong"}>{selectedAnswer === activeQuestion.correct_index ? "Correct. " : "That answer is incorrect. "}{activeQuestion.explanation}</div>}
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button className="tp-btn tp-btn-primary" disabled={selectedAnswer === undefined} onClick={() => answerChecked ? continueReading() : setAnswerChecked(true)}>{answerChecked ? "Continue reading" : "Check answer"}</button></div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button className="tp-btn tp-btn-primary" disabled={selectedAnswer === undefined} onClick={handleAnswerAction}>{answerChecked ? answerIsCorrect ? "Continue reading" : "Try again" : "Check answer"}</button></div>
               </div>
             ) : answeredIds.length === readingQuestions.length && readingQuestions.length > 0 ? (
               <div className="reading-question-complete tp-fade-in"><div className="reading-question-complete__icon">✓</div><div className="tp-display">Reading questions completed</div><p>You answered all {readingQuestions.length} reading checkpoints.</p></div>
@@ -155,8 +186,8 @@ export default function ReadingGateClient({ course, userId }) {
       </div>
 
       <div className="reading-footer">
-        <span>{done ? "All requirements complete" : "Complete the reading requirements to unlock your assessment."}</span>
-        <button className="tp-btn tp-btn-primary" disabled={!done} onClick={proceed}>{done ? "Start assessment →" : elapsed < total ? `Continue reading · ${total - elapsed}s left` : `Complete ${readingQuestions.length - answeredIds.length} checkpoint${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}`}</button>
+        <span>{progressError || (done ? "All requirements complete" : "Complete the reading requirements to unlock your assessment.")}</span>
+        <button className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>{completing ? "Saving progress…" : done ? "Start assessment →" : elapsed < total ? `Continue reading · ${total - elapsed}s left` : `Complete ${readingQuestions.length - answeredIds.length} checkpoint${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}`}</button>
       </div>
       <style jsx>{`
         .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "npm run build"
+    "test": "node --test",
+    "check": "npm run test && npm run build"
   },
   "engines": {
     "node": ">=20.9.0"
