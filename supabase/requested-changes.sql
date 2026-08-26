@@ -15,6 +15,40 @@ alter table public.questions
 alter table public.attempt_questions
   add column if not exists image_url text;
 
+do $migration$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'attempt_questions'
+      and column_name = 'is_mandatory'
+  ) then
+    alter table public.attempt_questions
+      add column is_mandatory boolean not null default false;
+
+    update public.attempt_questions aq
+    set is_mandatory = q.is_mandatory
+    from public.questions q
+    where aq.question_id = q.id;
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'attempt_questions'
+      and column_name = 'position'
+  ) then
+    alter table public.attempt_questions
+      add column position int not null default 0;
+  end if;
+end;
+$migration$;
+
+alter table public.attempt_questions
+  drop constraint if exists attempt_questions_position_check;
+alter table public.attempt_questions
+  add constraint attempt_questions_position_check check (position >= 0);
+
 drop function if exists public.get_quiz_questions(uuid, int);
 
 create or replace function public.get_quiz_questions(p_course_id uuid)

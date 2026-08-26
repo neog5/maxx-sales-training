@@ -52,7 +52,7 @@ Sign up through the app. The database trigger creates a `profiles` row with the 
 
 If the database was created before profile role editing was added, run `supabase/profile-role-policy.sql` once in the Supabase SQL Editor. Without this policy, Supabase RLS blocks admins from updating another person's role.
 
-If the database already exists and was created before question images and mandatory assessment questions were added, run `supabase/requested-changes.sql` once in the Supabase SQL Editor. Do not rerun `setup.sql` against an existing database.
+If the database already exists, run `supabase/requested-changes.sql` in the Supabase SQL Editor after pulling these changes, even if you ran an earlier version of that script. It safely adds question images, mandatory assessment questions, and the attempt-question metadata used by performance reporting. Do not rerun `setup.sql` against an existing database.
 
 If email confirmation is enabled in Supabase Auth, confirm the new account before signing in. For a frictionless local demo, adjust that setting in the Supabase dashboard.
 
@@ -70,7 +70,7 @@ npm run check    # repository verification (tests and production build)
 
 - `supabase/setup.sql` initializes a fresh Supabase project.
 - `supabase/seed.sql` replaces only the `DEMO-101` sample course, so it can be rerun without deleting real courses or users.
-- `supabase/requested-changes.sql` upgrades an existing database with question media and mandatory-question assessment selection.
+- `supabase/requested-changes.sql` upgrades an existing database with question media, mandatory-question assessment selection, and question-level attempt reporting.
 - `supabase/profile-role-policy.sql` upgrades older databases with administrator profile-editing access.
 
 The setup script is intended for a fresh project and is not a migration for an existing database. Future schema changes should use a migration workflow rather than rerunning it against production.

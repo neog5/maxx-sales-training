@@ -70,9 +70,11 @@ create table public.quiz_attempts (
 create table public.attempt_questions (
   id uuid primary key default gen_random_uuid(),
   attempt_id uuid not null references public.quiz_attempts(id) on delete cascade,
+  position int not null default 0 check (position >= 0),
   question_id uuid references public.questions(id) on delete set null,
   question_text text not null,
   image_url text,
+  is_mandatory boolean not null default false,
   options jsonb not null check (jsonb_typeof(options) = 'array' and jsonb_array_length(options) >= 2),
   correct_index int not null check (correct_index >= 0 and correct_index < jsonb_array_length(options)),
   explanation text not null,

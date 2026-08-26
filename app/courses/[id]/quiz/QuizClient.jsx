@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Dial from "@/components/Dial";
 import { AssessmentSkeleton } from "@/components/Skeleton";
+import { gradeAssessment } from "@/lib/assessment.mjs";
 import { createClient } from "@/lib/supabase/client";
 
 // Options ship shuffled per question so the correct answer isn't always in the same slot.
@@ -45,13 +46,8 @@ export default function QuizClient({ course, userId, lastAttempt }) {
 
   async function submit() {
     setSubmitting(true);
-    const graded = questions.map((q) => {
-      const selected = answers[q.id];
-      return { ...q, selected_index: selected, is_correct: selected === q.correct_index };
-    });
-    const correctCount = graded.filter((g) => g.is_correct).length;
-    const score = Math.round((correctCount / graded.length) * 100);
-    const passed = score >= course.pass_threshold;
+    const assessmentResult = gradeAssessment(questions, answers, course.pass_threshold);
+    const { graded, score, passed } = assessmentResult;
 
     const { data: attempt } = await supabase
       .from("quiz_attempts")
@@ -65,11 +61,13 @@ export default function QuizClient({ course, userId, lastAttempt }) {
 
     if (attempt) {
       await supabase.from("attempt_questions").insert(
-        graded.map((g) => ({
+        graded.map((g, index) => ({
           attempt_id: attempt.id,
+          position: index,
           question_id: g.id,
           question_text: g.question_text,
           image_url: g.image_url,
+          is_mandatory: g.is_mandatory,
           options: g.options,
           correct_index: g.correct_index,
           explanation: g.explanation,
@@ -79,7 +77,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
       );
     }
 
-    setResult({ score, passed, graded });
+    setResult(assessmentResult);
     setSubmitting(false);
   }
 
@@ -114,6 +112,10 @@ export default function QuizClient({ course, userId, lastAttempt }) {
             <h2 className="tp-display">{result.passed ? "Course complete" : "Keep building your knowledge"}</h2>
             <div className="assessment-result-card__detail">
               {result.graded.filter((g) => g.is_correct).length} of {result.graded.length} correct · threshold {course.pass_threshold}%
+            </div>
+            <div className={`assessment-requirement ${result.mandatoryPassed ? "is-met" : "is-unmet"}`}>
+              <strong>{result.mandatoryCount ? `Mandatory questions: ${result.mandatoryCorrectCount} of ${result.mandatoryCount} correct` : "No mandatory questions in this assessment"}</strong>
+              <span>{result.mandatoryPassed ? "Requirement met" : "All mandatory questions must be correct to pass"}</span>
             </div>
             {!result.passed && (
               <div style={{ marginTop: 14 }}>
@@ -167,7 +169,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         <div className="assessment-progress" aria-label={`${Object.keys(answers).length} of ${questions.length} questions answered`}>
           <span style={{ width: `${questions.length ? (Object.keys(answers).length / questions.length) * 100 : 0}%` }} />
         </div>
-        <p>Choose the best answer for each question. You can change selections before submitting.</p>
+        <p>Choose the best answer for each question. You must meet the score threshold and answer every mandatory question correctly to pass.</p>
       </header>
 
       <div className="assessment-list">
@@ -175,7 +177,10 @@ export default function QuizClient({ course, userId, lastAttempt }) {
           <section key={q.id} className="tp-card assessment-card" aria-labelledby={`question-${q.id}`}>
             <div className="assessment-question">
               <span className="assessment-question__number">{String(qi + 1).padStart(2, "0")}</span>
-              <h2 id={`question-${q.id}`}>{q.question_text}</h2>
+              <div>
+                {q.is_mandatory && <span className="tp-badge question-mandatory-badge">Mandatory</span>}
+                <h2 id={`question-${q.id}`}>{q.question_text}</h2>
+              </div>
             </div>
             {q.image_url && <img className="question-media question-media--assessment" src={q.image_url} alt="Reference for this question" />}
             <div className="assessment-options" role="group" aria-labelledby={`question-${q.id}`}>
