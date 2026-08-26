@@ -29,6 +29,8 @@ create table public.questions (
   question_type text not null default 'main_test' check (question_type in ('main_test', 'reading_test')),
   page_number int,
   question_text text not null,
+  image_url text,
+  is_mandatory boolean not null default false,
   options jsonb not null check (jsonb_typeof(options) = 'array' and jsonb_array_length(options) >= 2),
   correct_index int not null check (correct_index >= 0),
   explanation text not null,
@@ -37,6 +39,9 @@ create table public.questions (
   constraint questions_page_number_check check (
     (question_type = 'main_test' and page_number is null)
     or (question_type = 'reading_test' and page_number > 0)
+  ),
+  constraint questions_mandatory_main_test_check check (
+    not is_mandatory or question_type = 'main_test'
   ),
   constraint questions_correct_index_check check (correct_index < jsonb_array_length(options))
 );
@@ -67,6 +72,7 @@ create table public.attempt_questions (
   attempt_id uuid not null references public.quiz_attempts(id) on delete cascade,
   question_id uuid references public.questions(id) on delete set null,
   question_text text not null,
+  image_url text,
   options jsonb not null check (jsonb_typeof(options) = 'array' and jsonb_array_length(options) >= 2),
   correct_index int not null check (correct_index >= 0 and correct_index < jsonb_array_length(options)),
   explanation text not null,
@@ -168,20 +174,51 @@ create policy "attempt_q_insert_own" on public.attempt_questions for insert to a
     )
   );
 
-create or replace function public.get_quiz_questions(p_course_id uuid, p_count int default 5)
+create or replace function public.get_quiz_questions(p_course_id uuid)
 returns setof public.questions
 language sql
 security definer
 set search_path = ''
 as $$
-  select q.* from public.questions q
-  join public.courses c on c.id = q.course_id
-  where q.course_id = p_course_id
-    and c.is_active
-    and q.question_type = 'main_test'
-    and q.is_active
-  order by random()
-  limit greatest(0, least(coalesce(p_count, 5), 20));
+  with eligible as (
+    select q as question
+    from public.questions q
+    join public.courses c on c.id = q.course_id
+    where q.course_id = p_course_id
+      and c.is_active
+      and q.question_type = 'main_test'
+      and q.is_active
+  ),
+  counts as (
+    select count(*) filter (where (question).is_mandatory)::int as mandatory_count
+    from eligible
+  ),
+  target as (
+    -- Mandatory questions make up approximately 60% of the assessment. The
+    -- five-question floor retains the minimum assessment size.
+    select greatest(5, round(mandatory_count / 0.6)::int) as question_count
+    from counts
+  ),
+  mandatory_questions as (
+    select question, random() as random_order
+    from eligible
+    where (question).is_mandatory
+  ),
+  optional_questions as (
+    select question, random() as random_order
+    from eligible
+    where not (question).is_mandatory
+    order by random()
+    limit greatest(0, (select question_count from target) - (select mandatory_count from counts))
+  ),
+  selected as (
+    select * from mandatory_questions
+    union all
+    select * from optional_questions
+  )
+  select (question).*
+  from selected
+  order by random_order;
 $$;
 
 create or replace function public.get_reading_questions(p_course_id uuid, p_count int default 3)
@@ -200,9 +237,9 @@ as $$
   limit greatest(0, least(coalesce(p_count, 3), 3));
 $$;
 
-revoke all on function public.get_quiz_questions(uuid, int) from public;
+revoke all on function public.get_quiz_questions(uuid) from public;
 revoke all on function public.get_reading_questions(uuid, int) from public;
-grant execute on function public.get_quiz_questions(uuid, int) to authenticated;
+grant execute on function public.get_quiz_questions(uuid) to authenticated;
 grant execute on function public.get_reading_questions(uuid, int) to authenticated;
 
 create or replace function public.handle_new_user()
@@ -229,6 +266,13 @@ set public = excluded.public,
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('question-images', 'question-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 create policy "course_pdfs_admin_insert" on storage.objects for insert to authenticated
   with check (bucket_id = 'course-pdfs' and public.is_admin());
 create policy "course_pdfs_admin_update" on storage.objects for update to authenticated
@@ -236,5 +280,13 @@ create policy "course_pdfs_admin_update" on storage.objects for update to authen
   with check (bucket_id = 'course-pdfs' and public.is_admin());
 create policy "course_pdfs_admin_delete" on storage.objects for delete to authenticated
   using (bucket_id = 'course-pdfs' and public.is_admin());
+
+create policy "question_images_admin_insert" on storage.objects for insert to authenticated
+  with check (bucket_id = 'question-images' and public.is_admin());
+create policy "question_images_admin_update" on storage.objects for update to authenticated
+  using (bucket_id = 'question-images' and public.is_admin())
+  with check (bucket_id = 'question-images' and public.is_admin());
+create policy "question_images_admin_delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'question-images' and public.is_admin());
 
 commit;

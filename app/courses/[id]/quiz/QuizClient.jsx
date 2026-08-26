@@ -35,7 +35,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
 
   useEffect(() => {
     if (remaining > 0) return;
-    supabase.rpc("get_quiz_questions", { p_course_id: course.id, p_count: 5 }).then(({ data, error }) => {
+    supabase.rpc("get_quiz_questions", { p_course_id: course.id }).then(({ data, error }) => {
       if (!error && data) setQuestions(data.map(shuffleOptions));
       setLoading(false);
     });
@@ -69,6 +69,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
           attempt_id: attempt.id,
           question_id: g.id,
           question_text: g.question_text,
+          image_url: g.image_url,
           options: g.options,
           correct_index: g.correct_index,
           explanation: g.explanation,
@@ -132,6 +133,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
                 <span className="tp-mono" style={{ color: "var(--faint)", fontSize: 12 }}>{String(qi + 1).padStart(2, "0")}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13.5, marginBottom: 8 }}>{q.question_text}</div>
+                  {q.image_url && <img className="question-media question-media--review" src={q.image_url} alt="Reference for this question" />}
                   <div className="review-options">
                     {q.options.map((option, index) => {
                       const isCorrect = index === q.correct_index;
@@ -175,6 +177,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
               <span className="assessment-question__number">{String(qi + 1).padStart(2, "0")}</span>
               <h2 id={`question-${q.id}`}>{q.question_text}</h2>
             </div>
+            {q.image_url && <img className="question-media question-media--assessment" src={q.image_url} alt="Reference for this question" />}
             <div className="assessment-options" role="group" aria-labelledby={`question-${q.id}`}>
               {q.shuffled.map((opt) => (
                 <button
