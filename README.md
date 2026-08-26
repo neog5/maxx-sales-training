@@ -19,7 +19,7 @@ A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, c
 
 2. In a new Supabase project's SQL editor, run these files in order:
 
-   - `supabase/setup.sql` - tables, constraints, indexes, row-level security, database functions, signup trigger, and the `course-pdfs` storage bucket
+   - `supabase/setup.sql` - tables, constraints, indexes, row-level security, database functions, signup trigger, and storage buckets
    - `supabase/seed.sql` - one fictional sample course with reading and quiz questions
 
 3. Copy the environment template and add the public credentials from the Supabase project's API settings:
@@ -52,6 +52,8 @@ Sign up through the app. The database trigger creates a `profiles` row with the 
 
 If the database was created before profile role editing was added, run `supabase/profile-role-policy.sql` once in the Supabase SQL Editor. Without this policy, Supabase RLS blocks admins from updating another person's role.
 
+If the database already exists and was created before question images and mandatory assessment questions were added, run `supabase/requested-changes.sql` once in the Supabase SQL Editor. Do not rerun `setup.sql` against an existing database.
+
 If email confirmation is enabled in Supabase Auth, confirm the new account before signing in. For a frictionless local demo, adjust that setting in the Supabase dashboard.
 
 ## Useful commands
@@ -66,10 +68,10 @@ npm run check    # repository verification (tests and production build)
 
 ## Database files
 
-The repository deliberately has only two SQL entry points:
-
 - `supabase/setup.sql` initializes a fresh Supabase project.
 - `supabase/seed.sql` replaces only the `DEMO-101` sample course, so it can be rerun without deleting real courses or users.
+- `supabase/requested-changes.sql` upgrades an existing database with question media and mandatory-question assessment selection.
+- `supabase/profile-role-policy.sql` upgrades older databases with administrator profile-editing access.
 
 The setup script is intended for a fresh project and is not a migration for an existing database. Future schema changes should use a migration workflow rather than rerunning it against production.
 
@@ -90,6 +92,7 @@ lib/supabase/             browser and server Supabase clients
 public/sample-course.pdf  fictional sample training document
 supabase/setup.sql        complete fresh-project database setup
 supabase/seed.sql         sample course and question bank
+supabase/requested-changes.sql  existing-project question upgrade
 proxy.js                  session refresh and route protection
 ```
 
@@ -101,7 +104,7 @@ This code is suitable for demonstration and further development, but quiz outcom
 - Quiz RPC responses include correct answers and explanations before submission.
 - Reading completion and retry cooldown enforcement are client-side and can be bypassed.
 - The results screen may appear even if attempt persistence fails.
-- Public course PDFs are readable by anyone with their URL. Use a private bucket and signed URLs if course material is confidential.
+- Public course PDFs and question images are readable by anyone with their URL. Use private buckets and signed URLs if course material is confidential.
 
 Move grading, attempt persistence, reading-gate enforcement, and cooldown enforcement to trusted server-side code before production use.
 

@@ -165,6 +165,7 @@ export default function ReadingGateClient({ course, userId }) {
               <div className="tp-fade-in">
                 <div className="tp-badge" style={{ background: "var(--warn-dim)", color: "var(--warn)", marginBottom: 12 }}>Reading question · page {activeQuestion.page_number}</div>
                 <div style={{ fontSize: 14.5, marginBottom: 16, lineHeight: 1.5 }}>{activeQuestion.question_text}</div>
+                {activeQuestion.image_url && <img className="question-media question-media--reading" src={activeQuestion.image_url} alt="Reference for this question" />}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {activeQuestion.shuffled.map((option) => {
                     const isCorrect = answerChecked && option.originalIndex === activeQuestion.correct_index;
