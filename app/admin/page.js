@@ -1,16 +1,20 @@
-import { createClient } from "@/lib/supabase/server";
-import TopNav from "@/components/TopNav";
-import AdminTabs from "./AdminTabs";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import TopNav from "@/components/TopNav";
+import QuestionPerformance from "@/components/QuestionPerformance";
+import { calculateQuestionPerformance } from "@/lib/assessment.mjs";
+import { createClient } from "@/lib/supabase/server";
+import AdminTabs from "./AdminTabs";
 
 export default async function AdminPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (profile?.role !== "admin") redirect("/courses");
 
-  const [{ data: attempts }, { data: people }] = await Promise.all([
+  const [{ data: attempts }, { data: people }, { data: attemptQuestions }] = await Promise.all([
     supabase
       .from("quiz_attempts")
       .select("id, score, passed, submitted_at, status, user_id, course_id, courses(title, code)")
@@ -19,46 +23,46 @@ export default async function AdminPage() {
     supabase
       .from("profiles")
       .select("id, full_name, role"),
+    supabase
+      .from("attempt_questions")
+      .select("attempt_id, is_mandatory, image_url, is_correct"),
   ]);
 
   const personById = new Map((people || []).map((person) => [person.id, person]));
   const learnerCount = people?.length || 0;
-
   const total = attempts?.length || 0;
-  const passRate = total ? Math.round((attempts.filter((a) => a.passed).length / total) * 100) : 0;
-  const avgScore = total ? Math.round(attempts.reduce((s, a) => s + (a.score || 0), 0) / total) : 0;
+  const passRate = total ? Math.round((attempts.filter((attempt) => attempt.passed).length / total) * 100) : 0;
+  const avgScore = total ? Math.round(attempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / total) : 0;
 
-  const latestAttemptByLearner = new Map();
+  const performanceByUser = new Map((people || []).map((person) => [person.id, {
+    ...person,
+    attempts: 0,
+    passed: 0,
+    scoreTotal: 0,
+  }]));
   for (const attempt of attempts || []) {
-    if (personById.has(attempt.user_id) && !latestAttemptByLearner.has(attempt.user_id)) {
-      latestAttemptByLearner.set(attempt.user_id, attempt);
-    }
-  }
-  const needsAttention = [...latestAttemptByLearner.values()].filter((attempt) => !attempt.passed);
-
-  const coursePerformance = new Map();
-  for (const attempt of attempts || []) {
-    const current = coursePerformance.get(attempt.course_id) || {
-      id: attempt.course_id,
-      title: attempt.courses?.title || "Course",
-      code: attempt.courses?.code || "",
-      attempts: 0,
-      passed: 0,
-      scoreTotal: 0,
-    };
+    const current = performanceByUser.get(attempt.user_id);
+    if (!current) continue;
     current.attempts += 1;
     current.passed += attempt.passed ? 1 : 0;
     current.scoreTotal += attempt.score || 0;
-    coursePerformance.set(attempt.course_id, current);
   }
-  const courseInsights = [...coursePerformance.values()]
-    .map((course) => ({
-      ...course,
-      passRate: Math.round((course.passed / course.attempts) * 100),
-      averageScore: Math.round(course.scoreTotal / course.attempts),
+  const userPerformance = [...performanceByUser.values()]
+    .map((person) => ({
+      ...person,
+      averageScore: person.attempts ? Math.round(person.scoreTotal / person.attempts) : null,
+      passRate: person.attempts ? Math.round((person.passed / person.attempts) * 100) : null,
     }))
-    .sort((a, b) => a.passRate - b.passRate || b.attempts - a.attempts)
-    .slice(0, 5);
+    .sort((a, b) => {
+      if (!a.attempts && b.attempts) return 1;
+      if (a.attempts && !b.attempts) return -1;
+      return (a.passRate ?? 101) - (b.passRate ?? 101) || a.full_name.localeCompare(b.full_name);
+    });
+  const questionPerformance = calculateQuestionPerformance(attemptQuestions || []);
+  const questionsByAttempt = new Map();
+  for (const question of attemptQuestions || []) {
+    questionsByAttempt.set(question.attempt_id, (questionsByAttempt.get(question.attempt_id) || 0) + 1);
+  }
 
   return (
     <div>
@@ -70,16 +74,16 @@ export default async function AdminPage() {
         <div className="page-heading">
           <div className="tp-label">Admin workspace</div>
           <h1 className="tp-display">Training dashboard</h1>
-          <p>Track assessment activity and current team performance at a glance.</p>
+          <p>Compare learner outcomes, question-type accuracy, and individual assessment attempts.</p>
         </div>
 
         <div className="metric-grid metric-grid--admin">
           <div className="tp-card metric-card">
-            <div className="tp-label">Learners</div>
+            <div className="tp-label">Users</div>
             <div className="tp-mono metric-value">{learnerCount}</div>
           </div>
           <div className="tp-card metric-card">
-            <div className="tp-label">Total attempts</div>
+            <div className="tp-label">Completed attempts</div>
             <div className="tp-mono metric-value">{total}</div>
           </div>
           <div className="tp-card metric-card">
@@ -95,67 +99,71 @@ export default async function AdminPage() {
         <div className="admin-insight-grid">
           <section>
             <div className="section-heading-row">
-              <div className="tp-label">Learners needing attention</div>
-              <Link href="/admin/people?status=needs-attention" className="section-heading-link">View people</Link>
+              <div>
+                <div className="tp-label">Performance by user</div>
+                <span>Lowest pass rate first</span>
+              </div>
+              <Link href="/admin/people" className="section-heading-link">View all people</Link>
             </div>
-            <div className="tp-card attention-list">
-              {needsAttention.slice(0, 4).map((attempt) => (
-                <Link href={`/profile/${attempt.user_id}`} className="attention-list__item" key={attempt.user_id}>
+            <div className="tp-card user-performance-list">
+              {userPerformance.slice(0, 6).map((person) => (
+                <Link href={`/profile/${person.id}`} className="user-performance-list__item" key={person.id}>
                   <span>
-                    <strong>{personById.get(attempt.user_id)?.full_name || "Team member"}</strong>
-                    <small>{attempt.courses?.title || "Course"}</small>
+                    <strong>{person.full_name || "Team member"}</strong>
+                    <small>{person.attempts ? `${person.attempts} completed ${person.attempts === 1 ? "attempt" : "attempts"}` : "No completed attempts"}</small>
                   </span>
-                  <span className="tp-mono">{attempt.score}%</span>
+                  <span className="user-performance-list__scores">
+                    <strong className="tp-mono">{person.averageScore === null ? "—" : `${person.averageScore}%`}</strong>
+                    <small>{person.passRate === null ? "No pass rate" : `${person.passRate}% pass`}</small>
+                  </span>
                 </Link>
               ))}
-              {needsAttention.length === 0 && <div className="admin-insight-empty">No learners currently need attention.</div>}
+              {userPerformance.length === 0 && <div className="admin-insight-empty">User performance will appear after profiles are created.</div>}
             </div>
           </section>
 
           <section>
             <div className="section-heading-row">
-              <div className="tp-label">Course performance</div>
-              <span>Lowest pass rate first</span>
+              <div>
+                <div className="tp-label">Performance by question type</div>
+                <span>Accuracy across all completed attempts</span>
+              </div>
+              <span>Groups can overlap</span>
             </div>
-            <div className="tp-card course-performance-list">
-              {courseInsights.map((course) => (
-                <div className="course-performance-list__item" key={course.id}>
-                  <span>
-                    <strong>{course.title}</strong>
-                    <small>{course.code} · {course.attempts} {course.attempts === 1 ? "attempt" : "attempts"}</small>
-                  </span>
-                  <span className="course-performance-list__scores">
-                    <strong className="tp-mono">{course.passRate}%</strong>
-                    <small>{course.averageScore}% avg</small>
-                  </span>
-                </div>
-              ))}
-              {courseInsights.length === 0 && <div className="admin-insight-empty">Course insights will appear after the first completed attempt.</div>}
+            <div className="tp-card question-performance-card">
+              <QuestionPerformance groups={questionPerformance} compact />
             </div>
           </section>
         </div>
 
         <section className="attempt-log-section">
-          <div className="tp-label attempt-log-section__heading">Attempt log</div>
-          <div className="tp-card" style={{ overflow: "hidden" }}>
-            <div className="attempt-table__head">
-              <div>Learner</div><div>Course</div><div>Score</div><div>Status</div><div>Date</div>
+          <div className="section-heading-row">
+            <div>
+              <div className="tp-label">Attempt log</div>
+              <span>Open an attempt to review every question and answer</span>
             </div>
-            <div className="tp-scroll" style={{ maxHeight: 400, overflowY: "auto" }}>
-              {(attempts || []).map((a) => (
-                <div key={a.id} className="attempt-table__row">
-                  <div><Link className="profile-link" href={`/profile/${a.user_id}`}>{personById.get(a.user_id)?.full_name || "Team member"}</Link></div>
-                  <div style={{ color: "var(--dim)" }}>{a.courses?.title}</div>
-                  <div className="tp-mono">{a.score}%</div>
+          </div>
+          <div className="tp-card attempt-table" style={{ overflow: "hidden" }}>
+            <div className="attempt-table__head">
+              <div>User</div><div>Course</div><div>Score</div><div>Result</div><div>Questions</div><div>Date</div><div></div>
+            </div>
+            <div className="tp-scroll" style={{ maxHeight: 440, overflowY: "auto" }}>
+              {(attempts || []).map((attempt) => (
+                <div key={attempt.id} className="attempt-table__row">
+                  <div><Link className="profile-link" href={`/profile/${attempt.user_id}`}>{personById.get(attempt.user_id)?.full_name || "Team member"}</Link></div>
+                  <div style={{ color: "var(--dim)" }}>{attempt.courses?.title}</div>
+                  <div className="tp-mono">{attempt.score}%</div>
                   <div>
-                    <span className="tp-badge" style={{ background: a.passed ? "var(--accent-dim)" : "var(--danger-dim)", color: a.passed ? "var(--accent)" : "var(--danger)" }}>
-                      {a.passed ? "Passed" : "Failed"}
+                    <span className="tp-badge" style={{ background: attempt.passed ? "var(--success-dim)" : "var(--danger-dim)", color: attempt.passed ? "var(--success)" : "var(--danger)" }}>
+                      {attempt.passed ? "Passed" : "Failed"}
                     </span>
                   </div>
-                  <div style={{ color: "var(--faint)", fontSize: 12 }}>{new Date(a.submitted_at).toLocaleDateString()}</div>
+                  <div className="tp-mono">{questionsByAttempt.get(attempt.id) || 0}</div>
+                  <div style={{ color: "var(--faint)", fontSize: 12 }}>{new Date(attempt.submitted_at).toLocaleDateString()}</div>
+                  <div><Link href={`/profile/${attempt.user_id}/attempts/${attempt.id}`} className="tp-btn tp-btn-ghost attempt-review-link">Review</Link></div>
                 </div>
               ))}
-              {total === 0 && <div style={{ padding: 20, color: "var(--faint)", fontSize: 13 }}>No completed attempts yet.</div>}
+              {total === 0 && <div className="admin-insight-empty">No completed attempts yet.</div>}
             </div>
           </div>
         </section>
