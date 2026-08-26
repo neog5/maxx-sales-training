@@ -58,9 +58,10 @@ If email confirmation is enabled in Supabase Auth, confirm the new account befor
 
 ```bash
 npm run dev      # development server
+npm run test     # question-suggestion validation tests
 npm run build    # production build
 npm run start    # serve a completed production build
-npm run check    # repository verification (currently the production build)
+npm run check    # repository verification (tests and production build)
 ```
 
 ## Database files
