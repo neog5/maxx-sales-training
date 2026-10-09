@@ -1,7 +1,9 @@
+// Kept as Edge middleware (not Next 16 `proxy.js`) for Cloudflare Workers: the Node.js
+// proxy runtime is experimental in OpenNext and pushes the Worker over the 3 MB Free plan limit.
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
-export async function proxy(request) {
+export async function middleware(request) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(

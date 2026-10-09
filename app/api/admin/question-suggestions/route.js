@@ -12,15 +12,14 @@ function timeoutSignal(signal, milliseconds) {
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
-async function downloadPdf(pdfUrl, signal) {
-  const response = await fetch(pdfUrl, { signal: timeoutSignal(signal, 30000) });
-  if (!response.ok) throw new Error("Could not download the course PDF.");
+// OpenRouter fetches the public PDF URL itself, so the Worker never buffers the
+// file (Workers have a 128 MB memory limit). Only confirm it exists and its size.
+async function checkPdf(pdfUrl, signal) {
+  const response = await fetch(pdfUrl, { method: "HEAD", signal: timeoutSignal(signal, 30000) });
+  if (!response.ok) throw new Error("Could not reach the course PDF.");
 
   const contentLength = Number(response.headers.get("content-length"));
   if (contentLength && contentLength > MAX_PDF_BYTES) throw new Error("The course PDF is too large to process.");
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength > MAX_PDF_BYTES) throw new Error("The course PDF is too large to process.");
-  return new Uint8Array(buffer);
 }
 
 async function callOpenRouter(body, signal) {
@@ -83,7 +82,7 @@ export async function POST(request) {
   const model = process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
   const pdfEngine = process.env.OPENROUTER_PDF_ENGINE || "cloudflare-ai";
   try {
-    const pdfData = await downloadPdf(course.pdf_url, request.signal);
+    await checkPdf(course.pdf_url, request.signal);
     const prompt = `You create accurate assessment questions for a professional training course.
 
 Course: ${course.code} — ${course.title}
@@ -101,7 +100,7 @@ Return only one valid JSON object with no Markdown or commentary. Use exactly th
         type: "file",
         file: {
           filename: `${course.code}.pdf`,
-          file_data: `data:application/pdf;base64,${Buffer.from(pdfData).toString("base64")}`,
+          file_data: course.pdf_url,
         },
       },
     ];

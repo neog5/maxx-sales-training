@@ -36,7 +36,7 @@ A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, c
 
    The two `NEXT_PUBLIC_*` values are intentionally exposed to the browser. `OPENROUTER_API_KEY` is server-only and must never use the `NEXT_PUBLIC_` prefix. Security depends on Supabase Row Level Security; never put a service-role key or another private credential in a `NEXT_PUBLIC_*` variable.
 
-   Question generation always sends PDFs as base64 file attachments so models can consider diagrams and other page imagery as well as text. It defaults to the zero-usage-cost `nvidia/nemotron-3-ultra-550b-a55b:free` model and OpenRouter’s free `cloudflare-ai` PDF parser. Pinning this model provides enough output capacity for complete question sets and avoids random free-router choices with small output limits. Free models still have lower rate limits and variable availability. Override `OPENROUTER_MODEL` for a more consistent paid model, or set `OPENROUTER_PDF_ENGINE=mistral-ocr` for stronger paid OCR of scanned documents.
+   Question generation passes the course PDF to OpenRouter by its public Supabase URL (OpenRouter fetches the file itself), so models can consider diagrams and other page imagery as well as text without the server buffering the PDF. It defaults to the zero-usage-cost `nvidia/nemotron-3-ultra-550b-a55b:free` model and OpenRouter’s free `cloudflare-ai` PDF parser. Pinning this model provides enough output capacity for complete question sets and avoids random free-router choices with small output limits. Free models still have lower rate limits and variable availability. Override `OPENROUTER_MODEL` for a more consistent paid model, or set `OPENROUTER_PDF_ENGINE=mistral-ocr` for stronger paid OCR of scanned documents.
 
 4. Start the app:
 
@@ -69,6 +69,11 @@ npm run deploy   # build and deploy with Wrangler (needs `npx wrangler login`)
 - `OPENROUTER_API_KEY` (and optional `OPENROUTER_MODEL` / `OPENROUTER_PDF_ENGINE`) are runtime-only: add them as Worker secrets/variables.
 - Keep `next` within the range supported by `@opennextjs/cloudflare`; Next 16.4 is not yet supported by adapter 1.20.10.
 - OpenNext is not fully supported on Windows; prefer WSL, or let Cloudflare build from GitHub.
+- **Worker size:** the Workers Free plan limits the compressed Worker to 3 MB (Paid: 10 MB). The build is currently about 1.75 MB. Check it with `npx wrangler deploy --dry-run` ("gzip" figure) after adding dependencies.
+- **Route protection uses `middleware.js`, not `proxy.js`.** Next 16 renamed middleware to `proxy`, but `proxy.js` always runs on the Node.js runtime, which OpenNext supports only experimentally and which bundles a second copy of the Next.js server (about +1.2 MB compressed, over the Free plan limit). The Edge `middleware.js` is officially supported and much smaller. Next prints a deprecation warning for it during builds; do not run the `middleware-to-proxy` codemod while deploying to Cloudflare.
+- **Workers Free plan CPU limit:** 10 ms of CPU time per request (time spent waiting on Supabase/OpenRouter does not count). Requests that exceed it fail with error 1102; if that appears in logs, move to the Workers Paid plan.
+- **Course PDF size:** keep course PDFs under **15 MB**. Uploads are capped at 50 MB by the storage bucket, and the suggestions route rejects anything larger. The Worker no longer downloads PDFs (OpenRouter fetches the public URL), so the 128 MB Worker memory limit no longer applies, but large PDFs are slower and more likely to hit OpenRouter parser or model context limits. If the route is ever changed back to downloading or base64-encoding PDFs, PDFs over about 20 MB can exhaust Worker memory.
+- **Private PDFs:** the URL approach requires the `course-pdfs` bucket to stay public. If it becomes private, pass a short-lived signed URL to OpenRouter instead.
 
 ## Useful commands
 
@@ -109,7 +114,9 @@ public/sample-course.pdf  fictional sample training document
 supabase/setup.sql        complete fresh-project database setup
 supabase/seed.sql         sample course and question bank
 supabase/requested-changes.sql  existing-project question upgrade
-proxy.js                  session refresh and route protection
+middleware.js             session refresh and route protection (Edge middleware; see Cloudflare notes)
+wrangler.jsonc            Cloudflare Worker configuration
+open-next.config.ts       OpenNext Cloudflare adapter configuration
 ```
 
 ## Prototype security and integrity limitations
