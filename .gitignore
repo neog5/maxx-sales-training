@@ -15,3 +15,9 @@ coverage/
 
 # Generated PDF QA files
 tmp/
+
+# Cloudflare / OpenNext
+.open-next/
+.wrangler/
+.dev.vars*
+!.dev.vars.example

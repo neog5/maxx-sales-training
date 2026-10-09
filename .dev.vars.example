@@ -1,0 +1,2 @@
+# Copy to .dev.vars for `npm run preview` (local Workers runtime).
+NEXTJS_ENV=development

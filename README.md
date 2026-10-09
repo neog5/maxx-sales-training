@@ -56,6 +56,20 @@ If the database already exists, run `supabase/requested-changes.sql` in the Supa
 
 If email confirmation is enabled in Supabase Auth, confirm the new account before signing in. For a frictionless local demo, adjust that setting in the Supabase dashboard.
 
+## Deploying to Cloudflare Workers
+
+The app deploys to Cloudflare Workers with the [OpenNext Cloudflare adapter](https://opennext.js.org/cloudflare). Config lives in `wrangler.jsonc` and `open-next.config.ts`.
+
+```bash
+npm run preview  # build and run in the local Workers runtime (needs .env.local)
+npm run deploy   # build and deploy with Wrangler (needs `npx wrangler login`)
+```
+
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are inlined at build time, so in Cloudflare Workers Builds set them as **build variables** as well as runtime variables.
+- `OPENROUTER_API_KEY` (and optional `OPENROUTER_MODEL` / `OPENROUTER_PDF_ENGINE`) are runtime-only: add them as Worker secrets/variables.
+- Keep `next` within the range supported by `@opennextjs/cloudflare`; Next 16.4 is not yet supported by adapter 1.20.10.
+- OpenNext is not fully supported on Windows; prefer WSL, or let Cloudflare build from GitHub.
+
 ## Useful commands
 
 ```bash
@@ -64,6 +78,8 @@ npm run test     # question-suggestion validation tests
 npm run build    # production build
 npm run start    # serve a completed production build
 npm run check    # repository verification (tests and production build)
+npm run preview  # production build in the local Cloudflare Workers runtime
+npm run deploy   # deploy to Cloudflare Workers
 ```
 
 ## Database files
