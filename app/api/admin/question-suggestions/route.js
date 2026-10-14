@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getResponseText, isPublicCoursePdfUrl, parseSuggestionPayload } from "@/lib/question-suggestions.mjs";
+import {
+  FREE_PDF_PARSER_MAX_BYTES,
+  PDF_TOO_LARGE_MESSAGE,
+  getResponseText,
+  isPdfParserSizeError,
+  isPublicCoursePdfUrl,
+  parseSuggestionPayload,
+} from "@/lib/question-suggestions.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -20,6 +27,7 @@ async function checkPdf(pdfUrl, signal) {
 
   const contentLength = Number(response.headers.get("content-length"));
   if (contentLength && contentLength > MAX_PDF_BYTES) throw new Error("The course PDF is too large to process.");
+  return contentLength || 0;
 }
 
 async function callOpenRouter(body, signal) {
@@ -82,7 +90,10 @@ export async function POST(request) {
   const model = process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
   const pdfEngine = process.env.OPENROUTER_PDF_ENGINE || "cloudflare-ai";
   try {
-    await checkPdf(course.pdf_url, request.signal);
+    const pdfBytes = await checkPdf(course.pdf_url, request.signal);
+    if (pdfEngine === "cloudflare-ai" && pdfBytes > FREE_PDF_PARSER_MAX_BYTES) {
+      return NextResponse.json({ error: PDF_TOO_LARGE_MESSAGE }, { status: 413 });
+    }
     const prompt = `You create accurate assessment questions for a professional training course.
 
 Course: ${course.code} — ${course.title}
@@ -119,6 +130,9 @@ Return only one valid JSON object with no Markdown or commentary. Use exactly th
     const payload = await openRouterResponse.json();
     if (!openRouterResponse.ok) {
       console.error("OpenRouter question generation failed", openRouterResponse.status, payload?.error?.message);
+      if (isPdfParserSizeError(payload?.error?.message)) {
+        return NextResponse.json({ error: PDF_TOO_LARGE_MESSAGE }, { status: 413 });
+      }
       return NextResponse.json({ error: "We couldn’t create suggestions from this PDF. Please try again." }, { status: 502 });
     }
 

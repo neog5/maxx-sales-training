@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { FREE_PDF_PARSER_MAX_BYTES } from "@/lib/question-suggestions.mjs";
 
 const initialCourse = { code: "", title: "", description: "", pass_threshold: 80, read_seconds: 60, is_active: true };
 const initialRecommendationCounts = { reading: 5, main: 10 };
@@ -85,7 +86,7 @@ export default function CourseFormClient() {
           <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Course title</div><input className="tp-input" value={course.title} placeholder="Sales foundations" onChange={(e) => update("title", e.target.value)} required /></label>
         </div>
         <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><textarea className="tp-input" rows={3} value={course.description} placeholder="What reps will learn in this course." onChange={(e) => update("description", e.target.value)} /></label>
-        <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Training PDF</div><input className="tp-input" type="file" accept="application/pdf,.pdf" onChange={(e) => setPdf(e.target.files?.[0] || null)} /><div style={{ color: "var(--faint)", fontSize: 11.5, marginTop: 6 }}>Optional · PDFs are stored in the <span className="tp-mono">course-pdfs</span> bucket (50 MB maximum).</div></label>
+        <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Training PDF</div><input className="tp-input" type="file" accept="application/pdf,.pdf" onChange={(e) => setPdf(e.target.files?.[0] || null)} /><div style={{ color: "var(--faint)", fontSize: 11.5, marginTop: 6 }}>Optional · PDFs are stored in the <span className="tp-mono">course-pdfs</span> bucket (50 MB maximum). Keep it under 5 MB to use AI question suggestions.</div>{pdf?.size > FREE_PDF_PARSER_MAX_BYTES && <div role="alert" style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>This PDF is {(pdf.size / (1024 * 1024)).toFixed(1)} MB. AI question suggestions only work for PDFs up to 5 MB, so compress it (for example with Acrobat’s Reduce File Size) before uploading. You can still create the course and add questions manually.</div>}</label>
         {pdf && <div className="tp-form-grid tp-form-grid--equal">
           <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Reading recommendations</div><input className="tp-input" type="number" min="1" max="10" value={recommendationCounts.reading} onChange={(e) => setRecommendationCounts((current) => ({ ...current, reading: e.target.value }))} required /></label>
           <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Main-test recommendations</div><input className="tp-input" type="number" min="5" max="30" value={recommendationCounts.main} onChange={(e) => setRecommendationCounts((current) => ({ ...current, main: e.target.value }))} required /></label>
