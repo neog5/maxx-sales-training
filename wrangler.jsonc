@@ -11,6 +11,10 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Only serve on the custom domains (protected by Cloudflare Access), not on
+  // *.workers.dev or per-version preview URLs, which would bypass Access.
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": {
     "enabled": true
   },
@@ -22,6 +26,8 @@
   ],
   "env": {
     "dev": {
+      "workers_dev": false,
+      "preview_urls": false,
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "maxx-sales-training-dev" }
       ],
