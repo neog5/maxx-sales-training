@@ -1,5 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Top level = production Worker "maxx-sales-training" (training.maxxorthoportal.com).
+  // `--env dev` = Worker "maxx-sales-training-dev" (training-dev.maxxorthoportal.com).
+  // Each environment gets its own Supabase project via build variables in Cloudflare.
   "name": "maxx-sales-training",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-10-01",
@@ -8,13 +11,23 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "maxx-sales-training"
-    }
-  ],
   "observability": {
     "enabled": true
+  },
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "maxx-sales-training" }
+  ],
+  "routes": [
+    { "pattern": "training.maxxorthoportal.com", "custom_domain": true }
+  ],
+  "env": {
+    "dev": {
+      "services": [
+        { "binding": "WORKER_SELF_REFERENCE", "service": "maxx-sales-training-dev" }
+      ],
+      "routes": [
+        { "pattern": "training-dev.maxxorthoportal.com", "custom_domain": true }
+      ]
+    }
   }
 }

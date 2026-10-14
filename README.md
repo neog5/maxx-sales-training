@@ -60,10 +60,20 @@ If email confirmation is enabled in Supabase Auth, confirm the new account befor
 
 The app deploys to Cloudflare Workers with the [OpenNext Cloudflare adapter](https://opennext.js.org/cloudflare). Config lives in `wrangler.jsonc` and `open-next.config.ts`.
 
+There are two Workers, defined as environments in `wrangler.jsonc`, each with its own Supabase project:
+
+| Environment | Worker | Domain | Git branch | Supabase |
+|---|---|---|---|---|
+| dev | `maxx-sales-training-dev` | training-dev.maxxorthoportal.com | `dev` | current project |
+| production | `maxx-sales-training` | training.maxxorthoportal.com | `main` | business-account project (not created yet) |
+
 ```bash
-npm run preview  # build and run in the local Workers runtime (needs .env.local)
-npm run deploy   # build and deploy with Wrangler (needs `npx wrangler login`)
+npm run preview     # build and run in the local Workers runtime (needs .env.local)
+npm run deploy:dev  # build and deploy the dev Worker (needs `npx wrangler login`)
+npm run deploy      # build and deploy the production Worker
 ```
+
+In Cloudflare Workers Builds, use build command `npx opennextjs-cloudflare build` and deploy command `npx opennextjs-cloudflare deploy --env dev` for the dev Worker, or `npx opennextjs-cloudflare deploy` for production. The custom domains in `wrangler.jsonc` are created on deploy, so the `maxxorthoportal.com` zone must be in the same Cloudflare account as the Workers.
 
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are inlined at build time, so in Cloudflare Workers Builds set them as **build variables** as well as runtime variables.
 - `OPENROUTER_API_KEY` (and optional `OPENROUTER_MODEL` / `OPENROUTER_PDF_ENGINE`) are runtime-only: add them as Worker secrets/variables.
