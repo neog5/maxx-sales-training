@@ -84,8 +84,6 @@ export async function POST(request) {
     return NextResponse.json({ error: "This course’s PDF is not available for suggestions. Re-upload it and try again." }, { status: 400 });
   }
   if (!process.env.OPENROUTER_API_KEY) {
-    // Names only, never values: shows whether the runtime received a similarly named variable.
-    console.error("OPENROUTER_API_KEY is not set. Related runtime variable names:", Object.keys(process.env).filter((name) => /openrouter|api_key/i.test(name)));
     return NextResponse.json({ error: "Question suggestions are not configured. Contact the app administrator." }, { status: 503 });
   }
 
