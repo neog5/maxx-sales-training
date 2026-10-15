@@ -73,6 +73,10 @@ npm run deploy:dev  # build and deploy the dev Worker (needs `npx wrangler login
 npm run deploy      # build and deploy the production Worker
 ```
 
+Build variables per Worker (Settings → Build → Variables and secrets): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and on every non-production Worker `NEXT_PUBLIC_APP_ENV=dev`. Runtime secret (Settings → Variables and Secrets, outside Build): `OPENROUTER_API_KEY`.
+
+**Environment banner:** when `NEXT_PUBLIC_APP_ENV` is set to anything other than `production`, every page shows a red "DEV environment" strip, the browser tab title is prefixed with `[DEV]`, and search engines are told not to index the site (`components/EnvironmentBanner.jsx`). The production Worker must leave `NEXT_PUBLIC_APP_ENV` unset (or set it to `production`). It is a build variable, so changing it requires a rebuild.
+
 In Cloudflare Workers Builds, use build command `npx opennextjs-cloudflare build` and deploy command `npx opennextjs-cloudflare deploy --env dev` for the dev Worker, or `npx opennextjs-cloudflare deploy` for production. The custom domains in `wrangler.jsonc` are created on deploy, so the `maxxorthoportal.com` zone must be in the same Cloudflare account as the Workers.
 
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are inlined at build time, so in Cloudflare Workers Builds set them as **build variables** as well as runtime variables.
@@ -84,6 +88,23 @@ In Cloudflare Workers Builds, use build command `npx opennextjs-cloudflare build
 - **Workers Free plan CPU limit:** 10 ms of CPU time per request (time spent waiting on Supabase/OpenRouter does not count). Requests that exceed it fail with error 1102; if that appears in logs, move to the Workers Paid plan.
 - **Course PDF size:** with the default free `cloudflare-ai` PDF engine, AI question suggestions only work for PDFs of **5 MiB (5,242,880 bytes) or less**. OpenRouter rejects larger files with "The file exceeds the maximum size supported by the file parser" (or "Download exceeded 5242880 byte limit" when sent by URL). Compress larger PDFs before uploading (a lossless re-save often saves 10%; image downsampling saves far more), or set `OPENROUTER_PDF_ENGINE=mistral-ocr` (paid). Uploads themselves are capped at 50 MB by the storage bucket, and the course reader works at any size. The Worker no longer downloads PDFs (OpenRouter fetches the public URL), so the 128 MB Worker memory limit no longer applies. If the route is ever changed back to downloading or base64-encoding PDFs, PDFs over about 20 MB can exhaust Worker memory.
 - **Private PDFs:** the URL approach requires the `course-pdfs` bucket to stay public. If it becomes private, pass a short-lived signed URL to OpenRouter instead.
+
+## Production launch checklist
+
+Not done yet. When moving to training.maxxorthoportal.com:
+
+1. Create the production Supabase project on the business account, run `supabase/setup.sql` (and any later migration files), and set its Authentication → URL Configuration Site URL to `https://training.maxxorthoportal.com`.
+2. Create a second Worker named exactly `maxx-sales-training` from this repo: Git branch `main`, build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`.
+3. Build variables: the production `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Do **not** set `NEXT_PUBLIC_APP_ENV` (no dev banner).
+4. Runtime secret (Settings → Variables and Secrets, not Build): `OPENROUTER_API_KEY`.
+5. Merge `dev` into `main`; the push builds and deploys production.
+6. **Restrict the dev site with Cloudflare Access** so employees cannot land on it by mistake (production users are also `@maxxortho.com`, so allow a named list of testers, not the whole domain):
+   - Zero Trust → Settings → Authentication: confirm the One-time PIN login method.
+   - Access → Access Groups → add `Training portal – dev testers`, Include → Emails → each tester.
+   - Access → Applications → Add → Self-hosted: domain `training-dev.maxxorthoportal.com` (empty path), session 24 hours, policy Allow → Include → Access Group `Training portal – dev testers`.
+   - Test in a private window with an allowed and a non-allowed email. Make sure the application does not cover `training.maxxorthoportal.com`.
+   - `workers_dev` and `preview_urls` are already disabled in `wrangler.jsonc`, so Access cannot be bypassed via other URLs.
+7. Retire the old Vercel deployment.
 
 ## Useful commands
 

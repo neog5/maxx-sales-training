@@ -895,3 +895,7 @@ body {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Non-production environment banner (components/EnvironmentBanner.jsx) */
+.env-banner { padding: 7px 16px; background: #B42318; color: #FFFFFF; font-size: 12.5px; line-height: 1.4; text-align: center; letter-spacing: .01em; }
+.env-banner strong { font-weight: 700; letter-spacing: .06em; }
