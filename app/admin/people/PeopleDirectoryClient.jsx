@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ROLES, ROLE_LABELS } from "@/lib/roles.mjs";
 
 const STATUS_LABELS = {
   "on-track": "On track",
@@ -94,8 +95,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
           <span className="tp-sr-only">Filter by role</span>
           <select className="tp-input" value={role} onChange={(event) => setRole(event.target.value)}>
             <option value="all">All roles</option>
-            <option value="rep">Reps</option>
-            <option value="admin">Admins</option>
+            {ROLES.map((value) => <option key={value} value={value}>{ROLE_LABELS[value]}</option>)}
           </select>
         </label>
         <label>
@@ -136,7 +136,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
                   <small>{person.attemptCount === 0 ? "No completed training" : `${person.attemptCount} completed ${person.attemptCount === 1 ? "attempt" : "attempts"}`}</small>
                 </span>
               </div>
-              <div><span className={`tp-badge role-badge role-badge--${person.role}`}>{person.role}</span></div>
+              <div><span className={`tp-badge role-badge role-badge--${person.role}`}>{ROLE_LABELS[person.role] || person.role}</span></div>
               <div>
                 <span
                   className={`training-status training-status--${person.attentionStatus}`}

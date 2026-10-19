@@ -1,18 +1,13 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import QuestionPerformance from "@/components/QuestionPerformance";
 import { calculateQuestionPerformance } from "@/lib/assessment.mjs";
-import { createClient } from "@/lib/supabase/server";
-import AdminTabs from "./AdminTabs";
+import { requireViewer } from "@/lib/auth";
+import { canViewReports } from "@/lib/roles.mjs";
+import AdminTabs from "../AdminTabs";
 
-export default async function AdminPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (profile?.role !== "admin") redirect("/courses");
+export default async function InsightsPage() {
+  const { supabase, profile } = await requireViewer(canViewReports);
 
   const [{ data: attempts }, { data: people }, { data: attemptQuestions }] = await Promise.all([
     supabase
@@ -68,12 +63,12 @@ export default async function AdminPage() {
     <div>
       <TopNav profile={profile} />
       <div className="admin-nav tp-fade-in">
-        <AdminTabs active="dashboard" />
+        <AdminTabs active="insights" role={profile.role} />
       </div>
       <main className="tp-page">
         <div className="page-heading">
           <div className="tp-label">Admin workspace</div>
-          <h1 className="tp-display">Training dashboard</h1>
+          <h1 className="tp-display">Assessment insights</h1>
           <p>Compare learner outcomes, question-type accuracy, and individual assessment attempts.</p>
         </div>
 
