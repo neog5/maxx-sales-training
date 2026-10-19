@@ -1,6 +1,6 @@
 # Maxx Orthopedics Rep Training Portal
 
-A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, complete page-based reading checkpoints, take randomized quizzes, and review their results. Admins can create courses, upload PDFs, manage question banks, and view attempt metrics.
+A Next.js 16 App Router application backed by Supabase. Learners read course PDFs, complete page-based reading checkpoints, take randomized quizzes, and review their results. Admins create courses, upload PDFs, manage question banks, group people, assign courses, and track compliance.
 
 ## Prerequisites
 
@@ -20,6 +20,9 @@ A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, c
 2. In a new Supabase project's SQL editor, run these files in order:
 
    - `supabase/setup.sql` - tables, constraints, indexes, row-level security, database functions, signup trigger, and storage buckets
+   - `supabase/requested-changes.sql` - question images, mandatory questions and attempt reporting
+   - `supabase/migrations/001_compliance_safety.sql` - roles, course archiving, the audit log and record protection
+   - `supabase/migrations/002_groups_and_assignments.sql` - groups and course assignments
    - `supabase/seed.sql` - one fictional sample course with reading and quiz questions
 
 3. Copy the environment template and add the public credentials from the Supabase project's API settings:
@@ -46,13 +49,42 @@ A Next.js 16 App Router application backed by Supabase. Reps read course PDFs, c
 
    Open [http://localhost:3000](http://localhost:3000). The included `public/sample-course.pdf` is referenced by the sample course and requires no storage upload.
 
-## Create an administrator
+## Roles and the first super admin
 
-Sign up through the app. The database trigger creates a `profiles` row with the `rep` role. In the Supabase Table Editor, change that profile's role to `admin`, then refresh the app. Admins can open `/admin`, upload course PDFs, and edit question banks.
+Roles control what someone can do; every role can also be assigned courses.
 
-If the database was created before profile role editing was added, run `supabase/profile-role-policy.sql` once in the Supabase SQL Editor. Without this policy, Supabase RLS blocks admins from updating another person's role.
+| Role | Can |
+|---|---|
+| `learner` | Take their courses and see their own results (default for new sign-ups) |
+| `manager` | Everything a learner can, plus read-only Dashboard, People, Insights and profiles |
+| `admin` | Everything a manager can, plus courses, question banks, groups, assignments, roles and archiving |
+| `super_admin` | Everything an admin can, plus deleting courses that have no training records and granting super admin |
 
-If the database already exists, run `supabase/requested-changes.sql` in the Supabase SQL Editor after pulling these changes, even if you ran an earlier version of that script. It safely adds question images, mandatory assessment questions, and the attempt-question metadata used by performance reporting. Do not rerun `setup.sql` against an existing database.
+Sign up through the app, then make the first super admin in the Supabase SQL Editor (direct database sessions are allowed to change roles):
+
+```sql
+update public.profiles set role = 'super_admin'
+where id = (select id from auth.users where email = 'you@maxxortho.com');
+```
+
+After that, manage roles from each person's profile page.
+
+## Groups, assignments and compliance
+
+- **Groups** (Admin → Groups) hold people, such as Titan Distributors, Normal Distributors or a manager's team. A person can be in several groups.
+- **Assignments** make a course required: assign it to a group (everyone in it) on the group or course page, or to one person from the course page or their profile.
+- **Compliance**: a person is compliant when they have passed every course assigned to them or their groups. Archived and hidden courses no longer count. The Dashboard filters by group and status and exports CSV.
+- Courses that aren't assigned to someone still appear under "Other available courses" for them.
+
+## Archiving, deleting and the audit log
+
+Courses are compliance records, so the database protects them:
+
+- **Archive** (admins): hides the course from learners and stops new attempts, but keeps every reading session, attempt and answer. The server stamps who archived it and when. Restoring undoes it.
+- **Delete** (super admins only): allowed only for courses with no reading sessions or attempts. Foreign keys use `ON DELETE RESTRICT`, so the database refuses to delete courses or people that have training records.
+- **Audit log**: triggers record course, group, membership, assignment and role changes in `audit_log` with who and when. The table is append-only, and only admins can read it. Each course page shows its history.
+
+If the database already exists, run `supabase/requested-changes.sql` and then the files in `supabase/migrations/` (in number order) in the Supabase SQL Editor. Each migration has a matching `.undo.sql` file. `requested-changes.sql` is safe to rerun even if you ran an earlier version of that script. It safely adds question images, mandatory assessment questions, and the attempt-question metadata used by performance reporting. Do not rerun `setup.sql` against an existing database.
 
 If email confirmation is enabled in Supabase Auth, confirm the new account before signing in. For a frictionless local demo, adjust that setting in the Supabase dashboard.
 
@@ -110,7 +142,7 @@ Not done yet. When moving to training.maxxorthoportal.com:
 
 ```bash
 npm run dev      # development server
-npm run test     # question-suggestion validation tests
+npm run test     # unit tests (question suggestions, grading, compliance, roles)
 npm run build    # production build
 npm run start    # serve a completed production build
 npm run check    # repository verification (tests and production build)
@@ -124,6 +156,7 @@ npm run deploy   # deploy to Cloudflare Workers
 - `supabase/seed.sql` replaces only the `DEMO-101` sample course, so it can be rerun without deleting real courses or users.
 - `supabase/requested-changes.sql` upgrades an existing database with question media, mandatory-question assessment selection, and question-level attempt reporting.
 - `supabase/profile-role-policy.sql` upgrades older databases with administrator profile-editing access.
+- `supabase/migrations/NNN_*.sql` are numbered migrations for existing databases; run them in order. Each `NNN_*.undo.sql` reverses its migration.
 
 The setup script is intended for a fresh project and is not a migration for an existing database. Future schema changes should use a migration workflow rather than rerunning it against production.
 
@@ -132,19 +165,22 @@ The setup script is intended for a fresh project and is not a migration for an e
 ```text
 app/
   login/                  authentication
-  courses/                rep-facing course list
+  courses/                learner course list (required and optional)
   courses/[id]/read/      PDF reader and page checkpoints
   courses/[id]/quiz/      randomized quiz and results
-  admin/                  dashboard
+  admin/                  compliance dashboard
   admin/people/           searchable team directory and performance overview
-  admin/courses/          course and PDF creation
+  admin/groups/           groups, members and group course assignments
+  admin/courses/          course list; [id]/ manages details, assignments, archive and delete; new/ creates a course
   admin/questions/        question bank CRUD
+  admin/insights/         assessment analytics and attempt log
 components/               shared UI components
 lib/supabase/             browser and server Supabase clients
 public/sample-course.pdf  fictional sample training document
 supabase/setup.sql        complete fresh-project database setup
 supabase/seed.sql         sample course and question bank
 supabase/requested-changes.sql  existing-project question upgrade
+supabase/migrations/      numbered migrations with undo scripts
 middleware.js             session refresh and route protection (Edge middleware; see Cloudflare notes)
 wrangler.jsonc            Cloudflare Worker configuration
 open-next.config.ts       OpenNext Cloudflare adapter configuration
