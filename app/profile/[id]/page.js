@@ -7,6 +7,7 @@ import { isRequirableCourse } from "@/lib/compliance.mjs";
 import { ROLE_LABELS, assignableRoles, canViewReports, isAdmin } from "@/lib/roles.mjs";
 import { createClient } from "@/lib/supabase/server";
 import RoleEditor from "./RoleEditor";
+import { fetchAssignmentsForUser } from "@/lib/assignments";
 import RequiredTraining from "./RequiredTraining";
 
 export default async function ProfilePage({ params }) {
@@ -34,11 +35,7 @@ export default async function ProfilePage({ params }) {
   if (!person) notFound();
 
   const groupIds = (memberships || []).map((membership) => membership.group_id);
-  let assignmentQuery = supabase.from("course_assignments").select("id, course_id, group_id, user_id");
-  assignmentQuery = groupIds.length
-    ? assignmentQuery.or(`user_id.eq.${id},group_id.in.(${groupIds.join(",")})`)
-    : assignmentQuery.eq("user_id", id);
-  const { data: assignments } = await assignmentQuery;
+  const assignments = await fetchAssignmentsForUser(supabase, id, groupIds);
   const passedCourseIds = new Set((attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id));
   const requirableCourses = (courses || []).filter(isRequirableCourse);
 
@@ -100,7 +97,7 @@ export default async function ProfilePage({ params }) {
           groups={groups || []}
           initialGroupIds={groupIds}
           courses={requirableCourses}
-          initialAssignments={assignments || []}
+          initialAssignments={assignments}
           passedCourseIds={[...passedCourseIds]}
         />
 

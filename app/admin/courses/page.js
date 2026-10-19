@@ -2,11 +2,8 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import { requireViewer } from "@/lib/auth";
 import { isAdmin } from "@/lib/roles.mjs";
+import { formatDate } from "@/lib/format.mjs";
 import AdminTabs from "../AdminTabs";
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
-}
 
 function countBy(rows, key) {
   const counts = new Map();

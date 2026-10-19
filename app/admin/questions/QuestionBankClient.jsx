@@ -8,6 +8,7 @@ function emptyDraft(courseId) {
 }
 
 function generationCount(value, minimum, maximum, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
 }

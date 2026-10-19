@@ -4,12 +4,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { describeAuditEntry, formatAuditTime } from "@/lib/audit.mjs";
+import { describeAuditEntry } from "@/lib/audit.mjs";
+import { formatDate, formatDateTime } from "@/lib/format.mjs";
 import { isSuperAdmin } from "@/lib/roles.mjs";
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
-}
 
 function coursePdfPath(pdfUrl) {
   const marker = "/storage/v1/object/public/course-pdfs/";
@@ -42,13 +39,13 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
   const availableGroups = groups.filter((group) => !assignedGroups.some((assignment) => assignment.group_id === group.id));
   const availablePeople = people.filter((person) => !assignedPeople.some((assignment) => assignment.user_id === person.id));
 
-  async function run(label, action, success) {
+  async function run(label, action, success, { refresh = true } = {}) {
     setBusy(label);
     setMessage({ type: "", text: "" });
     try {
       await action();
       if (success) setMessage({ type: "success", text: success });
-      router.refresh();
+      if (refresh) router.refresh();
     } catch (error) {
       setMessage({ type: "error", text: error.message || "Something went wrong. Please try again." });
     } finally {
@@ -121,10 +118,13 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
       const { data, error } = await supabase.from("courses").delete().eq("id", course.id).select("id");
       if (error) throw new Error(/foreign key/i.test(error.message) ? "This course has training records, so it can only be archived." : error.message);
       if (!data?.length) throw new Error("Only a super admin can delete courses.");
+      // The course is gone; clean up its files on a best-effort basis.
       const pdfPath = coursePdfPath(course.pdf_url);
       if (pdfPath) await supabase.storage.from("course-pdfs").remove([pdfPath]);
+      const { data: images } = await supabase.storage.from("question-images").list(course.id, { limit: 1000 });
+      if (images?.length) await supabase.storage.from("question-images").remove(images.map((image) => `${course.id}/${image.name}`));
       router.push("/admin/courses");
-    });
+    }, "", { refresh: false });
   }
 
   return (
@@ -247,7 +247,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
           {history.map((entry) => (
             <div className="audit-list__row" key={entry.id}>
               <span>{describeAuditEntry(entry, names)}</span>
-              <small>{entry.actor_name || "System"} · {formatAuditTime(entry.created_at)}</small>
+              <small>{entry.actor_name || "System"} · {formatDateTime(entry.created_at)}</small>
             </div>
           ))}
           {history.length === 0 && <div className="admin-insight-empty">No recorded changes yet.</div>}

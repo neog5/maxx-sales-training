@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { requiredCoursesByUser } from "@/lib/compliance.mjs";
 
 // Lists the courses this person must complete and why. Admins can change the
 // person's groups and add one-off course assignments here.
@@ -20,17 +21,16 @@ export default function RequiredTraining({ personId, canEdit, groups, initialGro
   const groupNames = new Map(groups.map((group) => [group.id, group.name]));
   const passed = new Set(passedCourseIds);
   const memberGroupIds = new Set(initialGroupIds);
-  const reasonsByCourse = new Map();
-  for (const assignment of initialAssignments) {
-    if (assignment.group_id && !memberGroupIds.has(assignment.group_id)) continue;
-    if (assignment.user_id && assignment.user_id !== personId) continue;
-    const reasons = reasonsByCourse.get(assignment.course_id) || [];
-    reasons.push(assignment);
-    reasonsByCourse.set(assignment.course_id, reasons);
-  }
+  const requiredIds = requiredCoursesByUser({
+    assignments: initialAssignments,
+    memberships: initialGroupIds.map((groupId) => ({ group_id: groupId, user_id: personId })),
+    courses,
+  }).get(personId) || new Set();
+  const reasonsFor = (courseId) => initialAssignments.filter((assignment) => assignment.course_id === courseId
+    && (assignment.user_id === personId || memberGroupIds.has(assignment.group_id)));
   const required = courses
-    .filter((course) => reasonsByCourse.has(course.id))
-    .map((course) => ({ ...course, reasons: reasonsByCourse.get(course.id), passed: passed.has(course.id) }));
+    .filter((course) => requiredIds.has(course.id))
+    .map((course) => ({ ...course, reasons: reasonsFor(course.id), passed: passed.has(course.id) }));
   const completed = required.filter((course) => course.passed).length;
   const directCourseIds = new Set(initialAssignments.filter((assignment) => assignment.user_id === personId).map((assignment) => assignment.course_id));
 

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import TopNav from "@/components/TopNav";
 import CourseCardClient from "./CourseCardClient";
+import { fetchAssignmentsForUser } from "@/lib/assignments";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
@@ -21,14 +22,9 @@ export default async function CoursesPage() {
     supabase.from("group_members").select("group_id").eq("user_id", user.id),
   ]);
 
-  // Managers and admins can read every assignment, so filter to this person's own.
   const groupIds = (memberships || []).map((membership) => membership.group_id);
-  let assignmentQuery = supabase.from("course_assignments").select("course_id");
-  assignmentQuery = groupIds.length
-    ? assignmentQuery.or(`user_id.eq.${user.id},group_id.in.(${groupIds.join(",")})`)
-    : assignmentQuery.eq("user_id", user.id);
-  const { data: assignments } = await assignmentQuery;
-  const requiredIds = new Set((assignments || []).map((assignment) => assignment.course_id));
+  const assignments = await fetchAssignmentsForUser(supabase, user.id, groupIds, "course_id");
+  const requiredIds = new Set(assignments.map((assignment) => assignment.course_id));
 
   const byCourse = {};
   (attempts || []).forEach((a) => { (byCourse[a.course_id] = byCourse[a.course_id] || []).push(a); });
