@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { GENERATION_LIMITS } from "@/lib/question-suggestions.mjs";
 
 function emptyDraft(courseId) {
   return { course_id: courseId, question_type: "main_test", page_number: null, question_text: "", image_url: null, is_mandatory: false, options: ["", "", "", ""], correct_index: 0, explanation: "" };
@@ -161,8 +162,8 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
   const [suggestionError, setSuggestionError] = useState("");
   const [mutationError, setMutationError] = useState("");
   const [generationCounts, setGenerationCounts] = useState({
-    reading: generationCount(initialGenerationCounts.reading, 1, 10, 5),
-    main: generationCount(initialGenerationCounts.main, 5, 30, 10),
+    reading: generationCount(initialGenerationCounts.reading, 0, GENERATION_LIMITS.reading.max, 5),
+    main: generationCount(initialGenerationCounts.main, 0, GENERATION_LIMITS.main.max, 10),
   });
   const autoSuggestStarted = useRef(false);
   const generationRequest = useRef(null);
@@ -337,9 +338,9 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
       {!suggestions && !generating && !suggestionError && courses.find((course) => course.id === courseId)?.pdf_url && (
         <div className="suggestion-launch">
           <span>Generate from this course’s PDF</span>
-          <label><b>Reading</b><input className="tp-input" type="number" min="1" max="10" value={generationCounts.reading} onChange={(event) => setGenerationCounts((current) => ({ ...current, reading: event.target.value }))} /></label>
-          <label><b>Main test</b><input className="tp-input" type="number" min="5" max="30" value={generationCounts.main} onChange={(event) => setGenerationCounts((current) => ({ ...current, main: event.target.value }))} /></label>
-          <button className="tp-btn tp-btn-ghost" onClick={generateSuggestions}>Generate recommendations</button>
+          <label><b>Reading</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.reading.max} value={generationCounts.reading} onChange={(event) => setGenerationCounts((current) => ({ ...current, reading: event.target.value }))} /></label>
+          <label><b>Main test</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.main.max} value={generationCounts.main} onChange={(event) => setGenerationCounts((current) => ({ ...current, main: event.target.value }))} /></label>
+          <button className="tp-btn tp-btn-ghost" onClick={generateSuggestions} disabled={!(Number(generationCounts.reading) + Number(generationCounts.main) > 0)}>Generate recommendations</button>
         </div>
       )}
 
