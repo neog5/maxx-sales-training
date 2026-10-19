@@ -1,12 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import TopNav from "@/components/TopNav";
 import CourseCardClient from "./CourseCardClient";
-import { fetchAssignmentsForUser } from "@/lib/assignments";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: profile }, { data: courses }, { data: attempts }, { data: readingSessions }, { data: memberships }] = await Promise.all([
+  const [{ data: profile }, { data: courses }, { data: attempts }, { data: readingSessions }, { data: requiredRows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("courses").select("*").eq("is_active", true).is("archived_at", null).order("code"),
     supabase
@@ -19,12 +18,11 @@ export default async function CoursesPage() {
       .from("reading_sessions")
       .select("course_id, checkpoint_passed")
       .eq("user_id", user.id),
-    supabase.from("group_members").select("group_id").eq("user_id", user.id),
+    // Managers and admins can read everyone's rows, so filter to this person.
+    supabase.rpc("required_courses").eq("user_id", user.id),
   ]);
 
-  const groupIds = (memberships || []).map((membership) => membership.group_id);
-  const assignments = await fetchAssignmentsForUser(supabase, user.id, groupIds, "course_id");
-  const requiredIds = new Set(assignments.map((assignment) => assignment.course_id));
+  const requiredIds = new Set((requiredRows || []).map((row) => row.course_id));
 
   const byCourse = {};
   (attempts || []).forEach((a) => { (byCourse[a.course_id] = byCourse[a.course_id] || []).push(a); });

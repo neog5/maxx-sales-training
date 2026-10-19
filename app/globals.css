@@ -903,7 +903,7 @@ body {
 /* Course management, groups and compliance (overhaul) */
 .notice--error { color: var(--danger); background: var(--danger-dim); border-color: rgba(201,76,67,.22); }
 .notice--success { color: var(--success); background: var(--success-dim); border-color: rgba(35,134,91,.2); }
-.page-heading.section-heading-row { align-items: flex-end; }
+.page-heading.section-heading-row { align-items: flex-end; margin-bottom: 28px; }
 .page-heading.section-heading-row > .tp-btn { flex-shrink: 0; }
 .course-admin-table, .group-table, .compliance-table { overflow: hidden; }
 .course-admin-table__head, .course-admin-table__row { display: grid; grid-template-columns: minmax(200px, 2fr) 1.2fr .6fr .7fr .6fr .5fr; gap: 12px; padding: 13px 16px; align-items: center; }
@@ -1025,3 +1025,43 @@ body {
   .required-course { grid-template-columns: 24px 1fr auto; }
   .required-course__remove { grid-column: 2 / -1; justify-self: start; }
 }
+/* Searchable pickers and member lists */
+.picker { position: relative; margin: 10px 0 12px; }
+.picker__bar { display: flex; gap: 8px; }
+.picker__bar .tp-input { flex: 1; min-width: 0; }
+.picker__bar .tp-btn { flex-shrink: 0; }
+.picker__selected { display: flex; justify-content: space-between; gap: 10px; margin-top: 7px; color: var(--dim); font-size: 12px; }
+.picker__selected button, .picker__panel-head button, .picker__link { padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 700; }
+.picker__panel { margin-top: 6px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: #FFFFFF; box-shadow: var(--shadow-soft); }
+.picker__panel-head { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #EDF2F7; color: var(--faint); font-size: 11.5px; }
+.picker__results { max-height: 260px; overflow-y: auto; }
+.picker__option { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; font-size: 12.5px; }
+.picker__option:hover { background: var(--surface2); }
+.picker__option.is-selected { background: var(--accent-dim); }
+.picker__option span { display: flex; flex-direction: column; min-width: 0; }
+.picker__option small { color: var(--faint); font-size: 11.5px; }
+.picker__empty { padding: 14px 12px; color: var(--faint); font-size: 12px; }
+.picker__paste { margin-top: 8px; }
+.picker__paste textarea { margin-bottom: 8px; }
+.picker__paste-actions { display: flex; align-items: center; gap: 12px; }
+.picker__unmatched { margin-top: 8px; color: var(--warn); font-size: 12px; }
+.member-list__search { margin-bottom: 8px; }
+.member-list__rows { max-height: 360px; overflow-y: auto; border: 1px solid #EDF2F7; border-radius: 10px; }
+.member-list__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-bottom: 1px solid #EDF2F7; font-size: 12.5px; }
+.member-list__row:last-child { border-bottom: 0; }
+.member-list__row > span { display: flex; flex-direction: column; min-width: 0; }
+.member-list__row small { color: var(--faint); font-size: 11.5px; }
+.member-list__remove { padding: 4px 9px; font-size: 11.5px; }
+.member-list__empty { padding: 10px 0; }
+.member-list__more { margin-top: 8px; }
+.course-tabs { display: flex; gap: 2px; margin: -8px 0 22px; border-bottom: 1px solid var(--border); }
+.course-tabs a { margin-bottom: -1px; padding: 10px 14px; border-bottom: 2px solid transparent; color: var(--dim); font-size: 13px; font-weight: 700; text-decoration: none; }
+.course-tabs a:hover { color: var(--text); }
+.course-tabs a[aria-current="page"] { border-bottom-color: var(--accent); color: var(--text); }
+.course-tabs small { margin-left: 6px; color: var(--faint); font-weight: 600; }
+.bank-page.is-embedded { max-width: none; margin: 0; padding: 0; }
+.bank-heading__counts { color: var(--faint); font-size: 12px; }
+.group-summary__label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 4px 0 8px; }
+.group-summary__hint { justify-content: center; border-style: dashed; text-decoration: none; }
+.group-summary__hint > span { color: var(--accent); }
+.group-summary__hint > small { line-height: 1.4; }

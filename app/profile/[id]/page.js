@@ -35,7 +35,10 @@ export default async function ProfilePage({ params }) {
   if (!person) notFound();
 
   const groupIds = (memberships || []).map((membership) => membership.group_id);
-  const assignments = await fetchAssignmentsForUser(supabase, id, groupIds);
+  const [assignments, { data: requiredRows }] = await Promise.all([
+    fetchAssignmentsForUser(supabase, id, groupIds),
+    supabase.rpc("required_courses").eq("user_id", id),
+  ]);
   const passedCourseIds = new Set((attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id));
   const requirableCourses = (courses || []).filter(isRequirableCourse);
 
@@ -94,6 +97,8 @@ export default async function ProfilePage({ params }) {
         <RequiredTraining
           personId={person.id}
           canEdit={isAdmin(viewer.role)}
+          showGroups={isAdmin(viewer.role) || viewer.id === person.id}
+          requiredCourseIds={(requiredRows || []).map((row) => row.course_id)}
           groups={groups || []}
           initialGroupIds={groupIds}
           courses={requirableCourses}

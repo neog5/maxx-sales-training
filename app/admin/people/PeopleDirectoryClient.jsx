@@ -38,7 +38,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
     return people
       .filter((person) => {
         const matchesQuery = !normalizedQuery
-          || person.full_name?.toLocaleLowerCase().includes(normalizedQuery);
+          || `${person.full_name || ""} ${person.email || ""}`.toLocaleLowerCase().includes(normalizedQuery);
         return matchesQuery
           && (role === "all" || person.role === role)
           && (status === "all" || person.attentionStatus === status);
@@ -86,7 +86,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
           <input
             className="tp-input"
             type="search"
-            placeholder="Search by name…"
+            placeholder="Search by name or email…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />

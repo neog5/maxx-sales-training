@@ -5,9 +5,9 @@ import { isAdmin } from "@/lib/roles.mjs";
 const TABS = [
   { key: "dashboard", href: "/admin", label: "Dashboard" },
   { key: "people", href: "/admin/people", label: "People" },
+  { key: "view-groups", href: "/admin/view-groups", label: "My view groups" },
   { key: "groups", href: "/admin/groups", label: "Groups", adminOnly: true },
   { key: "courses", href: "/admin/courses", label: "Courses", adminOnly: true },
-  { key: "bank", href: "/admin/questions", label: "Question bank", adminOnly: true },
   { key: "insights", href: "/admin/insights", label: "Insights" },
 ];
 

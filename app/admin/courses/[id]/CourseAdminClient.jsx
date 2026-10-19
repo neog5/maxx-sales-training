@@ -1,11 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import MemberList from "@/components/MemberList";
+import MultiPicker from "@/components/MultiPicker";
 import { createClient } from "@/lib/supabase/client";
+import { groupItems, personItems } from "@/lib/picker-items.mjs";
 import { describeAuditEntry } from "@/lib/audit.mjs";
-import { formatDate, formatDateTime } from "@/lib/format.mjs";
+import { formatDateTime } from "@/lib/format.mjs";
 import { isSuperAdmin } from "@/lib/roles.mjs";
 
 function coursePdfPath(pdfUrl) {
@@ -26,8 +28,6 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
     is_active: course.is_active,
   });
   const [assignments, setAssignments] = useState(initialAssignments);
-  const [groupToAdd, setGroupToAdd] = useState("");
-  const [personToAdd, setPersonToAdd] = useState("");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
 
@@ -36,8 +36,13 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
   const names = { groups: groupNames, people: peopleNames, courses: new Map([[course.id, course.title]]) };
   const assignedGroups = assignments.filter((assignment) => assignment.group_id);
   const assignedPeople = assignments.filter((assignment) => assignment.user_id);
-  const availableGroups = groups.filter((group) => !assignedGroups.some((assignment) => assignment.group_id === group.id));
-  const availablePeople = people.filter((person) => !assignedPeople.some((assignment) => assignment.user_id === person.id));
+  const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
+  const personOptions = useMemo(() => personItems(people), [people]);
+  const groupOptions = useMemo(() => groupItems(groups), [groups]);
+  const assignedPeopleList = assignedPeople
+    .map((assignment) => peopleById.get(assignment.user_id))
+    .filter(Boolean)
+    .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
 
   async function run(label, action, success, { refresh = true } = {}) {
     setBusy(label);
@@ -46,8 +51,10 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
       await action();
       if (success) setMessage({ type: "success", text: success });
       if (refresh) router.refresh();
+      return true;
     } catch (error) {
       setMessage({ type: "error", text: error.message || "Something went wrong. Please try again." });
+      return false;
     } finally {
       setBusy("");
     }
@@ -71,18 +78,15 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
     }, "Course details saved.");
   }
 
-  function addAssignment(target) {
-    run("assign", async () => {
+  function addAssignments(field, ids) {
+    return run("assign", async () => {
       const { data, error } = await supabase
         .from("course_assignments")
-        .insert({ course_id: course.id, ...target })
-        .select("id, group_id, user_id, assigned_at")
-        .single();
+        .insert(ids.map((id) => ({ course_id: course.id, [field]: id })))
+        .select("id, group_id, user_id, assigned_at");
       if (error) throw error;
-      setAssignments((current) => [...current, data]);
-      setGroupToAdd("");
-      setPersonToAdd("");
-    });
+      setAssignments((current) => [...current, ...data]);
+    }, `Assigned to ${ids.length} ${field === "group_id" ? (ids.length === 1 ? "group" : "groups") : (ids.length === 1 ? "person" : "people")}.`);
   }
 
   function removeAssignment(assignment) {
@@ -128,21 +132,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
   }
 
   return (
-    <main className="tp-page tp-fade-in course-admin">
-      <Link href="/admin/courses" className="tp-btn tp-btn-ghost back-link">← All courses</Link>
-      <div className="page-heading section-heading-row">
-        <div>
-          <div className="tp-label tp-mono">{course.code}</div>
-          <h1 className="tp-display">{course.title}</h1>
-          <p>
-            {archived
-              ? `Archived ${formatDate(course.archived_at)}${course.archiver?.full_name ? ` by ${course.archiver.full_name}` : ""}. Learners can no longer start it, and it no longer counts toward compliance.`
-              : `${recordCount} training ${recordCount === 1 ? "record" : "records"} (reading sessions and assessment attempts).`}
-          </p>
-        </div>
-        <Link href={`/admin/questions?course=${course.id}`} className="tp-btn tp-btn-ghost">Question bank</Link>
-      </div>
-
+    <div className="course-admin">
       {message.text && (
         <div className={message.type === "error" ? "notice notice--error" : "notice notice--success"} role={message.type === "error" ? "alert" : "status"}>{message.text}</div>
       )}
@@ -180,34 +170,21 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
             {assignedGroups.length === 0 && <span className="chip-list__empty">No groups assigned</span>}
           </div>
           {!archived && (
-            <div className="inline-add">
-              <select className="tp-input" aria-label="Group to assign" value={groupToAdd} onChange={(event) => setGroupToAdd(event.target.value)}>
-                <option value="">Choose a group…</option>
-                {availableGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-              </select>
-              <button type="button" className="tp-btn tp-btn-ghost" disabled={!groupToAdd || Boolean(busy)} onClick={() => addAssignment({ group_id: groupToAdd })}>Assign</button>
-            </div>
+            <MultiPicker items={groupOptions} excludeIds={assignedGroups.map((assignment) => assignment.group_id)} onAdd={(ids) => addAssignments("group_id", ids)}
+              placeholder="Assign groups…" addLabel="Assign" noun="group" busy={busy === "assign"} />
           )}
 
           <div className="course-admin__subhead">Individual people</div>
-          <div className="chip-list">
-            {assignedPeople.map((assignment) => (
-              <span className="chip" key={assignment.id}>
-                {peopleNames.get(assignment.user_id) || "Person"}
-                {!archived && <button type="button" aria-label={`Remove ${peopleNames.get(assignment.user_id)}`} disabled={Boolean(busy)} onClick={() => removeAssignment(assignment)}>×</button>}
-              </span>
-            ))}
-            {assignedPeople.length === 0 && <span className="chip-list__empty">No individual assignments</span>}
-          </div>
           {!archived && (
-            <div className="inline-add">
-              <select className="tp-input" aria-label="Person to assign" value={personToAdd} onChange={(event) => setPersonToAdd(event.target.value)}>
-                <option value="">Choose a person…</option>
-                {availablePeople.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
-              </select>
-              <button type="button" className="tp-btn tp-btn-ghost" disabled={!personToAdd || Boolean(busy)} onClick={() => addAssignment({ user_id: personToAdd })}>Assign</button>
-            </div>
+            <MultiPicker items={personOptions} excludeIds={assignedPeople.map((assignment) => assignment.user_id)} onAdd={(ids) => addAssignments("user_id", ids)}
+              placeholder="Assign people by name or email…" addLabel="Assign" noun="person" busy={busy === "assign"} pasteEmails />
           )}
+          <MemberList
+            people={assignedPeopleList}
+            onRemove={archived ? undefined : (person) => removeAssignment(assignedPeople.find((assignment) => assignment.user_id === person.id))}
+            busy={Boolean(busy)}
+            emptyText="No individual assignments"
+          />
         </section>
       </div>
 
@@ -253,6 +230,6 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
           {history.length === 0 && <div className="admin-insight-empty">No recorded changes yet.</div>}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

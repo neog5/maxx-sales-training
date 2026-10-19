@@ -3,9 +3,36 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import MemberList from "@/components/MemberList";
+import MultiPicker from "@/components/MultiPicker";
 import { createClient } from "@/lib/supabase/client";
+import { courseItems, personItems } from "@/lib/picker-items.mjs";
 
-export default function GroupsClient({ initialGroups, initialMemberships, people, courses, initialAssignments, initialGroupId }) {
+// Central groups (admin-managed; drive course assignments) and private view groups
+// (each manager's or admin's own watch lists) share this editor.
+const KINDS = {
+  central: {
+    groups: "groups",
+    members: "group_members",
+    key: "group_id",
+    columns: "id, name, description, created_at",
+    title: "Groups",
+    intro: "Group people, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several groups.",
+    path: "/admin/groups",
+  },
+  view: {
+    groups: "view_groups",
+    members: "view_group_members",
+    key: "view_group_id",
+    columns: "id, name, created_at",
+    title: "My view groups",
+    intro: "Private lists of people whose compliance you want to watch, such as your team. Only you can see your view groups, and they don’t change what anyone has to complete.",
+    path: "/admin/view-groups",
+  },
+};
+
+export default function GroupsClient({ kind = "central", initialGroups, initialMemberships, people, courses = [], initialAssignments = [], initialGroupId }) {
+  const config = KINDS[kind];
   const supabase = createClient();
   const router = useRouter();
   const [groups, setGroups] = useState(initialGroups);
@@ -14,22 +41,17 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   const [selectedId, setSelectedId] = useState(initialGroups.some((group) => group.id === initialGroupId) ? initialGroupId : initialGroups[0]?.id);
   const [newGroup, setNewGroup] = useState("");
   const [edit, setEdit] = useState(null);
-  const [personToAdd, setPersonToAdd] = useState("");
-  const [courseToAdd, setCourseToAdd] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const coursesById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
+  const personOptions = useMemo(() => personItems(people), [people]);
+  const courseOptions = useMemo(() => courseItems(courses), [courses]);
   const selected = groups.find((group) => group.id === selectedId);
-  const members = memberships
-    .filter((membership) => membership.group_id === selectedId)
-    .map((membership) => peopleById.get(membership.user_id))
-    .filter(Boolean)
-    .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const memberIds = memberships.filter((membership) => membership.group_id === selectedId).map((membership) => membership.user_id);
+  const members = memberIds.map((id) => peopleById.get(id)).filter(Boolean).sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
   const groupAssignments = assignments.filter((assignment) => assignment.group_id === selectedId && coursesById.has(assignment.course_id));
-  const availablePeople = people.filter((person) => !members.some((member) => member.id === person.id));
-  const availableCourses = courses.filter((course) => !groupAssignments.some((assignment) => assignment.course_id === course.id));
 
   async function run(action, success) {
     setBusy(true);
@@ -38,9 +60,11 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
       await action();
       if (success) setMessage({ type: "success", text: success });
       router.refresh();
+      return true;
     } catch (error) {
       const text = /duplicate key|unique/i.test(error.message || "") ? "A group with that name already exists." : error.message;
       setMessage({ type: "error", text: text || "Something went wrong. Please try again." });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -49,8 +73,6 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   function selectGroup(groupId) {
     setSelectedId(groupId);
     setEdit(null);
-    setPersonToAdd("");
-    setCourseToAdd("");
     setMessage({ type: "", text: "" });
   }
 
@@ -59,24 +81,20 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
     const name = newGroup.trim();
     if (!name) return;
     run(async () => {
-      const { data, error } = await supabase.from("groups").insert({ name }).select("id, name, description, created_at").single();
+      const { data, error } = await supabase.from(config.groups).insert({ name }).select(config.columns).single();
       if (error) throw error;
       setGroups((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
       setNewGroup("");
       setSelectedId(data.id);
-    }, `Created “${name}”. Add members and courses below.`);
+    }, `Created “${name}”. Add people below.`);
   }
 
   function saveGroup(event) {
     event.preventDefault();
     if (!edit.name.trim()) return;
+    const changes = kind === "central" ? { name: edit.name.trim(), description: edit.description.trim() || null } : { name: edit.name.trim() };
     run(async () => {
-      const { data, error } = await supabase
-        .from("groups")
-        .update({ name: edit.name.trim(), description: edit.description.trim() || null })
-        .eq("id", selectedId)
-        .select("id, name, description, created_at")
-        .single();
+      const { data, error } = await supabase.from(config.groups).update(changes).eq("id", selectedId).select(config.columns).single();
       if (error) throw error;
       setGroups((current) => current.map((group) => (group.id === data.id ? data : group)).sort((a, b) => a.name.localeCompare(b.name)));
       setEdit(null);
@@ -84,9 +102,12 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   }
 
   function deleteGroup() {
-    if (!window.confirm(`Delete “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`)) return;
+    const warning = kind === "central"
+      ? `Delete “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`
+      : `Delete your view group “${selected.name}”? Nobody’s training is affected.`;
+    if (!window.confirm(warning)) return;
     run(async () => {
-      const { error } = await supabase.from("groups").delete().eq("id", selectedId);
+      const { error } = await supabase.from(config.groups).delete().eq("id", selectedId);
       if (error) throw error;
       const remaining = groups.filter((group) => group.id !== selectedId);
       setGroups(remaining);
@@ -96,37 +117,30 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
     }, "Group deleted.");
   }
 
-  function addMember() {
-    run(async () => {
-      const { data, error } = await supabase
-        .from("group_members")
-        .insert({ group_id: selectedId, user_id: personToAdd })
-        .select("group_id, user_id, added_at")
-        .single();
+  function addMembers(userIds) {
+    return run(async () => {
+      const { error } = await supabase.from(config.members).insert(userIds.map((userId) => ({ [config.key]: selectedId, user_id: userId })));
       if (error) throw error;
-      setMemberships((current) => [...current, data]);
-      setPersonToAdd("");
+      setMemberships((current) => [...current, ...userIds.map((userId) => ({ group_id: selectedId, user_id: userId }))]);
+    }, `Added ${userIds.length} ${userIds.length === 1 ? "person" : "people"}.`);
+  }
+
+  function removeMember(person) {
+    run(async () => {
+      const { error } = await supabase.from(config.members).delete().eq(config.key, selectedId).eq("user_id", person.id);
+      if (error) throw error;
+      setMemberships((current) => current.filter((membership) => !(membership.group_id === selectedId && membership.user_id === person.id)));
     });
   }
 
-  function removeMember(userId) {
-    run(async () => {
-      const { error } = await supabase.from("group_members").delete().eq("group_id", selectedId).eq("user_id", userId);
-      if (error) throw error;
-      setMemberships((current) => current.filter((membership) => !(membership.group_id === selectedId && membership.user_id === userId)));
-    });
-  }
-
-  function assignCourse() {
-    run(async () => {
+  function assignCourses(courseIds) {
+    return run(async () => {
       const { data, error } = await supabase
         .from("course_assignments")
-        .insert({ course_id: courseToAdd, group_id: selectedId })
-        .select("id, course_id, group_id")
-        .single();
+        .insert(courseIds.map((courseId) => ({ course_id: courseId, group_id: selectedId })))
+        .select("id, course_id, group_id");
       if (error) throw error;
-      setAssignments((current) => [...current, data]);
-      setCourseToAdd("");
+      setAssignments((current) => [...current, ...data]);
     });
   }
 
@@ -141,9 +155,9 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   return (
     <main className="tp-page tp-fade-in">
       <div className="page-heading">
-        <div className="tp-label">Admin workspace</div>
-        <h1 className="tp-display">Groups</h1>
-        <p>Group people, such as Titan Distributors or a manager’s team, then assign courses to the whole group. A person can belong to several groups.</p>
+        <div className="tp-label">{kind === "central" ? "Admin workspace" : "Your workspace"}</div>
+        <h1 className="tp-display">{config.title}</h1>
+        <p>{config.intro}</p>
       </div>
 
       {message.text && (
@@ -153,7 +167,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
       <div className="groups-layout">
         <aside className="tp-card groups-list">
           <form className="groups-list__create" onSubmit={createGroup}>
-            <input className="tp-input" aria-label="New group name" placeholder="New group name" value={newGroup} onChange={(event) => setNewGroup(event.target.value)} />
+            <input className="tp-input" aria-label="New group name" placeholder={kind === "central" ? "New group name" : "e.g. My team"} value={newGroup} onChange={(event) => setNewGroup(event.target.value)} />
             <button className="tp-btn tp-btn-primary" type="submit" disabled={busy || !newGroup.trim()}>Add</button>
           </form>
           {groups.map((group) => {
@@ -162,7 +176,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
             return (
               <button type="button" key={group.id} className={`groups-list__item ${group.id === selectedId ? "is-selected" : ""}`} onClick={() => selectGroup(group.id)}>
                 <strong>{group.name}</strong>
-                <small>{memberCount} {memberCount === 1 ? "member" : "members"} · {courseCount} {courseCount === 1 ? "course" : "courses"}</small>
+                <small>{memberCount} {memberCount === 1 ? "member" : "members"}{kind === "central" ? ` · ${courseCount} ${courseCount === 1 ? "course" : "courses"}` : ""}</small>
               </button>
             );
           })}
@@ -174,7 +188,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
             {edit ? (
               <form onSubmit={saveGroup} className="group-detail__edit">
                 <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Name</div><input className="tp-input" value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} required /></label>
-                <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><input className="tp-input" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label>
+                {kind === "central" && <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><input className="tp-input" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label>}
                 <div className="tp-form-actions">
                   <button className="tp-btn tp-btn-primary" type="submit" disabled={busy}>Save</button>
                   <button className="tp-btn tp-btn-ghost" type="button" onClick={() => setEdit(null)}>Cancel</button>
@@ -195,43 +209,27 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
             )}
 
             <div className="course-admin__subhead">Members ({members.length})</div>
-            <div className="chip-list">
-              {members.map((member) => (
-                <span className="chip" key={member.id}>
-                  <Link href={`/profile/${member.id}`}>{member.full_name}</Link>
-                  <button type="button" aria-label={`Remove ${member.full_name}`} disabled={busy} onClick={() => removeMember(member.id)}>×</button>
-                </span>
-              ))}
-              {members.length === 0 && <span className="chip-list__empty">No members yet</span>}
-            </div>
-            <div className="inline-add">
-              <select className="tp-input" aria-label="Person to add" value={personToAdd} onChange={(event) => setPersonToAdd(event.target.value)}>
-                <option value="">Choose a person…</option>
-                {availablePeople.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
-              </select>
-              <button type="button" className="tp-btn tp-btn-ghost" disabled={!personToAdd || busy} onClick={addMember}>Add member</button>
-            </div>
+            <MultiPicker items={personOptions} excludeIds={memberIds} onAdd={addMembers} placeholder="Add people by name or email…" noun="person" busy={busy} pasteEmails />
+            <MemberList people={members} onRemove={removeMember} busy={busy} emptyText="No members yet" />
 
-            <div className="course-admin__subhead">Required courses ({groupAssignments.length})</div>
-            <div className="chip-list">
-              {groupAssignments.map((assignment) => {
-                const course = coursesById.get(assignment.course_id);
-                return (
-                  <span className="chip" key={assignment.id}>
-                    <Link href={`/admin/courses/${course.id}`}><span className="tp-mono">{course.code}</span> · {course.title}</Link>
-                    <button type="button" aria-label={`Unassign ${course.title}`} disabled={busy} onClick={() => unassignCourse(assignment.id)}>×</button>
-                  </span>
-                );
-              })}
-              {groupAssignments.length === 0 && <span className="chip-list__empty">No courses assigned</span>}
-            </div>
-            <div className="inline-add">
-              <select className="tp-input" aria-label="Course to assign" value={courseToAdd} onChange={(event) => setCourseToAdd(event.target.value)}>
-                <option value="">Choose a course…</option>
-                {availableCourses.map((course) => <option key={course.id} value={course.id}>{course.code} · {course.title}</option>)}
-              </select>
-              <button type="button" className="tp-btn tp-btn-ghost" disabled={!courseToAdd || busy} onClick={assignCourse}>Assign course</button>
-            </div>
+            {kind === "central" && (
+              <>
+                <div className="course-admin__subhead">Required courses ({groupAssignments.length})</div>
+                <div className="chip-list">
+                  {groupAssignments.map((assignment) => {
+                    const course = coursesById.get(assignment.course_id);
+                    return (
+                      <span className="chip" key={assignment.id}>
+                        <Link href={`/admin/courses/${course.id}`}><span className="tp-mono">{course.code}</span> · {course.title}</Link>
+                        <button type="button" aria-label={`Unassign ${course.title}`} disabled={busy} onClick={() => unassignCourse(assignment.id)}>×</button>
+                      </span>
+                    );
+                  })}
+                  {groupAssignments.length === 0 && <span className="chip-list__empty">No courses assigned</span>}
+                </div>
+                <MultiPicker items={courseOptions} excludeIds={groupAssignments.map((assignment) => assignment.course_id)} onAdd={assignCourses} placeholder="Assign courses by title or code…" addLabel="Assign" noun="course" busy={busy} />
+              </>
+            )}
           </section>
         ) : (
           <section className="tp-card admin-insight-empty">Create a group to get started.</section>

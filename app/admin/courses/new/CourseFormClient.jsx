@@ -70,7 +70,7 @@ export default function CourseFormClient() {
       const suggestionQuery = pdf
         ? `&suggest=1&reading=${recommendationCounts.reading}&main=${recommendationCounts.main}`
         : "";
-      router.push(`/admin/questions?course=${created.id}${suggestionQuery}`);
+      router.push(`/admin/courses/${created.id}/questions${suggestionQuery.replace(/^&/, "?")}`);
       router.refresh();
     } catch (cause) {
       if (uploadedPath) await supabase.storage.from("course-pdfs").remove([uploadedPath]);

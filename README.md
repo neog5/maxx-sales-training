@@ -23,6 +23,7 @@ A Next.js 16 App Router application backed by Supabase. Learners read course PDF
    - `supabase/requested-changes.sql` - question images, mandatory questions and attempt reporting
    - `supabase/migrations/001_compliance_safety.sql` - roles, course archiving, the audit log and record protection
    - `supabase/migrations/002_groups_and_assignments.sql` - groups and course assignments
+   - `supabase/migrations/003_view_groups.sql` - private view groups, profile emails and manager scoping
    - `supabase/seed.sql` - one fictional sample course with reading and quiz questions
 
 3. Copy the environment template and add the public credentials from the Supabase project's API settings:
@@ -56,7 +57,7 @@ Roles control what someone can do; every role can also be assigned courses.
 | Role | Can |
 |---|---|
 | `learner` | Take their courses and see their own results (default for new sign-ups) |
-| `manager` | Everything a learner can, plus read-only Dashboard, People, Insights and profiles |
+| `manager` | Everything a learner can, plus read-only Dashboard, People, Insights and profiles, and their own private view groups |
 | `admin` | Everything a manager can, plus courses, question banks, groups, assignments, roles and archiving |
 | `super_admin` | Everything an admin can, plus deleting courses that have no training records and granting super admin |
 
@@ -75,6 +76,8 @@ After that, manage roles from each person's profile page.
 - **Assignments** make a course required: assign it to a group (everyone in it) on the group or course page, or to one person from the course page or their profile.
 - **Compliance**: a person is compliant when they have passed every course assigned to them or their groups. Archived and hidden courses no longer count. The Dashboard filters by group and status and exports CSV.
 - Courses that aren't assigned to someone still appear under "Other available courses" for them.
+- **View groups** (Admin → My view groups) are private lists that managers, admins and super admins make to watch a team's compliance, such as "My team". Only the creator can see a view group, and view groups never change what anyone has to complete. Managers can't see central groups; they get accurate compliance through the `required_courses()` database function, which expands group assignments without revealing them.
+- People pickers search by name or email, can select every match at once, and accept a pasted list of email addresses.
 
 ## Archiving, deleting and the audit log
 
@@ -171,8 +174,8 @@ app/
   admin/                  compliance dashboard
   admin/people/           searchable team directory and performance overview
   admin/groups/           groups, members and group course assignments
-  admin/courses/          course list; [id]/ manages details, assignments, archive and delete; new/ creates a course
-  admin/questions/        question bank CRUD
+  admin/courses/          course list; [id]/ manages details, assignments, archive and delete; [id]/questions/ is the course's question bank; new/ creates a course
+  admin/view-groups/      each viewer's private view groups
   admin/insights/         assessment analytics and attempt log
 components/               shared UI components
 lib/supabase/             browser and server Supabase clients

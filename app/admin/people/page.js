@@ -11,7 +11,7 @@ export default async function PeoplePage({ searchParams }) {
   const [{ data: people }, { data: attempts }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, role, created_at")
+      .select("id, full_name, email, role, created_at")
       .order("full_name"),
     supabase
       .from("quiz_attempts")

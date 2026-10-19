@@ -7,7 +7,19 @@ import { ROLE_LABELS } from "@/lib/roles.mjs";
 
 const STATUS_ORDER = { non_compliant: 0, compliant: 1, none: 2 };
 
-export default function ComplianceDashboardClient({ rows, groupSummaries, courseLabels, initialGroup = "all", initialStatus = "all" }) {
+function GroupCard({ summary, selected, onSelect }) {
+  return (
+    <button type="button" className={`tp-card group-summary__item ${selected ? "is-selected" : ""} ${summary.nonCompliantCount ? "has-gaps" : ""}`} onClick={onSelect}>
+      <span>{summary.name}</span>
+      <strong className="tp-mono">{summary.compliantCount}<small>/{summary.assessedCount}</small></strong>
+      <small>{summary.memberCount === 0 ? "no members" : summary.assessedCount === 0 ? "nothing assigned" : "compliant"}</small>
+    </button>
+  );
+}
+
+export default function ComplianceDashboardClient({ rows, groupSummaries, courseLabels, showCentralGroups = false, initialGroup = "all", initialStatus = "all" }) {
+  const viewSummaries = groupSummaries.filter((summary) => summary.kind === "view");
+  const centralSummaries = groupSummaries.filter((summary) => summary.kind !== "view");
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState(initialGroup);
   const [status, setStatus] = useState(initialStatus);
@@ -17,7 +29,7 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return inGroup
       .filter((row) => (status === "all" || row.status === status)
-        && (!normalizedQuery || row.full_name?.toLocaleLowerCase().includes(normalizedQuery)))
+        && (!normalizedQuery || `${row.full_name || ""} ${row.email || ""}`.toLocaleLowerCase().includes(normalizedQuery)))
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.full_name.localeCompare(b.full_name));
   }, [inGroup, query, status]);
 
@@ -49,34 +61,46 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
         <button type="button" className="tp-btn tp-btn-ghost" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</button>
       </div>
 
-      {groupSummaries.length > 0 && (
-        <section className="group-summary" aria-label="Compliance by group">
-          <button type="button" className={`tp-card group-summary__item ${group === "all" ? "is-selected" : ""}`} onClick={() => setGroup("all")}>
-            <span>Everyone</span>
-            <strong className="tp-mono">{rows.filter((row) => row.status === "compliant").length}<small>/{rows.filter((row) => row.status !== "none").length}</small></strong>
-            <small>compliant</small>
-          </button>
-          {groupSummaries.map((summary) => (
-            <button type="button" key={summary.id} className={`tp-card group-summary__item ${group === summary.id ? "is-selected" : ""} ${summary.nonCompliantCount ? "has-gaps" : ""}`} onClick={() => setGroup(summary.id)}>
-              <span>{summary.name}</span>
-              <strong className="tp-mono">{summary.compliantCount}<small>/{summary.assessedCount}</small></strong>
-              <small>{summary.memberCount === 0 ? "no members" : summary.assessedCount === 0 ? "nothing assigned" : "compliant"}</small>
-            </button>
-          ))}
-        </section>
+      <div className="group-summary__label">
+        <div className="tp-label">My view groups</div>
+        <Link href="/admin/view-groups" className="section-heading-link">{viewSummaries.length ? "Manage" : "Create a view group"}</Link>
+      </div>
+      <section className="group-summary" aria-label="Compliance by view group">
+        <button type="button" className={`tp-card group-summary__item ${group === "all" ? "is-selected" : ""}`} onClick={() => setGroup("all")}>
+          <span>Everyone</span>
+          <strong className="tp-mono">{rows.filter((row) => row.status === "compliant").length}<small>/{rows.filter((row) => row.status !== "none").length}</small></strong>
+          <small>compliant</small>
+        </button>
+        {viewSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
+        {viewSummaries.length === 0 && (
+          <Link href="/admin/view-groups" className="tp-card group-summary__item group-summary__hint">
+            <span>Watch a team</span>
+            <small>Make a private list of people, like your team, to filter this dashboard.</small>
+          </Link>
+        )}
+      </section>
+
+      {showCentralGroups && centralSummaries.length > 0 && (
+        <>
+          <div className="group-summary__label"><div className="tp-label">Groups</div></div>
+          <section className="group-summary" aria-label="Compliance by group">
+            {centralSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
+          </section>
+        </>
       )}
 
       <section className="tp-card directory-toolbar compliance-toolbar" aria-label="Dashboard filters">
         <label className="directory-search">
           <span className="tp-sr-only">Search people</span>
           <span className="directory-search__icon" aria-hidden="true">⌕</span>
-          <input className="tp-input" type="search" placeholder="Search by name…" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input className="tp-input" type="search" placeholder="Search by name or email…" value={query} onChange={(event) => setQuery(event.target.value)} />
         </label>
         <label>
           <span className="tp-sr-only">Filter by group</span>
           <select className="tp-input" value={group} onChange={(event) => setGroup(event.target.value)}>
-            <option value="all">All groups</option>
-            {groupSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}
+            <option value="all">Everyone</option>
+            {viewSummaries.length > 0 && <optgroup label="My view groups">{viewSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
+            {showCentralGroups && centralSummaries.length > 0 && <optgroup label="Groups">{centralSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
           </select>
         </label>
         <div className="status-filter" role="group" aria-label="Filter by compliance">

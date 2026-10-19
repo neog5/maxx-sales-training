@@ -11,7 +11,7 @@ export default async function GroupsPage({ searchParams }) {
   const [{ data: groups }, { data: memberships }, { data: people }, { data: courses }, { data: assignments }] = await Promise.all([
     supabase.from("groups").select("id, name, description, created_at").order("name"),
     supabase.from("group_members").select("group_id, user_id, added_at"),
-    supabase.from("profiles").select("id, full_name, role").order("full_name"),
+    supabase.from("profiles").select("id, full_name, email, role").order("full_name"),
     supabase.from("courses").select("id, code, title").is("archived_at", null).order("code"),
     supabase.from("course_assignments").select("id, course_id, group_id").not("group_id", "is", null),
   ]);
