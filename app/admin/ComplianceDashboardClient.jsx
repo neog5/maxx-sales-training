@@ -10,7 +10,8 @@ const STATUS_ORDER = { non_compliant: 0, compliant: 1, none: 2 };
 
 function GroupCard({ summary, selected, onSelect }) {
   return (
-    <button type="button" className={`tp-card group-summary__item ${selected ? "is-selected" : ""} ${summary.nonCompliantCount ? "has-gaps" : ""}`} onClick={onSelect}>
+    <button type="button" className={`tp-card group-summary__item ${selected ? "is-selected" : ""} ${summary.nonCompliantCount ? "has-gaps" : ""}`} onClick={onSelect}
+      aria-pressed={selected} aria-label={`${summary.name}: ${summary.compliantCount} of ${summary.assessedCount} compliant`}>
       <span>{summary.name}</span>
       <strong className="tp-mono">{summary.compliantCount}<small>/{summary.assessedCount}</small></strong>
       <small>{summary.memberCount === 0 ? "no members" : summary.assessedCount === 0 ? "nothing assigned" : "compliant"}</small>
@@ -66,7 +67,8 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, watchl
       </div>
 
       <section className="group-summary" aria-label="Compliance by training group">
-        <button type="button" className={`tp-card group-summary__item ${group === "all" ? "is-selected" : ""}`} onClick={() => setGroup("all")}>
+        <button type="button" className={`tp-card group-summary__item ${group === "all" ? "is-selected" : ""}`} onClick={() => setGroup("all")}
+          aria-pressed={group === "all"} aria-label={`Everyone: ${rows.filter((row) => row.status === "compliant").length} of ${rows.filter((row) => row.status !== "none").length} compliant`}>
           <span>Everyone</span>
           <strong className="tp-mono">{rows.filter((row) => row.status === "compliant").length}<small>/{rows.filter((row) => row.status !== "none").length}</small></strong>
           <small>compliant</small>

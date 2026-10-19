@@ -33,7 +33,7 @@ export default function MemberList({ people, onRemove, busy = false, emptyText =
               {linkProfiles ? <Link className="profile-link" href={`/profile/${person.id}`}>{person.full_name}</Link> : <strong>{person.full_name}</strong>}
               {person.email && <small>{person.email}</small>}
             </span>
-            {onRemove && <button type="button" className="tp-btn tp-btn-ghost member-list__remove" disabled={busy} onClick={() => onRemove(person)}>Remove</button>}
+            {onRemove && <button type="button" className="tp-btn tp-btn-ghost member-list__remove" aria-label={`Remove ${person.full_name}`} disabled={busy} onClick={() => onRemove(person)}>Remove</button>}
           </div>
         ))}
         {filtered.length === 0 && <div className="chip-list__empty member-list__empty">No members match.</div>}

@@ -134,7 +134,7 @@ export default function MultiPicker({ items, excludeIds = [], onAdd, placeholder
           <div className="picker__results tp-scroll" role="listbox" aria-multiselectable="true">
             {shown.map((item) => (
               <label key={item.id} className={`picker__option ${selected.has(item.id) ? "is-selected" : ""}`}>
-                <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
+                <input type="checkbox" aria-label={item.sublabel ? `${item.label} (${item.sublabel})` : item.label} checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
                 <span>
                   <strong>{item.label}</strong>
                   {item.sublabel && <small>{item.sublabel}</small>}
