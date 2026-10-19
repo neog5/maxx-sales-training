@@ -76,7 +76,7 @@ After that, manage roles from each person's profile page.
 - **Assignments** make a course required: assign it to a training group (everyone in it) on the training group or course page, or to one person from the course page or their profile.
 - **Compliance**: a person is compliant when they have passed every course assigned to them or their groups. Archived and hidden courses no longer count. The Dashboard filters by group and status and exports CSV.
 - Courses that aren't assigned to someone still appear under "Other available courses" for them.
-- **Watchlists** (Admin → Watchlists) are private lists that managers, admins and super admins make to watch a team's compliance, such as "My team". Only the creator can see a watchlist, and watchlists never change what anyone has to complete. Managers can't see training groups; they get accurate compliance through the `required_courses()` database function, which expands group assignments without revealing them.
+- **Watchlists** (the ☆ row on the Dashboard) are private lists that managers, admins and super admins make to watch a team's compliance, such as "My team". Only the creator can see a watchlist, and watchlists never change what anyone has to complete. Managers can't see training groups; they get accurate compliance through the `required_courses()` database function, which expands group assignments without revealing them.
 - People pickers search by name or email, can select every match at once, and accept a pasted list of email addresses.
 
 ## Archiving, deleting and the audit log
@@ -175,7 +175,6 @@ app/
   admin/people/           searchable team directory and performance overview
   admin/training-groups/  training groups, members and group course assignments
   admin/courses/          course list; [id]/ manages details, assignments, archive and delete; [id]/questions/ is the course's question bank; new/ creates a course
-  admin/watchlists/       each viewer's private watchlists (view_groups table)
   admin/insights/         assessment analytics and attempt log
 components/               shared UI components
 lib/supabase/             browser and server Supabase clients

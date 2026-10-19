@@ -63,6 +63,10 @@ export default async function AdminDashboardPage({ searchParams }) {
         groupSummaries={groupSummaries}
         courseLabels={courseLabels}
         showCentralGroups={admin}
+        watchlists={(viewGroups || []).map((viewGroup) => ({
+          ...viewGroup,
+          memberIds: (viewMembers || []).filter((member) => member.view_group_id === viewGroup.id).map((member) => member.user_id),
+        }))}
         initialGroup={groupSummaries.some((summary) => summary.id === group) ? group : "all"}
         initialStatus={["compliant", "non_compliant", "none"].includes(status) ? status : "all"}
       />

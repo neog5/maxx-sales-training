@@ -8,33 +8,9 @@ import MultiPicker from "@/components/MultiPicker";
 import { createClient } from "@/lib/supabase/client";
 import { courseItems, personItems } from "@/lib/picker-items.mjs";
 
-// Training groups (admin-managed; they decide who must complete which courses) and
-// watchlists (each manager's or admin's private lists; table view_groups) share this editor.
-const KINDS = {
-  central: {
-    groups: "groups",
-    members: "group_members",
-    key: "group_id",
-    columns: "id, name, description, created_at",
-    title: "Training groups",
-    noun: "training group",
-    intro: "Training groups decide what people must complete. Put people in a group, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several training groups.",
-    path: "/admin/training-groups",
-  },
-  view: {
-    groups: "view_groups",
-    members: "view_group_members",
-    key: "view_group_id",
-    columns: "id, name, created_at",
-    title: "Watchlists",
-    noun: "watchlist",
-    intro: "Private lists of people whose compliance you want to keep an eye on, such as your team. Only you can see your watchlists, and they don’t change what anyone has to complete.",
-    path: "/admin/watchlists",
-  },
-};
-
-export default function GroupsClient({ kind = "central", initialGroups, initialMemberships, people, courses = [], initialAssignments = [], initialGroupId }) {
-  const config = KINDS[kind];
+// Training groups decide who must complete which courses. Admins manage their members
+// and the courses assigned to each group here.
+export default function GroupsClient({ initialGroups, initialMemberships, people, courses = [], initialAssignments = [], initialGroupId }) {
   const supabase = createClient();
   const router = useRouter();
   const [groups, setGroups] = useState(initialGroups);
@@ -64,7 +40,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
       router.refresh();
       return true;
     } catch (error) {
-      const text = /duplicate key|unique/i.test(error.message || "") ? `You already have a ${config.noun} with that name.` : error.message;
+      const text = /duplicate key|unique/i.test(error.message || "") ? "A training group with that name already exists." : error.message;
       setMessage({ type: "error", text: text || "Something went wrong. Please try again." });
       return false;
     } finally {
@@ -83,7 +59,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
     const name = newGroup.trim();
     if (!name) return;
     run(async () => {
-      const { data, error } = await supabase.from(config.groups).insert({ name }).select(config.columns).single();
+      const { data, error } = await supabase.from("groups").insert({ name }).select("id, name, description, created_at").single();
       if (error) throw error;
       setGroups((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
       setNewGroup("");
@@ -94,9 +70,9 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
   function saveGroup(event) {
     event.preventDefault();
     if (!edit.name.trim()) return;
-    const changes = kind === "central" ? { name: edit.name.trim(), description: edit.description.trim() || null } : { name: edit.name.trim() };
+    const changes = { name: edit.name.trim(), description: edit.description.trim() || null };
     run(async () => {
-      const { data, error } = await supabase.from(config.groups).update(changes).eq("id", selectedId).select(config.columns).single();
+      const { data, error } = await supabase.from("groups").update(changes).eq("id", selectedId).select("id, name, description, created_at").single();
       if (error) throw error;
       setGroups((current) => current.map((group) => (group.id === data.id ? data : group)).sort((a, b) => a.name.localeCompare(b.name)));
       setEdit(null);
@@ -104,12 +80,10 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
   }
 
   function deleteGroup() {
-    const warning = kind === "central"
-      ? `Delete the training group “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`
-      : `Delete your watchlist “${selected.name}”? Nobody’s training is affected.`;
+    const warning = `Delete the training group “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`;
     if (!window.confirm(warning)) return;
     run(async () => {
-      const { error } = await supabase.from(config.groups).delete().eq("id", selectedId);
+      const { error } = await supabase.from("groups").delete().eq("id", selectedId);
       if (error) throw error;
       const remaining = groups.filter((group) => group.id !== selectedId);
       setGroups(remaining);
@@ -121,7 +95,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
 
   function addMembers(userIds) {
     return run(async () => {
-      const { error } = await supabase.from(config.members).insert(userIds.map((userId) => ({ [config.key]: selectedId, user_id: userId })));
+      const { error } = await supabase.from("group_members").insert(userIds.map((userId) => ({ group_id: selectedId, user_id: userId })));
       if (error) throw error;
       setMemberships((current) => [...current, ...userIds.map((userId) => ({ group_id: selectedId, user_id: userId }))]);
     }, `Added ${userIds.length} ${userIds.length === 1 ? "person" : "people"}.`);
@@ -129,7 +103,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
 
   function removeMember(person) {
     run(async () => {
-      const { error } = await supabase.from(config.members).delete().eq(config.key, selectedId).eq("user_id", person.id);
+      const { error } = await supabase.from("group_members").delete().eq("group_id", selectedId).eq("user_id", person.id);
       if (error) throw error;
       setMemberships((current) => current.filter((membership) => !(membership.group_id === selectedId && membership.user_id === person.id)));
     });
@@ -157,9 +131,9 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
   return (
     <main className="tp-page tp-fade-in">
       <div className="page-heading">
-        <div className="tp-label">{kind === "central" ? "Admin workspace" : "Your workspace"}</div>
-        <h1 className="tp-display">{config.title}</h1>
-        <p>{config.intro}</p>
+        <div className="tp-label">Admin workspace</div>
+        <h1 className="tp-display">Training groups</h1>
+        <p>Training groups decide what people must complete. Put people in a group, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several training groups.</p>
       </div>
 
       {message.text && (
@@ -169,7 +143,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
       <div className="groups-layout">
         <aside className="tp-card groups-list">
           <form className="groups-list__create" onSubmit={createGroup}>
-            <input className="tp-input" aria-label={`New ${config.noun} name`} placeholder={kind === "central" ? "New training group" : "New watchlist, e.g. My team"} value={newGroup} onChange={(event) => setNewGroup(event.target.value)} />
+            <input className="tp-input" aria-label="New training group name" placeholder="New training group" value={newGroup} onChange={(event) => setNewGroup(event.target.value)} />
             <button className="tp-btn tp-btn-primary" type="submit" disabled={busy || !newGroup.trim()}>Add</button>
           </form>
           {groups.map((group) => {
@@ -178,11 +152,11 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
             return (
               <button type="button" key={group.id} className={`groups-list__item ${group.id === selectedId ? "is-selected" : ""}`} onClick={() => selectGroup(group.id)}>
                 <strong>{group.name}</strong>
-                <small>{memberCount} {memberCount === 1 ? "member" : "members"}{kind === "central" ? ` · ${courseCount} ${courseCount === 1 ? "course" : "courses"}` : ""}</small>
+                <small>{memberCount} {memberCount === 1 ? "member" : "members"} · {courseCount} {courseCount === 1 ? "course" : "courses"}</small>
               </button>
             );
           })}
-          {groups.length === 0 && <div className="chip-list__empty" style={{ padding: 14 }}>No {config.noun}s yet.</div>}
+          {groups.length === 0 && <div className="chip-list__empty" style={{ padding: 14 }}>No training groups yet.</div>}
         </aside>
 
         {selected ? (
@@ -190,7 +164,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
             {edit ? (
               <form onSubmit={saveGroup} className="group-detail__edit">
                 <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Name</div><input className="tp-input" value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} required /></label>
-                {kind === "central" && <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><input className="tp-input" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label>}
+                <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><input className="tp-input" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label>
                 <div className="tp-form-actions">
                   <button className="tp-btn tp-btn-primary" type="submit" disabled={busy}>Save</button>
                   <button className="tp-btn tp-btn-ghost" type="button" onClick={() => setEdit(null)}>Cancel</button>
@@ -214,27 +188,23 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
             <MultiPicker items={personOptions} excludeIds={memberIds} onAdd={addMembers} placeholder="Add people by name or email…" noun="person" busy={busy} pasteEmails />
             <MemberList people={members} onRemove={removeMember} busy={busy} emptyText="No members yet" />
 
-            {kind === "central" && (
-              <>
-                <div className="course-admin__subhead">Required courses ({groupAssignments.length})</div>
-                <div className="chip-list">
-                  {groupAssignments.map((assignment) => {
-                    const course = coursesById.get(assignment.course_id);
-                    return (
-                      <span className="chip" key={assignment.id}>
-                        <Link href={`/admin/courses/${course.id}`}><span className="tp-mono">{course.code}</span> · {course.title}</Link>
-                        <button type="button" aria-label={`Unassign ${course.title}`} disabled={busy} onClick={() => unassignCourse(assignment.id)}>×</button>
-                      </span>
-                    );
-                  })}
-                  {groupAssignments.length === 0 && <span className="chip-list__empty">No courses assigned</span>}
-                </div>
-                <MultiPicker items={courseOptions} excludeIds={groupAssignments.map((assignment) => assignment.course_id)} onAdd={assignCourses} placeholder="Assign courses by title or code…" addLabel="Assign" noun="course" busy={busy} />
-              </>
-            )}
+            <div className="course-admin__subhead">Required courses ({groupAssignments.length})</div>
+            <div className="chip-list">
+              {groupAssignments.map((assignment) => {
+                const course = coursesById.get(assignment.course_id);
+                return (
+                  <span className="chip" key={assignment.id}>
+                    <Link href={`/admin/courses/${course.id}`}><span className="tp-mono">{course.code}</span> · {course.title}</Link>
+                    <button type="button" aria-label={`Unassign ${course.title}`} disabled={busy} onClick={() => unassignCourse(assignment.id)}>×</button>
+                  </span>
+                );
+              })}
+              {groupAssignments.length === 0 && <span className="chip-list__empty">No courses assigned</span>}
+            </div>
+            <MultiPicker items={courseOptions} excludeIds={groupAssignments.map((assignment) => assignment.course_id)} onAdd={assignCourses} placeholder="Assign courses by title or code…" addLabel="Assign" noun="course" busy={busy} />
           </section>
         ) : (
-          <section className="tp-card admin-insight-empty">Create a {config.noun} to get started.</section>
+          <section className="tp-card admin-insight-empty">Create a training group to get started.</section>
         )}
       </div>
     </main>

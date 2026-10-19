@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { COMPLIANCE_LABELS, complianceCsv } from "@/lib/compliance.mjs";
 import { ROLE_LABELS } from "@/lib/roles.mjs";
+import WatchlistBar from "./WatchlistBar";
 
 const STATUS_ORDER = { non_compliant: 0, compliant: 1, none: 2 };
 
@@ -17,9 +18,12 @@ function GroupCard({ summary, selected, onSelect }) {
   );
 }
 
-export default function ComplianceDashboardClient({ rows, groupSummaries, courseLabels, showCentralGroups = false, initialGroup = "all", initialStatus = "all" }) {
+export default function ComplianceDashboardClient({ rows, groupSummaries, watchlists = [], courseLabels, showCentralGroups = false, initialGroup = "all", initialStatus = "all" }) {
   const viewSummaries = groupSummaries.filter((summary) => summary.kind === "view");
   const centralSummaries = groupSummaries.filter((summary) => summary.kind !== "view");
+  const viewSummaryById = new Map(viewSummaries.map((summary) => [summary.id, summary]));
+  const trainingGroupNames = new Map(centralSummaries.map((summary) => [summary.id, summary.name]));
+  const trainingGroupsOf = (row) => row.groupIds.map((id) => trainingGroupNames.get(id)).filter(Boolean).sort();
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState(initialGroup);
   const [status, setStatus] = useState(initialStatus);
@@ -40,7 +44,7 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
   };
 
   function exportCsv() {
-    const blob = new Blob([complianceCsv(filtered, ROLE_LABELS)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([complianceCsv(filtered.map((row) => ({ ...row, groupNames: trainingGroupsOf(row) })), ROLE_LABELS)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     const groupName = groupSummaries.find((summary) => summary.id === group)?.name;
@@ -61,33 +65,16 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
         <button type="button" className="tp-btn tp-btn-ghost" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</button>
       </div>
 
-      <div className="group-summary__label">
-        <div className="tp-label">My watchlists</div>
-        <Link href="/admin/watchlists" className="section-heading-link">{viewSummaries.length ? "Manage watchlists" : "Create a watchlist"}</Link>
-      </div>
-      <section className="group-summary" aria-label="Compliance by watchlist">
+      <section className="group-summary" aria-label="Compliance by training group">
         <button type="button" className={`tp-card group-summary__item ${group === "all" ? "is-selected" : ""}`} onClick={() => setGroup("all")}>
           <span>Everyone</span>
           <strong className="tp-mono">{rows.filter((row) => row.status === "compliant").length}<small>/{rows.filter((row) => row.status !== "none").length}</small></strong>
           <small>compliant</small>
         </button>
-        {viewSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
-        {viewSummaries.length === 0 && (
-          <Link href="/admin/watchlists" className="tp-card group-summary__item group-summary__hint">
-            <span>Watch a team</span>
-            <small>Make a private list of people, like your team, to filter this dashboard.</small>
-          </Link>
-        )}
+        {showCentralGroups && centralSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
       </section>
 
-      {showCentralGroups && centralSummaries.length > 0 && (
-        <>
-          <div className="group-summary__label"><div className="tp-label">Training groups</div><Link href="/admin/training-groups" className="section-heading-link">Manage training groups</Link></div>
-          <section className="group-summary" aria-label="Compliance by training group">
-            {centralSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
-          </section>
-        </>
-      )}
+      <WatchlistBar watchlists={watchlists} summaries={viewSummaryById} people={rows} selectedId={group} onSelect={setGroup} />
 
       <section className="tp-card directory-toolbar compliance-toolbar" aria-label="Dashboard filters">
         <label className="directory-search">
@@ -113,12 +100,12 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
       <div className="directory-result-count" role="status">Showing {filtered.length} of {inGroup.length} people</div>
 
       <section className="tp-card compliance-table">
-        <div className="compliance-table__head">
-          <div>Person</div><div>Groups</div><div>Completed</div><div>Status</div>
+        <div className={`compliance-table__head ${showCentralGroups ? "" : "is-compact"}`}>
+          <div>Person</div>{showCentralGroups && <div>Training groups</div>}<div>Completed</div><div>Status</div>
         </div>
         <div className="tp-scroll compliance-table__body">
           {filtered.map((row) => (
-            <article className="compliance-table__row" key={row.id}>
+            <article className={`compliance-table__row ${showCentralGroups ? "" : "is-compact"}`} key={row.id}>
               <div className="people-identity">
                 <span className="people-avatar" aria-hidden="true">{row.full_name?.trim()?.charAt(0)?.toUpperCase() || "U"}</span>
                 <span>
@@ -126,7 +113,7 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
                   <small>{ROLE_LABELS[row.role] || row.role}</small>
                 </span>
               </div>
-              <div className="compliance-groups">{row.groupNames.length ? row.groupNames.join(", ") : <span className="chip-list__empty">None</span>}</div>
+              {showCentralGroups && <div className="compliance-groups">{trainingGroupsOf(row).join(", ") || <span className="chip-list__empty">None</span>}</div>}
               <div className="compliance-progress" title={row.outstandingCourseIds.length ? `Outstanding: ${row.outstandingCourseIds.map((id) => courseLabels[id]).join("; ")}` : undefined}>
                 <span className="tp-mono">{row.completedCount}/{row.assignedCount}</span>
                 <span className="compliance-progress__track"><span style={{ width: `${row.assignedCount ? Math.round((row.completedCount / row.assignedCount) * 100) : 0}%` }} /></span>

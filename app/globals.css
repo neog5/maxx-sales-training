@@ -1065,3 +1065,34 @@ body {
 .group-summary__hint { justify-content: center; border-style: dashed; text-decoration: none; }
 .group-summary__hint > span { color: var(--accent); }
 .group-summary__hint > small { line-height: 1.4; }
+/* Watchlists: a light, personal filter row on the dashboard */
+.watchlists { margin: -4px 0 16px; }
+.watchlists__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.watchlists__label { margin-right: 4px; color: var(--faint); font-size: 12px; font-weight: 700; }
+.watchlist-pill { display: inline-flex; align-items: center; overflow: hidden; border: 1px solid var(--border); border-radius: 999px; background: #FFFFFF; }
+.watchlist-pill button { border: 0; background: transparent; color: var(--dim); cursor: pointer; font-size: 12px; font-weight: 700; }
+.watchlist-pill > button:first-child { display: inline-flex; align-items: center; gap: 6px; padding: 5px 4px 5px 11px; }
+.watchlist-pill small { padding: 1px 6px; border-radius: 999px; background: var(--surface2); color: var(--faint); font-size: 10.5px; }
+.watchlist-pill small.has-gaps { color: var(--danger); background: var(--danger-dim); }
+.watchlist-pill__edit { padding: 5px 9px 5px 5px; color: var(--faint) !important; font-size: 12px; }
+.watchlist-pill__edit:hover { color: var(--accent) !important; }
+.watchlist-pill:hover { border-color: #9FB0C4; }
+.watchlist-pill.is-selected { border-color: var(--accent); background: var(--accent-dim); }
+.watchlist-pill.is-selected > button:first-child { color: var(--text); }
+.watchlists__new { padding: 5px 10px; border: 1px dashed var(--border); border-radius: 999px; background: transparent; color: var(--faint); cursor: pointer; font-size: 12px; font-weight: 700; }
+.watchlists__new:hover { border-color: var(--accent); color: var(--accent); }
+.watchlists__create { display: inline-flex; align-items: center; gap: 6px; }
+.watchlists__create .tp-input { width: 180px; padding-top: 6px; padding-bottom: 6px; }
+.watchlists__create .tp-btn { padding: 6px 12px; }
+.watchlists__editor { margin-top: 10px; padding: 16px 18px; }
+.watchlists__editor-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.watchlists__editor-head form, .watchlists__editor-head > div { display: flex; gap: 6px; }
+.watchlists__editor-head .tp-input { width: 220px; }
+.watchlists__editor .course-admin__hint { margin: 8px 0 0; }
+.compliance-table__head.is-compact, .compliance-table__row.is-compact { grid-template-columns: minmax(180px, 1.6fr) .9fr 1.3fr; }
+@media (max-width: 760px) {
+  .compliance-table__head.is-compact, .compliance-table__row.is-compact { grid-template-columns: minmax(140px, 1.3fr) .7fr 1fr; }
+  .compliance-table__head.is-compact > :nth-child(2), .compliance-table__row.is-compact > :nth-child(2) { display: flex; }
+  .watchlists__create .tp-input, .watchlists__editor-head .tp-input { width: 100%; }
+  .watchlists__editor-head form { flex: 1; }
+}
