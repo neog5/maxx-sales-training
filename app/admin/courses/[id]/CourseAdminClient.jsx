@@ -86,7 +86,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
         .select("id, group_id, user_id, assigned_at");
       if (error) throw error;
       setAssignments((current) => [...current, ...data]);
-    }, `Assigned to ${ids.length} ${field === "group_id" ? (ids.length === 1 ? "group" : "groups") : (ids.length === 1 ? "person" : "people")}.`);
+    }, `Assigned to ${ids.length} ${field === "group_id" ? (ids.length === 1 ? "training group" : "training groups") : (ids.length === 1 ? "person" : "people")}.`);
   }
 
   function removeAssignment(assignment) {
@@ -157,9 +157,9 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
 
         <section className="tp-card tp-form-card">
           <div className="tp-label" style={{ marginBottom: 4 }}>Who must complete this course</div>
-          <p className="course-admin__hint">Everyone in an assigned group must complete it. Add a single person for one-off requirements.</p>
+          <p className="course-admin__hint">Everyone in an assigned training group must complete it. Add a single person for one-off requirements.</p>
 
-          <div className="course-admin__subhead">Groups</div>
+          <div className="course-admin__subhead">Training groups</div>
           <div className="chip-list">
             {assignedGroups.map((assignment) => (
               <span className="chip" key={assignment.id}>
@@ -167,11 +167,11 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
                 {!archived && <button type="button" aria-label={`Remove ${groupNames.get(assignment.group_id)}`} disabled={Boolean(busy)} onClick={() => removeAssignment(assignment)}>×</button>}
               </span>
             ))}
-            {assignedGroups.length === 0 && <span className="chip-list__empty">No groups assigned</span>}
+            {assignedGroups.length === 0 && <span className="chip-list__empty">No training groups assigned</span>}
           </div>
           {!archived && (
             <MultiPicker items={groupOptions} excludeIds={assignedGroups.map((assignment) => assignment.group_id)} onAdd={(ids) => addAssignments("group_id", ids)}
-              placeholder="Assign groups…" addLabel="Assign" noun="group" busy={busy === "assign"} />
+              placeholder="Assign training groups…" addLabel="Assign" noun="training group" busy={busy === "assign"} />
           )}
 
           <div className="course-admin__subhead">Individual people</div>

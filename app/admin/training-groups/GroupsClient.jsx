@@ -8,26 +8,28 @@ import MultiPicker from "@/components/MultiPicker";
 import { createClient } from "@/lib/supabase/client";
 import { courseItems, personItems } from "@/lib/picker-items.mjs";
 
-// Central groups (admin-managed; drive course assignments) and private view groups
-// (each manager's or admin's own watch lists) share this editor.
+// Training groups (admin-managed; they decide who must complete which courses) and
+// watchlists (each manager's or admin's private lists; table view_groups) share this editor.
 const KINDS = {
   central: {
     groups: "groups",
     members: "group_members",
     key: "group_id",
     columns: "id, name, description, created_at",
-    title: "Groups",
-    intro: "Group people, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several groups.",
-    path: "/admin/groups",
+    title: "Training groups",
+    noun: "training group",
+    intro: "Training groups decide what people must complete. Put people in a group, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several training groups.",
+    path: "/admin/training-groups",
   },
   view: {
     groups: "view_groups",
     members: "view_group_members",
     key: "view_group_id",
     columns: "id, name, created_at",
-    title: "My view groups",
-    intro: "Private lists of people whose compliance you want to watch, such as your team. Only you can see your view groups, and they don’t change what anyone has to complete.",
-    path: "/admin/view-groups",
+    title: "Watchlists",
+    noun: "watchlist",
+    intro: "Private lists of people whose compliance you want to keep an eye on, such as your team. Only you can see your watchlists, and they don’t change what anyone has to complete.",
+    path: "/admin/watchlists",
   },
 };
 
@@ -62,7 +64,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
       router.refresh();
       return true;
     } catch (error) {
-      const text = /duplicate key|unique/i.test(error.message || "") ? "A group with that name already exists." : error.message;
+      const text = /duplicate key|unique/i.test(error.message || "") ? `You already have a ${config.noun} with that name.` : error.message;
       setMessage({ type: "error", text: text || "Something went wrong. Please try again." });
       return false;
     } finally {
@@ -98,13 +100,13 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
       if (error) throw error;
       setGroups((current) => current.map((group) => (group.id === data.id ? data : group)).sort((a, b) => a.name.localeCompare(b.name)));
       setEdit(null);
-    }, "Group saved.");
+    }, "Saved.");
   }
 
   function deleteGroup() {
     const warning = kind === "central"
-      ? `Delete “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`
-      : `Delete your view group “${selected.name}”? Nobody’s training is affected.`;
+      ? `Delete the training group “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`
+      : `Delete your watchlist “${selected.name}”? Nobody’s training is affected.`;
     if (!window.confirm(warning)) return;
     run(async () => {
       const { error } = await supabase.from(config.groups).delete().eq("id", selectedId);
@@ -114,7 +116,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
       setMemberships((current) => current.filter((membership) => membership.group_id !== selectedId));
       setAssignments((current) => current.filter((assignment) => assignment.group_id !== selectedId));
       setSelectedId(remaining[0]?.id);
-    }, "Group deleted.");
+    }, "Deleted.");
   }
 
   function addMembers(userIds) {
@@ -167,7 +169,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
       <div className="groups-layout">
         <aside className="tp-card groups-list">
           <form className="groups-list__create" onSubmit={createGroup}>
-            <input className="tp-input" aria-label="New group name" placeholder={kind === "central" ? "New group name" : "e.g. My team"} value={newGroup} onChange={(event) => setNewGroup(event.target.value)} />
+            <input className="tp-input" aria-label={`New ${config.noun} name`} placeholder={kind === "central" ? "New training group" : "New watchlist, e.g. My team"} value={newGroup} onChange={(event) => setNewGroup(event.target.value)} />
             <button className="tp-btn tp-btn-primary" type="submit" disabled={busy || !newGroup.trim()}>Add</button>
           </form>
           {groups.map((group) => {
@@ -180,7 +182,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
               </button>
             );
           })}
-          {groups.length === 0 && <div className="chip-list__empty" style={{ padding: 14 }}>No groups yet.</div>}
+          {groups.length === 0 && <div className="chip-list__empty" style={{ padding: 14 }}>No {config.noun}s yet.</div>}
         </aside>
 
         {selected ? (
@@ -232,7 +234,7 @@ export default function GroupsClient({ kind = "central", initialGroups, initialM
             )}
           </section>
         ) : (
-          <section className="tp-card admin-insight-empty">Create a group to get started.</section>
+          <section className="tp-card admin-insight-empty">Create a {config.noun} to get started.</section>
         )}
       </div>
     </main>

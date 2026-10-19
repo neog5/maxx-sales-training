@@ -56,16 +56,16 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
         <div>
           <div className="tp-label">Training compliance</div>
           <h1 className="tp-display">Dashboard</h1>
-          <p>Everyone’s required courses, completed versus assigned. A person is compliant once they’ve passed every course assigned to them or their groups.</p>
+          <p>Everyone’s required courses, completed versus assigned. A person is compliant once they’ve passed every course assigned to them or their training groups.</p>
         </div>
         <button type="button" className="tp-btn tp-btn-ghost" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</button>
       </div>
 
       <div className="group-summary__label">
-        <div className="tp-label">My view groups</div>
-        <Link href="/admin/view-groups" className="section-heading-link">{viewSummaries.length ? "Manage" : "Create a view group"}</Link>
+        <div className="tp-label">My watchlists</div>
+        <Link href="/admin/watchlists" className="section-heading-link">{viewSummaries.length ? "Manage watchlists" : "Create a watchlist"}</Link>
       </div>
-      <section className="group-summary" aria-label="Compliance by view group">
+      <section className="group-summary" aria-label="Compliance by watchlist">
         <button type="button" className={`tp-card group-summary__item ${group === "all" ? "is-selected" : ""}`} onClick={() => setGroup("all")}>
           <span>Everyone</span>
           <strong className="tp-mono">{rows.filter((row) => row.status === "compliant").length}<small>/{rows.filter((row) => row.status !== "none").length}</small></strong>
@@ -73,7 +73,7 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
         </button>
         {viewSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
         {viewSummaries.length === 0 && (
-          <Link href="/admin/view-groups" className="tp-card group-summary__item group-summary__hint">
+          <Link href="/admin/watchlists" className="tp-card group-summary__item group-summary__hint">
             <span>Watch a team</span>
             <small>Make a private list of people, like your team, to filter this dashboard.</small>
           </Link>
@@ -82,8 +82,8 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
 
       {showCentralGroups && centralSummaries.length > 0 && (
         <>
-          <div className="group-summary__label"><div className="tp-label">Groups</div></div>
-          <section className="group-summary" aria-label="Compliance by group">
+          <div className="group-summary__label"><div className="tp-label">Training groups</div><Link href="/admin/training-groups" className="section-heading-link">Manage training groups</Link></div>
+          <section className="group-summary" aria-label="Compliance by training group">
             {centralSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
           </section>
         </>
@@ -99,8 +99,8 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
           <span className="tp-sr-only">Filter by group</span>
           <select className="tp-input" value={group} onChange={(event) => setGroup(event.target.value)}>
             <option value="all">Everyone</option>
-            {viewSummaries.length > 0 && <optgroup label="My view groups">{viewSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
-            {showCentralGroups && centralSummaries.length > 0 && <optgroup label="Groups">{centralSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
+            {viewSummaries.length > 0 && <optgroup label="My watchlists">{viewSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
+            {showCentralGroups && centralSummaries.length > 0 && <optgroup label="Training groups">{centralSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
           </select>
         </label>
         <div className="status-filter" role="group" aria-label="Filter by compliance">
@@ -126,7 +126,7 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, course
                   <small>{ROLE_LABELS[row.role] || row.role}</small>
                 </span>
               </div>
-              <div className="compliance-groups">{row.groupNames.length ? row.groupNames.join(", ") : <span className="chip-list__empty">No group</span>}</div>
+              <div className="compliance-groups">{row.groupNames.length ? row.groupNames.join(", ") : <span className="chip-list__empty">None</span>}</div>
               <div className="compliance-progress" title={row.outstandingCourseIds.length ? `Outstanding: ${row.outstandingCourseIds.map((id) => courseLabels[id]).join("; ")}` : undefined}>
                 <span className="tp-mono">{row.completedCount}/{row.assignedCount}</span>
                 <span className="compliance-progress__track"><span style={{ width: `${row.assignedCount ? Math.round((row.completedCount / row.assignedCount) * 100) : 0}%` }} /></span>

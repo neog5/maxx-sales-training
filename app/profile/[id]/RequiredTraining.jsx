@@ -62,21 +62,21 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
       <div className="tp-card tp-form-card required-training">
         {showGroups && (
           <>
-            <div className="course-admin__subhead" style={{ marginTop: 0 }}>Groups</div>
+            <div className="course-admin__subhead" style={{ marginTop: 0 }}>Training groups</div>
             <div className="chip-list">
               {initialGroupIds.map((groupId) => (
                 <span className="chip" key={groupId}>
-                  {canEdit ? <Link href={`/admin/groups?group=${groupId}`}>{groupNames.get(groupId)}</Link> : groupNames.get(groupId)}
+                  {canEdit ? <Link href={`/admin/training-groups?group=${groupId}`}>{groupNames.get(groupId)}</Link> : groupNames.get(groupId)}
                   {canEdit && (
                     <button type="button" aria-label={`Remove from ${groupNames.get(groupId)}`} disabled={busy}
                       onClick={() => mutate(() => supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", personId))}>×</button>
                   )}
                 </span>
               ))}
-              {initialGroupIds.length === 0 && <span className="chip-list__empty">Not in any group</span>}
+              {initialGroupIds.length === 0 && <span className="chip-list__empty">Not in any training group</span>}
             </div>
             {canEdit && (
-              <MultiPicker items={groupOptions} excludeIds={initialGroupIds} placeholder="Add to groups…" noun="group" busy={busy}
+              <MultiPicker items={groupOptions} excludeIds={initialGroupIds} placeholder="Add to training groups…" noun="training group" busy={busy}
                 onAdd={(ids) => mutate(() => supabase.from("group_members").insert(ids.map((groupId) => ({ group_id: groupId, user_id: personId }))))} />
             )}
           </>

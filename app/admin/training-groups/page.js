@@ -4,7 +4,7 @@ import { isAdmin } from "@/lib/roles.mjs";
 import AdminTabs from "../AdminTabs";
 import GroupsClient from "./GroupsClient";
 
-export default async function GroupsPage({ searchParams }) {
+export default async function TrainingGroupsPage({ searchParams }) {
   const { group } = await searchParams;
   const { supabase, profile } = await requireViewer(isAdmin);
 
@@ -20,7 +20,7 @@ export default async function GroupsPage({ searchParams }) {
     <div>
       <TopNav profile={profile} />
       <div className="admin-nav tp-fade-in">
-        <AdminTabs active="groups" role={profile.role} />
+        <AdminTabs active="training-groups" role={profile.role} />
       </div>
       <GroupsClient
         initialGroups={groups || []}

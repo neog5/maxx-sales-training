@@ -13,7 +13,7 @@ export default async function AdminDashboardPage({ searchParams }) {
 
   // Who must complete what comes from required_courses(), which expands groups in the
   // database, so managers get accurate compliance without seeing central groups.
-  // Filters use central groups (admins only) plus the viewer's own private view groups.
+  // Filters use training groups (admins only) plus the viewer's own private watchlists.
   const [
     { data: people },
     { data: requiredPairs },
