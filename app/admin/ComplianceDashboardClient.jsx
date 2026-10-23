@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { COMPLIANCE_LABELS, complianceCsv } from "@/lib/compliance.mjs";
+import { localDateStamp } from "@/lib/format.mjs";
 import { ROLE_LABELS } from "@/lib/roles.mjs";
 import WatchlistBar from "./WatchlistBar";
 
@@ -45,12 +46,12 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, watchl
   };
 
   function exportCsv() {
-    const blob = new Blob([complianceCsv(filtered.map((row) => ({ ...row, groupNames: trainingGroupsOf(row) })), ROLE_LABELS)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([complianceCsv(filtered.map((row) => ({ ...row, groupNames: trainingGroupsOf(row) })), ROLE_LABELS, { includeGroups: showCentralGroups })], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     const groupName = groupSummaries.find((summary) => summary.id === group)?.name;
     link.href = url;
-    link.download = `compliance-${(groupName || "everyone").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `compliance-${(groupName || "everyone").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${localDateStamp()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }

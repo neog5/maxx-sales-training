@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/format.mjs";
+import LocalDate from "@/components/LocalDate";
 
 // Shared heading and sub-tabs for a course's Overview and Questions pages.
 export default function CourseHeader({ course, active, questionCount, recordCount }) {
@@ -12,7 +12,7 @@ export default function CourseHeader({ course, active, questionCount, recordCoun
         <h1 className="tp-display">{course.title}</h1>
         <p>
           {archived
-            ? `Archived ${formatDate(course.archived_at)}${course.archiver?.full_name ? ` by ${course.archiver.full_name}` : ""}. Learners can no longer start it, and it no longer counts toward compliance.`
+            ? <>Archived <LocalDate value={course.archived_at} />{course.archiver?.full_name ? ` by ${course.archiver.full_name}` : ""}. Learners can no longer start it, and it no longer counts toward compliance.</>
             : `${recordCount} training ${recordCount === 1 ? "record" : "records"} (reading sessions and assessment attempts).`}
         </p>
       </div>

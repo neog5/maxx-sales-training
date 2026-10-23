@@ -2,7 +2,7 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import { requireViewer } from "@/lib/auth";
 import { isAdmin } from "@/lib/roles.mjs";
-import { formatDate } from "@/lib/format.mjs";
+import LocalDate from "@/components/LocalDate";
 import AdminTabs from "../AdminTabs";
 
 function countBy(rows, key) {
@@ -44,8 +44,8 @@ export default async function CoursesAdminPage() {
             </div>
             <div>
               {course.archived_at ? (
-                <span className="course-status course-status--archived" title={`Archived ${formatDate(course.archived_at)}${course.archiver?.full_name ? ` by ${course.archiver.full_name}` : ""}`}>
-                  Archived {formatDate(course.archived_at)}
+                <span className="course-status course-status--archived">
+                  <span>Archived <LocalDate value={course.archived_at} /></span>
                   {course.archiver?.full_name && <small>by {course.archiver.full_name}</small>}
                 </span>
               ) : course.is_active ? (
