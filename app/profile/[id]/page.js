@@ -3,8 +3,12 @@ import Link from "next/link";
 import QuestionPerformance from "@/components/QuestionPerformance";
 import TopNav from "@/components/TopNav";
 import { calculateQuestionPerformance } from "@/lib/assessment.mjs";
+import { isRequirableCourse } from "@/lib/compliance.mjs";
+import { ROLE_LABELS, assignableRoles, canViewReports, isAdmin } from "@/lib/roles.mjs";
 import { createClient } from "@/lib/supabase/server";
 import RoleEditor from "./RoleEditor";
+import { fetchAssignmentsForUser } from "@/lib/assignments";
+import RequiredTraining from "./RequiredTraining";
 
 export default async function ProfilePage({ params }) {
   const { id } = await params;
@@ -14,18 +18,29 @@ export default async function ProfilePage({ params }) {
 
   const { data: viewer } = await supabase.from("profiles").select("id, full_name, role").eq("id", user.id).single();
   if (!viewer) redirect("/login");
-  if (viewer?.role !== "admin" && user.id !== id) redirect(`/profile/${user.id}`);
+  if (!canViewReports(viewer?.role) && user.id !== id) redirect(`/profile/${user.id}`);
 
-  const [{ data: person }, { data: attempts }] = await Promise.all([
+  const [{ data: person }, { data: attempts }, { data: memberships }, { data: groups }, { data: courses }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role").eq("id", id).single(),
     supabase
       .from("quiz_attempts")
-      .select("id, score, passed, submitted_at, status, courses(title, code)")
+      .select("id, course_id, score, passed, submitted_at, status, courses(title, code)")
       .eq("user_id", id)
       .eq("status", "completed")
       .order("submitted_at", { ascending: false }),
+    supabase.from("group_members").select("group_id").eq("user_id", id),
+    supabase.from("groups").select("id, name").order("name"),
+    supabase.from("courses").select("id, code, title, is_active, archived_at").order("code"),
   ]);
   if (!person) notFound();
+
+  const groupIds = (memberships || []).map((membership) => membership.group_id);
+  const [assignments, { data: requiredRows }] = await Promise.all([
+    fetchAssignmentsForUser(supabase, id, groupIds),
+    supabase.rpc("required_courses").eq("user_id", id),
+  ]);
+  const passedCourseIds = new Set((attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id));
+  const requirableCourses = (courses || []).filter(isRequirableCourse);
 
   const attemptIds = (attempts || []).map((attempt) => attempt.id);
   let attemptQuestions = [];
@@ -59,7 +74,7 @@ export default async function ProfilePage({ params }) {
     <div>
       <TopNav profile={viewer} />
       <main className="tp-page tp-fade-in">
-        {viewer.role === "admin" && <Link href="/admin/people" className="tp-btn tp-btn-ghost back-link">← Back to people</Link>}
+        {canViewReports(viewer.role) && <Link href="/admin/people" className="tp-btn tp-btn-ghost back-link">← Back to people</Link>}
         <div className="page-heading profile-heading">
           <div className="tp-label">User performance</div>
           <h1 className="tp-display">{person.full_name}</h1>
@@ -71,11 +86,25 @@ export default async function ProfilePage({ params }) {
             <div className="profile-summary__avatar" aria-hidden="true">{person.full_name?.trim()?.charAt(0)?.toUpperCase() || "U"}</div>
             <div>
               <h2 className="profile-summary__name tp-display">{person.full_name}</h2>
-              <div className="profile-summary__role">{person.role}</div>
+              <div className="profile-summary__role">{ROLE_LABELS[person.role] || person.role}</div>
             </div>
           </div>
-          {viewer.role === "admin" && <RoleEditor profileId={person.id} initialRole={person.role} />}
+          {assignableRoles(viewer.role, person.role).length > 0 && person.id !== viewer.id && (
+            <RoleEditor profileId={person.id} initialRole={person.role} roles={assignableRoles(viewer.role, person.role)} />
+          )}
         </section>
+
+        <RequiredTraining
+          personId={person.id}
+          canEdit={isAdmin(viewer.role)}
+          showGroups={isAdmin(viewer.role) || viewer.id === person.id}
+          requiredCourseIds={(requiredRows || []).map((row) => row.course_id)}
+          groups={groups || []}
+          initialGroupIds={groupIds}
+          courses={requirableCourses}
+          initialAssignments={assignments}
+          passedCourseIds={[...passedCourseIds]}
+        />
 
         <div className="metric-grid metric-grid--profile">
           <div className="tp-card metric-card">

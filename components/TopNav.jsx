@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ROLE_LABELS, canViewReports, isAdmin } from "@/lib/roles.mjs";
 
 export default function TopNav({ profile }) {
   const supabase = createClient();
@@ -41,10 +42,10 @@ export default function TopNav({ profile }) {
         </Link>
 
         <div className="site-nav__actions">
-          {profile?.role === "admin" && (
+          {canViewReports(profile?.role) && (
             <nav className="site-nav__primary" aria-label="Primary navigation">
               <Link href="/courses" className={`site-nav__link ${pathname.startsWith("/courses") ? "is-active" : ""}`}>Courses</Link>
-              <Link href="/admin" className={`site-nav__link ${pathname.startsWith("/admin") ? "is-active" : ""}`}>Admin</Link>
+              <Link href="/admin" className={`site-nav__link ${pathname.startsWith("/admin") ? "is-active" : ""}`}>{isAdmin(profile?.role) ? "Admin" : "Team"}</Link>
             </nav>
           )}
           <div className="site-nav__account" ref={accountRef}>
@@ -62,7 +63,7 @@ export default function TopNav({ profile }) {
               <div className="site-nav__menu" role="menu">
                 <div className="site-nav__menu-name">
                   <span>{profile?.full_name || "User"}</span>
-                  <small>{profile?.role === "admin" ? "Administrator" : "Sales representative"}</small>
+                  <small>{ROLE_LABELS[profile?.role] || "Learner"}</small>
                 </div>
                 <Link href={`/profile/${profile?.id}`} className="site-nav__menu-link" role="menuitem" onClick={() => setMenuOpen(false)}>
                   <span aria-hidden="true">○</span> View profile

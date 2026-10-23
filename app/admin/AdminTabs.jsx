@@ -1,41 +1,29 @@
 "use client";
 import Link from "next/link";
+import { isAdmin } from "@/lib/roles.mjs";
 
-export default function AdminTabs({ active }) {
+const TABS = [
+  { key: "dashboard", href: "/admin", label: "Dashboard" },
+  { key: "people", href: "/admin/people", label: "People" },
+  { key: "training-groups", href: "/admin/training-groups", label: "Training groups", adminOnly: true },
+  { key: "courses", href: "/admin/courses", label: "Courses", adminOnly: true },
+  { key: "insights", href: "/admin/insights", label: "Insights" },
+];
+
+export default function AdminTabs({ active, role }) {
   return (
     <nav className="admin-tabs" aria-label="Admin navigation">
-      <Link
-        href="/admin"
-        className="tp-btn"
-        aria-current={active === "dashboard" ? "page" : undefined}
-        style={{ color: active === "dashboard" ? "var(--text)" : "var(--faint)", textDecoration: "none" }}
-      >
-        Dashboard
-      </Link>
-      <Link
-        href="/admin/people"
-        className="tp-btn"
-        aria-current={active === "people" ? "page" : undefined}
-        style={{ color: active === "people" ? "var(--text)" : "var(--faint)", textDecoration: "none" }}
-      >
-        People
-      </Link>
-      <Link
-        href="/admin/questions"
-        className="tp-btn"
-        aria-current={active === "bank" ? "page" : undefined}
-        style={{ color: active === "bank" ? "var(--text)" : "var(--faint)", textDecoration: "none" }}
-      >
-        Question bank
-      </Link>
-      <Link
-        href="/admin/courses"
-        className="tp-btn"
-        aria-current={active === "courses" ? "page" : undefined}
-        style={{ color: active === "courses" ? "var(--text)" : "var(--faint)", textDecoration: "none" }}
-      >
-        Add course
-      </Link>
+      {TABS.filter((tab) => !tab.adminOnly || isAdmin(role)).map((tab) => (
+        <Link
+          key={tab.key}
+          href={tab.href}
+          className="tp-btn"
+          aria-current={active === tab.key ? "page" : undefined}
+          style={{ color: active === tab.key ? "var(--text)" : "var(--faint)", textDecoration: "none" }}
+        >
+          {tab.label}
+        </Link>
+      ))}
     </nav>
   );
 }

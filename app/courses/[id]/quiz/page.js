@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import TopNav from "@/components/TopNav";
+import CourseUnavailable from "@/components/CourseUnavailable";
 import QuizClient from "./QuizClient";
 import { notFound, redirect } from "next/navigation";
 
@@ -10,6 +11,7 @@ export default async function QuizPage({ params }) {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   const { data: course } = await supabase.from("courses").select("*").eq("id", id).single();
   if (!course) notFound();
+  if (course.archived_at) return <CourseUnavailable profile={profile} course={course} />;
   const { data: completedReading } = await supabase
     .from("reading_sessions")
     .select("id")

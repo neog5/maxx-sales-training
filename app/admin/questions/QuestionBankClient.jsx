@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { GENERATION_LIMITS } from "@/lib/question-suggestions.mjs";
 
 function emptyDraft(courseId) {
   return { course_id: courseId, question_type: "main_test", page_number: null, question_text: "", image_url: null, is_mandatory: false, options: ["", "", "", ""], correct_index: 0, explanation: "" };
 }
 
 function generationCount(value, minimum, maximum, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
 }
@@ -145,7 +147,8 @@ function SuggestionPanel({ questions, selected, loading, importing, error, count
   );
 }
 
-export default function QuestionBankClient({ courses, initialQuestions, initialCourseId, autoSuggest = false, initialGenerationCounts = {} }) {
+// One course's questions, shown on the course's Questions tab. Archived courses are read-only.
+export default function QuestionBankClient({ courses, initialQuestions, initialCourseId, autoSuggest = false, initialGenerationCounts = {}, readOnly = false }) {
   const supabase = createClient();
   const [courseId, setCourseId] = useState(courses.some((course) => course.id === initialCourseId) ? initialCourseId : courses[0]?.id);
   const [questions, setQuestions] = useState(initialQuestions);
@@ -161,8 +164,8 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
   const [suggestionError, setSuggestionError] = useState("");
   const [mutationError, setMutationError] = useState("");
   const [generationCounts, setGenerationCounts] = useState({
-    reading: generationCount(initialGenerationCounts.reading, 1, 10, 5),
-    main: generationCount(initialGenerationCounts.main, 5, 30, 10),
+    reading: generationCount(initialGenerationCounts.reading, 0, GENERATION_LIMITS.reading.max, 5),
+    main: generationCount(initialGenerationCounts.main, 0, GENERATION_LIMITS.main.max, 10),
   });
   const autoSuggestStarted = useRef(false);
   const generationRequest = useRef(null);
@@ -203,21 +206,6 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
         setGenerating(false);
       }
     }
-  }
-
-  function selectCourse(nextCourseId) {
-    generationRequest.current?.abort();
-    generationRequest.current = null;
-    setGenerating(false);
-    setCourseId(nextCourseId);
-    setDraft(null);
-    setImageFile(null);
-    setEditingId(null);
-    setFormError("");
-    setMutationError("");
-    setSuggestions(null);
-    setSelectedSuggestions(new Set());
-    setSuggestionError("");
   }
 
   useEffect(() => {
@@ -314,32 +302,25 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
   }
 
   return (
-    <main className="bank-page tp-fade-in">
+    <section className="bank-page is-embedded">
       <div className="bank-heading">
-        <div><div className="tp-label">Admin workspace</div><h1 className="tp-display">Question bank</h1></div>
-        <button className="tp-btn tp-btn-primary" onClick={() => { setDraft(emptyDraft(courseId)); setImageFile(null); setEditingId(null); setFormError(""); }}>+ Add question</button>
+        <div>
+          <div className="tp-label">Question bank</div>
+          <span className="bank-heading__counts">{mainQuestions.length} main test · {filtered.length - mainQuestions.length} reading{mandatoryCount ? ` · ${mandatoryCount} mandatory` : ""}</span>
+        </div>
+        {!readOnly && <button className="tp-btn tp-btn-primary" onClick={() => { setDraft(emptyDraft(courseId)); setImageFile(null); setEditingId(null); setFormError(""); }}>+ Add question</button>}
       </div>
 
-      <div className="course-filter">
-        {courses.map((c) => (
-          <button
-            key={c.id}
-            className={`tp-btn ${courseId === c.id ? "is-selected" : ""}`}
-            onClick={() => selectCourse(c.id)}
-          >
-            {c.code} <span style={{ opacity: 0.6 }}>({questions.filter((q) => q.course_id === c.id && q.question_type === "main_test").length} main · {questions.filter((q) => q.course_id === c.id && q.question_type === "reading_test").length} reading)</span>
-          </button>
-        ))}
-      </div>
+      {readOnly && <div className="notice">This course is archived, so its questions are read-only. Restore the course to edit them.</div>}
 
       {mutationError && <div className="notice" role="alert">{mutationError}</div>}
 
-      {!suggestions && !generating && !suggestionError && courses.find((course) => course.id === courseId)?.pdf_url && (
+      {!readOnly && !suggestions && !generating && !suggestionError && courses.find((course) => course.id === courseId)?.pdf_url && (
         <div className="suggestion-launch">
           <span>Generate from this course’s PDF</span>
-          <label><b>Reading</b><input className="tp-input" type="number" min="1" max="10" value={generationCounts.reading} onChange={(event) => setGenerationCounts((current) => ({ ...current, reading: event.target.value }))} /></label>
-          <label><b>Main test</b><input className="tp-input" type="number" min="5" max="30" value={generationCounts.main} onChange={(event) => setGenerationCounts((current) => ({ ...current, main: event.target.value }))} /></label>
-          <button className="tp-btn tp-btn-ghost" onClick={generateSuggestions}>Generate recommendations</button>
+          <label><b>Reading</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.reading.max} value={generationCounts.reading} onChange={(event) => setGenerationCounts((current) => ({ ...current, reading: event.target.value }))} /></label>
+          <label><b>Main test</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.main.max} value={generationCounts.main} onChange={(event) => setGenerationCounts((current) => ({ ...current, main: event.target.value }))} /></label>
+          <button className="tp-btn tp-btn-ghost" onClick={generateSuggestions} disabled={!(Number(generationCounts.reading) + Number(generationCounts.main) > 0)}>Generate recommendations</button>
         </div>
       )}
 
@@ -357,7 +338,7 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
         onImport={importSuggestions}
       />
 
-      {(mainQuestions.length < targetAssessmentCount || optionalCount < requiredOptionalCount) && (
+      {!readOnly && (mainQuestions.length < targetAssessmentCount || optionalCount < requiredOptionalCount) && (
         <div className="notice">
           This course needs {targetAssessmentCount} main-test questions ({mandatoryCount} mandatory and at least {requiredOptionalCount} non-mandatory) for the 60/40 assessment mix. Currently it has {mainQuestions.length} total and {optionalCount} non-mandatory.
         </div>
@@ -380,7 +361,7 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
               <div style={{ fontSize: 13.5 }}>{q.question_text}</div>
               {q.image_url && <img className="question-media question-media--bank" src={q.image_url} alt="" />}
             </div>
-            <div className="question-item__actions" style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {!readOnly && <div className="question-item__actions" style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button
                 className="tp-btn tp-btn-ghost"
                 style={{ padding: "6px 12px" }}
@@ -389,11 +370,11 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
                 Edit
               </button>
               <button className="tp-btn tp-btn-danger" style={{ padding: "6px 12px" }} onClick={() => deleteQuestion(q.id)}>Delete</button>
-            </div>
+            </div>}
           </div>
         ))}
         {filtered.length === 0 && <div className="tp-card" style={{ padding: 20, color: "var(--faint)", fontSize: 13 }}>No questions yet for this course.</div>}
       </div>
-    </main>
+    </section>
   );
 }

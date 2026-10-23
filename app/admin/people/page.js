@@ -1,26 +1,17 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireViewer } from "@/lib/auth";
+import { canViewReports } from "@/lib/roles.mjs";
 import TopNav from "@/components/TopNav";
 import AdminTabs from "../AdminTabs";
 import PeopleDirectoryClient from "./PeopleDirectoryClient";
 
 export default async function PeoplePage({ searchParams }) {
   const { status } = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, full_name, role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "admin") redirect("/courses");
+  const { supabase, profile } = await requireViewer(canViewReports);
 
   const [{ data: people }, { data: attempts }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, role, created_at")
+      .select("id, full_name, email, role, created_at")
       .order("full_name"),
     supabase
       .from("quiz_attempts")
@@ -61,7 +52,7 @@ export default async function PeoplePage({ searchParams }) {
     <div>
       <TopNav profile={profile} />
       <div className="admin-nav tp-fade-in">
-        <AdminTabs active="people" />
+        <AdminTabs active="people" role={profile.role} />
       </div>
       <PeopleDirectoryClient
         people={directory}

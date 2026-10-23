@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { ROLE_LABELS } from "@/lib/roles.mjs";
 
-export default function RoleEditor({ profileId, initialRole }) {
+export default function RoleEditor({ profileId, initialRole, roles }) {
   const [role, setRole] = useState(initialRole);
   const [savedRole, setSavedRole] = useState(initialRole);
   const [saving, setSaving] = useState(false);
@@ -25,7 +26,7 @@ export default function RoleEditor({ profileId, initialRole }) {
     if (error) {
       setMessage(`Role could not be updated: ${error.message}`);
     } else if (!data) {
-      setMessage("Role update was blocked by database permissions. Apply supabase/profile-role-policy.sql to this Supabase project.");
+      setMessage("Role update was blocked by database permissions.");
     } else {
       setRole(data.role);
       setSavedRole(data.role);
@@ -39,8 +40,7 @@ export default function RoleEditor({ profileId, initialRole }) {
     <div>
       <div className="role-editor">
         <select className="tp-input" aria-label="User role" value={role} onChange={(event) => setRole(event.target.value)}>
-          <option value="rep">Rep</option>
-          <option value="admin">Admin</option>
+          {roles.map((value) => <option key={value} value={value}>{ROLE_LABELS[value]}</option>)}
         </select>
         <button type="button" className="tp-btn tp-btn-primary" disabled={saving || role === savedRole} onClick={saveRole}>
           {saving ? "Saving…" : "Save role"}

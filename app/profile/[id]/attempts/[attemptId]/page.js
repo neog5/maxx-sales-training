@@ -4,6 +4,7 @@ import QuestionPerformance from "@/components/QuestionPerformance";
 import TopNav from "@/components/TopNav";
 import { calculateQuestionPerformance } from "@/lib/assessment.mjs";
 import { createClient } from "@/lib/supabase/server";
+import { canViewReports } from "@/lib/roles.mjs";
 
 function formatDate(value) {
   return new Intl.DateTimeFormat("en-US", {
@@ -20,7 +21,7 @@ export default async function AttemptPage({ params }) {
 
   const { data: viewer } = await supabase.from("profiles").select("id, full_name, role").eq("id", user.id).single();
   if (!viewer) redirect("/login");
-  if (viewer?.role !== "admin" && user.id !== id) redirect(`/profile/${user.id}`);
+  if (!canViewReports(viewer?.role) && user.id !== id) redirect(`/profile/${user.id}`);
 
   const [{ data: person }, { data: attempt }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role").eq("id", id).single(),
