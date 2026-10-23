@@ -11,8 +11,7 @@
 | Logic tests (`npm test`) | ✅ 19 / 19 |
 | Database access tests (`npm run test:db`) | ✅ 9 / 9 groups, 50+ checks, no data left behind |
 | Production build (`npm run build`) | ✅ |
-| Browser test cases run | ✅ 46 passed · 0 failed |
-| Browser test cases not run | ⏭ 1 (B1: needs a PDF picked from your computer) |
+| Browser test cases run | ✅ 47 passed · 0 failed (all cases) |
 
 All throwaway test data (the courses `QA-TEST` and `QA-ARCHIVED`, the training groups "QA test group" and "QA learner group", the watchlist and every assignment) was deleted afterwards. Each change was recorded in the audit log. Jane Smith's passed DEMO-101 attempt from E2 was kept, because attempts are training records and can't be deleted.
 
@@ -27,7 +26,7 @@ All throwaway test data (the courses `QA-TEST` and `QA-ARCHIVED`, the training g
 | A5 | ✅ | 	Saves; "Super admin" isn't offered |
 | A6 | ✅ | Admin's profile offers Learner / Manager / Admin / Super admin |
 | A7 | ✅ | No role editor on your own profile |
-| B1 | ⏭ | Needs a PDF upload (the in-app browser can't pick files) |
+| B1 | ✅ | Checked by Het: with a PDF attached and 2 reading / 4 main, the form blocks creation ("Value must be greater than or equal to 3") |
 | B2 | ✅ | Created a course without a PDF; landed on its Questions tab |
 | B3 | ✅ | 0 reading / 2 main generated 2 suggestions in about 2 minutes (no True/False required); not added |
 | B4 | ✅ | Generate button disabled at 0 / 0 |
@@ -87,4 +86,4 @@ All throwaway test data (the courses `QA-TEST` and `QA-ARCHIVED`, the training g
 
 ## Still to test by hand
 
-B1 (create a course with a PDF and 2 reading / 4 main suggestions; it should be blocked). The in-app browser can't pick files. Steps are in [TESTING.md](TESTING.md).
+Nothing. Every case in [TESTING.md](TESTING.md) has been run.
