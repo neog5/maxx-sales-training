@@ -1,7 +1,7 @@
 # Test results
 
-**Run:** 2026-10-19 · branch `overhaul` · local dev server against the dev Supabase project
-**Signed in as:** super admin (Het Patel Maxx), in the Claude desktop in-app browser
+**Runs:** 2026-10-19 (super admin) and 2026-10-22 (admin, manager, learner) · branch `overhaul` · local dev server against the dev Supabase project
+**Signed in as:** Het Patel Maxx (super admin), Het Patel 2 (admin), John Doe (manager), Jane Smith (learner), in the Claude desktop in-app browser. The A cases were run by hand by Het.
 **Test cases:** [TESTING.md](TESTING.md)
 
 ## Summary
@@ -11,20 +11,20 @@
 | Logic tests (`npm test`) | ✅ 19 / 19 |
 | Database access tests (`npm run test:db`) | ✅ 9 / 9 groups, 50+ checks, no data left behind |
 | Production build (`npm run build`) | ✅ |
-| Browser test cases run | ✅ 35 passed · 0 failed |
-| Browser test cases not run | ⏭ 13 (need a learner, manager or admin sign-in, a PDF upload, or a file download) |
+| Browser test cases run | ✅ 46 passed · 0 failed |
+| Browser test cases not run | ⏭ 1 (B1: needs a PDF picked from your computer) |
 
-All throwaway test data (the course `QA-TEST`, the training group "QA test group", the watchlist and every assignment) was deleted afterwards. Each change was recorded in the audit log.
+All throwaway test data (the courses `QA-TEST` and `QA-ARCHIVED`, the training groups "QA test group" and "QA learner group", the watchlist and every assignment) was deleted afterwards. Each change was recorded in the audit log. Jane Smith's passed DEMO-101 attempt from E2 was kept, because attempts are training records and can't be deleted.
 
 ## Browser results
 
 | ID | Result | Notes |
 |---|---|---|
-| A1 | ⏭ | Needs a new sign-up |
-| A2 | ⏭ | Needs a learner sign-in |
-| A3 | ⏭ | Needs a manager sign-in (layout also covered by the manager preview with sample data) |
+| A1 | ✅ | Lands on Courses; profile menu shows "Learner" |
+| A2 | ✅ | Redirected to Courses; no Admin link in the top bar |
+| A3 | ✅ | Tabs: Dashboard, People, Insights only |
 | A4 | ✅ | Super admin sees Dashboard, People, Training groups, Courses, Insights |
-| A5 | ⏭ | Needs an admin sign-in |
+| A5 | ✅ | 	Saves; "Super admin" isn't offered |
 | A6 | ✅ | Admin's profile offers Learner / Manager / Admin / Super admin |
 | A7 | ✅ | No role editor on your own profile |
 | B1 | ⏭ | Needs a PDF upload (the in-app browser can't pick files) |
@@ -34,9 +34,9 @@ All throwaway test data (the course `QA-TEST`, the training group "QA test group
 | B5 | ✅ | Title and passing score saved; History shows "Updated title, passing score" |
 | B6 | ✅ | Archived; list shows "Archived Oct 19, 2026 by Het Patel Maxx"; History shows "Archived the course" |
 | B7 | ✅ | Details, assignments and Questions read-only while archived |
-| B8 | ⏭ | Needs a learner sign-in |
+| B8 | ✅ | As Jane: archived `QA-ARCHIVED` isn't listed; its read and quiz links both show "This course has been archived and can no longer be started" |
 | B9 | ✅ | Restored; History shows "Restored the course from the archive" |
-| B10 | ⏭ | Needs an admin sign-in (the database test confirms admins can't delete) |
+| B10 | ✅ | As Het Patel 2 (admin): no Delete course section, even on an empty course |
 | B11 | ✅ | FPKT (35 records): Delete disabled with "archive it instead" |
 | B12 | ✅ | Deleted the empty test course after typing its code |
 | B13 | ✅ | `/admin/questions?course=…` redirects to the course's Questions tab |
@@ -55,15 +55,17 @@ All throwaway test data (the course `QA-TEST`, the training group "QA test group
 | D2 | ✅ | Clicking a group card filters the table |
 | D3 | ✅ | Status buttons filter correctly |
 | D4 | ✅ | Search by email ("hettrips") finds John Doe |
-| D5 | ⏭ | CSV download not clicked (downloads need your go-ahead); CSV content is covered by a logic test |
-| D6 | ⏭ | Needs a manager sign-in |
+| D5 | ✅ | As manager: downloaded `compliance-everyone-2026-10-23.csv` with 6 rows and the right completed/assigned/status values |
+| D6 | ✅ | As John (manager): only the Everyone card; no training groups in cards, filter or table; tabs Dashboard, People, Insights; admin-only URLs redirect to Courses |
 | D7 | ✅ | Created a watchlist from the Dashboard; editor opened inline |
 | D8 | ✅ | Added a person; pill showed 0/1 and filtered the table |
 | D9 | ✅ | Clicking the pill again shows everyone |
 | D10 | ✅ | Renamed, then deleted |
-| D11 | ⏭ | Needs two different sign-ins (the database test confirms watchlists are private) |
-| D12 | ⏭ | Needs a manager sign-in |
-| E1–E3 | ⏭ | Needs a learner sign-in |
+| D11 | ✅ | Het Patel 2's watchlists ("Test list", "Test list 2") aren't visible to John |
+| D12 | ✅ | As John: Jane's profile shows her required course and status, but no training-group name, role editor, pickers or remove buttons |
+| E1 | ✅ | As Jane: DEMO-101 under Required courses (0 of 1); other live courses under Other available courses; archived course absent |
+| E2 | ✅ | Started DEMO-101, passed 3 page checkpoints, waited out the 30 s reading time, then passed the quiz (7/7, 4/4 mandatory). Courses page shows "1 of 1 complete · Passed 100%" |
+| E3 | ✅ | Own profile: "Compliant", training group listed, nothing editable; other people's profiles and `/admin` redirect back |
 | F1 | ✅ | Dashboard, Training groups and a course page at 375 px wide: no sideways scrolling |
 
 **How the confirmation pop-ups were handled:** the in-app browser automatically dismisses the browser's "Are you sure?" pop-ups. For archive, restore, delete and watchlist delete, the page was made to answer "OK" (and to type the course code for course delete), which is what a person would do. The pop-up wording was checked.
@@ -78,7 +80,11 @@ All throwaway test data (the course `QA-TEST`, the training group "QA test group
 2. **The watchlist editor stays open** after you click the pill to show everyone again. It's harmless, but closing it at the same time may feel tidier.
 3. **Phone-width top bar** (existing before this work): the logo crowds the Courses / Admin switcher at 375 px.
 4. **AI suggestions take about 2 minutes** on the free OpenRouter model. See issue #7 for moving off OpenRouter.
+5. **Dates are shown in UTC**, so in US evenings they read as the next day (an archive done on Oct 22 showed "Oct 23"; the CSV filename too). This avoids page-load glitches; showing local time would need a small client-side change.
+6. **A manager's CSV has an empty Groups column**, because managers can't see training groups. It could be dropped from their export.
+7. **DEMO-101 has a mandatory test question** ("This is one you HAVE to get right!…") that looks like leftover test content. Consider removing it before real use.
+8. **The reading timer pauses while a checkpoint question is open.** This looks intentional, but learners may wonder why it stopped.
 
 ## Still to test by hand
 
-A1, A2, A3, A5, B1, B8, B10, D5, D6, D11, D12, E1–E3. These need sign-ins as other roles, a PDF upload or a file download. Steps are in [TESTING.md](TESTING.md).
+B1 (create a course with a PDF and 2 reading / 4 main suggestions; it should be blocked). The in-app browser can't pick files. Steps are in [TESTING.md](TESTING.md).
