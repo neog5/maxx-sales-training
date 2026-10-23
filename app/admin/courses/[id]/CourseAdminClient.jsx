@@ -7,7 +7,7 @@ import MultiPicker from "@/components/MultiPicker";
 import { createClient } from "@/lib/supabase/client";
 import { groupItems, personItems } from "@/lib/picker-items.mjs";
 import { describeAuditEntry } from "@/lib/audit.mjs";
-import { formatDateTime } from "@/lib/format.mjs";
+import LocalDate from "@/components/LocalDate";
 import { isSuperAdmin } from "@/lib/roles.mjs";
 
 function coursePdfPath(pdfUrl) {
@@ -224,7 +224,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
           {history.map((entry) => (
             <div className="audit-list__row" key={entry.id}>
               <span>{describeAuditEntry(entry, names)}</span>
-              <small>{entry.actor_name || "System"} · {formatDateTime(entry.created_at)}</small>
+              <small>{entry.actor_name || "System"} · <LocalDate value={entry.created_at} withTime /></small>
             </div>
           ))}
           {history.length === 0 && <div className="admin-insight-empty">No recorded changes yet.</div>}
