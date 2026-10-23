@@ -139,7 +139,6 @@ Not done yet. When moving to training.maxxorthoportal.com:
    - Access → Applications → Add → Self-hosted: domain `training-dev.maxxorthoportal.com` (empty path), session 24 hours, policy Allow → Include → Access Group `Training portal – dev testers`.
    - Test in a private window with an allowed and a non-allowed email. Make sure the application does not cover `training.maxxorthoportal.com`.
    - `workers_dev` and `preview_urls` are already disabled in `wrangler.jsonc`, so Access cannot be bypassed via other URLs.
-7. Retire the old Vercel deployment.
 
 ## Useful commands
 

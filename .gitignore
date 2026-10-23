@@ -10,7 +10,6 @@ out/
 # Logs and local tooling
 *.log
 .DS_Store
-.vercel/
 coverage/
 
 # Generated PDF QA files
