@@ -1096,3 +1096,18 @@ body {
   .watchlists__create .tp-input, .watchlists__editor-head .tp-input { width: 100%; }
   .watchlists__editor-head form { flex: 1; }
 }
+.certificate-page .back-link { margin-bottom: 20px; }
+.certificate-viewer { max-width: 980px; }
+.certificate-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.certificate-actions a { text-decoration: none; }
+.certificate-actions a[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+.certificate-preview { position: relative; padding: 12px; overflow: hidden; }
+.certificate-preview canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
+.certificate-preview__skeleton { display: block; width: 100%; aspect-ratio: 297 / 210; border-radius: 4px; }
+.certificate-preview:has(.certificate-preview__skeleton) canvas { position: absolute; inset: 12px; width: calc(100% - 24px); visibility: hidden; }
+.certificate-list { padding: 4px 18px; }
+.certificate-list__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.certificate-list__row:last-child { border-bottom: 0; }
+.certificate-list__row strong { display: block; font-size: 14px; }
+.certificate-list__row small { color: var(--faint); font-size: 12px; }
+.certificate-list .admin-insight-empty { min-height: 72px; }

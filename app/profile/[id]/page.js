@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import LocalDate from "@/components/LocalDate";
 import QuestionPerformance from "@/components/QuestionPerformance";
 import TopNav from "@/components/TopNav";
 import { calculateQuestionPerformance } from "@/lib/assessment.mjs";
@@ -20,7 +21,7 @@ export default async function ProfilePage({ params }) {
   if (!viewer) redirect("/login");
   if (!canViewReports(viewer?.role) && user.id !== id) redirect(`/profile/${user.id}`);
 
-  const [{ data: person }, { data: attempts }, { data: memberships }, { data: groups }, { data: courses }] = await Promise.all([
+  const [{ data: person }, { data: attempts }, { data: memberships }, { data: groups }, { data: courses }, { data: certificates }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role").eq("id", id).single(),
     supabase
       .from("quiz_attempts")
@@ -31,6 +32,7 @@ export default async function ProfilePage({ params }) {
     supabase.from("group_members").select("group_id").eq("user_id", id),
     supabase.from("groups").select("id, name").order("name"),
     supabase.from("courses").select("id, code, title, is_active, archived_at").order("code"),
+    supabase.from("certificates").select("id, course_title, course_code, issued_at").eq("user_id", id).order("issued_at", { ascending: false }),
   ]);
   if (!person) notFound();
 
@@ -105,6 +107,27 @@ export default async function ProfilePage({ params }) {
           initialAssignments={assignments}
           passedCourseIds={[...passedCourseIds]}
         />
+
+        <section className="profile-report-section">
+          <div className="section-heading-row">
+            <div>
+              <div className="tp-label">Certificates</div>
+              <span>Issued automatically the first time a course is passed</span>
+            </div>
+          </div>
+          <div className="tp-card certificate-list">
+            {(certificates || []).map((certificate) => (
+              <div key={certificate.id} className="certificate-list__row">
+                <div>
+                  <strong>{certificate.course_title}</strong>
+                  <small>{certificate.course_code} · completed <LocalDate value={certificate.issued_at} /></small>
+                </div>
+                <Link href={`/certificates/${certificate.id}`} className="tp-btn tp-btn-ghost attempt-review-link">View</Link>
+              </div>
+            ))}
+            {!certificates?.length && <div className="admin-insight-empty">No certificates yet.</div>}
+          </div>
+        </section>
 
         <div className="metric-grid metric-grid--profile">
           <div className="tp-card metric-card">

@@ -21,6 +21,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
+  const [certificateId, setCertificateId] = useState(null);
   const [result, setResult] = useState(null); // { score, passed, graded: [...] }
   const [submitting, setSubmitting] = useState(false);
 
@@ -77,6 +78,12 @@ export default function QuizClient({ course, userId, lastAttempt }) {
       );
     }
 
+    // The database issues the certificate when a passing attempt is saved.
+    if (attempt && passed) {
+      const { data: certificate } = await supabase.from("certificates").select("id").eq("user_id", userId).eq("course_id", course.id).maybeSingle();
+      setCertificateId(certificate?.id || null);
+    }
+
     setResult(assessmentResult);
     setSubmitting(false);
   }
@@ -117,6 +124,13 @@ export default function QuizClient({ course, userId, lastAttempt }) {
               <strong>{result.mandatoryCount ? `Mandatory questions: ${result.mandatoryCorrectCount} of ${result.mandatoryCount} correct` : "No mandatory questions in this assessment"}</strong>
               <span>{result.mandatoryPassed ? "Requirement met" : "All mandatory questions must be correct to pass"}</span>
             </div>
+            {result.passed && certificateId && (
+              <div style={{ marginTop: 14 }}>
+                <Link href={`/certificates/${certificateId}`} className="tp-btn tp-btn-primary" style={{ textDecoration: "none" }}>
+                  View certificate
+                </Link>
+              </div>
+            )}
             {!result.passed && (
               <div style={{ marginTop: 14 }}>
                 <Link href={`/courses/${course.id}/quiz`} className="tp-btn tp-btn-primary" style={{ textDecoration: "none" }} onClick={() => window.location.reload()}>

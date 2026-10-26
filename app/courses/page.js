@@ -5,7 +5,7 @@ import CourseCardClient from "./CourseCardClient";
 export default async function CoursesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: profile }, { data: courses }, { data: attempts }, { data: readingSessions }, { data: requiredRows }] = await Promise.all([
+  const [{ data: profile }, { data: courses }, { data: attempts }, { data: readingSessions }, { data: requiredRows }, { data: certificates }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("courses").select("*").eq("is_active", true).is("archived_at", null).order("code"),
     supabase
@@ -20,8 +20,10 @@ export default async function CoursesPage() {
       .eq("user_id", user.id),
     // Managers and admins can read everyone's rows, so filter to this person.
     supabase.rpc("required_courses").eq("user_id", user.id),
+    supabase.from("certificates").select("id, course_id").eq("user_id", user.id),
   ]);
 
+  const certificateIdByCourse = new Map((certificates || []).map((certificate) => [certificate.course_id, certificate.id]));
   const requiredIds = new Set((requiredRows || []).map((row) => row.course_id));
 
   const byCourse = {};
@@ -45,6 +47,7 @@ export default async function CoursesPage() {
           initiallyEnrolled={courseSessions.length > 0}
           readingComplete={courseSessions.some((session) => session.checkpoint_passed)}
           history={byCourse[c.id] || []}
+          certificateId={certificateIdByCourse.get(c.id)}
           index={index + offset}
         />
       );
