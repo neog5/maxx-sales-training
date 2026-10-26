@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-export default function CourseCardClient({ course, userId, initiallyEnrolled, readingComplete, history, index }) {
+export default function CourseCardClient({ course, userId, initiallyEnrolled, readingComplete, history, certificateId, index }) {
   const supabase = createClient();
   const [enrolled, setEnrolled] = useState(initiallyEnrolled);
   const [enrolling, setEnrolling] = useState(false);
@@ -71,6 +71,13 @@ export default function CourseCardClient({ course, userId, initiallyEnrolled, re
                 <span><strong>Assessment</strong><small>Complete the reading first</small></span>
                 <span className="course-step__lock" aria-hidden="true">Locked</span>
               </div>
+            )}
+            {certificateId && (
+              <Link href={`/certificates/${certificateId}`} className="course-step">
+                <span className="course-step__number">3</span>
+                <span><strong>Certificate</strong><small>View and download</small></span>
+                <span className="course-step__arrow" aria-hidden="true">→</span>
+              </Link>
             )}
           </div>
         )}

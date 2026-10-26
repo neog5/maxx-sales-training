@@ -24,6 +24,7 @@ A Next.js 16 App Router application backed by Supabase. Learners read course PDF
    - `supabase/migrations/001_compliance_safety.sql` - roles, course archiving, the audit log and record protection
    - `supabase/migrations/002_groups_and_assignments.sql` - groups and course assignments
    - `supabase/migrations/003_view_groups.sql` - private watchlists (`view_groups`), profile emails and manager scoping
+   - `supabase/migrations/004_certificates.sql` - course completion certificates
    - `supabase/seed.sql` - one fictional sample course with reading and quiz questions
 
 3. Copy the environment template and add the public credentials from the Supabase project's API settings:
@@ -78,6 +79,12 @@ After that, manage roles from each person's profile page.
 - Courses that aren't assigned to someone still appear under "Other available courses" for them.
 - **Watchlists** (the ☆ row on the Dashboard) are private lists that managers, admins and super admins make to watch a team's compliance, such as "My team". Only the creator can see a watchlist, and watchlists never change what anyone has to complete. Managers can't see training groups; they get accurate compliance through the `required_courses()` database function, which expands group assignments without revealing them.
 - People pickers search by name or email, can select every match at once, and accept a pasted list of email addresses.
+
+## Course completion certificates
+
+- The first time someone passes a course, the database issues a certificate with a number such as `MXO-2026-000001` and keeps a copy of their name, the course title and the completion date. Retakes don't issue another one, and renaming or archiving the course later doesn't change it. Nobody can edit or delete certificates from the app.
+- People open their certificates from the quiz results, their course cards and their profile; managers and admins also see them on each person's profile. The certificate page previews it and offers **Download PDF**; the PDF is made in the browser from the template.
+- **Changing the template:** design it in Canva (one template for every course) with the name, course and date areas left blank, then Download → **PDF Print** and save it as `public/certificates/template.pdf`. Then adjust the text positions, sizes, fonts and colours in `CERTIFICATE_TEMPLATE` in `lib/certificates.mjs` until the text sits in the right place. The current file is a placeholder drawn by `scripts/make-mock-certificate-template.mjs`.
 
 ## Archiving, deleting and the audit log
 
@@ -170,6 +177,7 @@ app/
   courses/                learner course list (required and optional)
   courses/[id]/read/      PDF reader and page checkpoints
   courses/[id]/quiz/      randomized quiz and results
+  certificates/[id]/      certificate preview and PDF download
   admin/                  compliance dashboard
   admin/people/           searchable team directory and performance overview
   admin/training-groups/  training groups, members and group course assignments
@@ -191,7 +199,7 @@ open-next.config.ts       OpenNext Cloudflare adapter configuration
 
 This code is suitable for demonstration and further development, but quiz outcomes should not yet be treated as trusted training or compliance records:
 
-- Grading and attempt creation happen in the browser, so an authenticated user can alter submitted results.
+- Grading and attempt creation happen in the browser, so an authenticated user can alter submitted results, and with them earn a certificate.
 - Quiz RPC responses include correct answers and explanations before submission.
 - Reading completion and retry cooldown enforcement are client-side and can be bypassed.
 - The results screen may appear even if attempt persistence fails.
