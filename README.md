@@ -84,7 +84,7 @@ After that, manage roles from each person's profile page.
 
 - The first time someone passes a course, the database issues a certificate with a number such as `MXO-2026-000001` and keeps a copy of their name, the course title and the completion date. Retakes don't issue another one, and renaming or archiving the course later doesn't change it. Nobody can edit or delete certificates from the app.
 - People open their certificates from the quiz results, their course cards and their profile; managers and admins also see them on each person's profile. The certificate page previews it and offers **Download PDF**; the PDF is made in the browser from the template.
-- **Changing the template:** design it in Canva (one template for every course) with the name, course and date areas left blank, then Download → **PDF Print** and save it as `public/certificates/template.pdf`. Then adjust the text positions, sizes, fonts and colours in `CERTIFICATE_TEMPLATE` in `lib/certificates.mjs` until the text sits in the right place. The current file is a placeholder drawn by `scripts/make-mock-certificate-template.mjs`.
+- **Changing the template:** design it in Canva (one template for every course) with the name, course and date areas left blank, then Download → **PDF Print** and save it as `public/certificates/template.pdf`. Then adjust the text positions, sizes, fonts and colours in `CERTIFICATE_TEMPLATE` in `lib/certificates.mjs` until the text sits in the right place. Fonts can be any `.ttf` file in `public/certificates/fonts/` (currently Archivo Black for the name, Alice for the course and Montserrat for the date, all free Google Fonts with their licences beside them) or a built-in PDF font.
 
 ## Archiving, deleting and the audit log
 
