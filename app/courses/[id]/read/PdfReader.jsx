@@ -182,8 +182,8 @@ export default function PdfReader({ url, title, onPageChange }) {
 
   if (!url) {
     return (
-      <div style={{ minHeight: 500, padding: 42, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", background: "linear-gradient(180deg, #edf2f6, #e4eaf0)", color: "#1a355c", textAlign: "center" }}>
-        <div aria-hidden="true" style={{ width: 46, height: 46, marginBottom: 13, display: "grid", placeItems: "center", border: "1px solid #cbd5e1", borderRadius: 13, background: "#fff", color: "#dd8b32", boxShadow: "0 7px 18px rgba(26,53,92,.09)", font: "700 18px/1 'JetBrains Mono', monospace" }}>▤</div>
+      <div style={{ minHeight: 500, padding: 42, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", background: "linear-gradient(180deg, #edf2f6, #e4eaf0)", color: "#112345", textAlign: "center" }}>
+        <div aria-hidden="true" style={{ width: 46, height: 46, marginBottom: 13, display: "grid", placeItems: "center", border: "1px solid #cbd5e1", borderRadius: 13, background: "#fff", color: "#F78E1E", boxShadow: "0 7px 18px rgba(17,35,69,.09)", font: "700 18px/1 'JetBrains Mono', monospace" }}>▤</div>
         <strong>No document yet</strong>
         <span style={{ marginTop: 5, color: "#687a90", fontSize: 12 }}>No PDF has been added to this course.</span>
       </div>
@@ -250,7 +250,7 @@ export default function PdfReader({ url, title, onPageChange }) {
 
       <style jsx>{`
         .pdf-viewer-shell { overflow: hidden; background: #dfe5ec; color: #fff; }
-        .pdf-toolbar { min-height: 62px; padding: 10px 12px 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid rgba(255,255,255,.08); background: #172b46; }
+        .pdf-toolbar { min-height: 62px; padding: 10px 12px 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid rgba(255,255,255,.08); background: #112345; }
         .pdf-document-meta { min-width: 0; display: flex; align-items: center; gap: 10px; }
         .pdf-document-icon { width: 34px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.2); border-radius: 7px; background: rgba(255,255,255,.09); color: #f4b46f; font: 700 9px/1 'JetBrains Mono', monospace; letter-spacing: .08em; }
         .pdf-document-copy { min-width: 0; display: flex; flex-direction: column; }
@@ -269,24 +269,24 @@ export default function PdfReader({ url, title, onPageChange }) {
         .pdf-toolbar-divider { width: 1px; height: 22px; margin: 0 1px; background: rgba(255,255,255,.13); }
         .pdf-open-link { height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; color: #dce7f1; font-size: 10.5px; font-weight: 650; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s; }
         .pdf-open-link:hover { border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; }
-        .pdf-progress-track { height: 3px; background: #223d5e; }
-        .pdf-progress-track span { height: 100%; display: block; background: #dd8b32; transition: width .2s ease; }
-        .pdf-scroll-region { height: min(82vh, 960px); min-height: 640px; overflow: auto; overscroll-behavior: contain; scrollbar-color: #8e9bab transparent; scrollbar-width: thin; background-color: #dfe5ec; background-image: radial-gradient(rgba(26,53,92,.11) .7px, transparent .7px), linear-gradient(180deg, rgba(255,255,255,.42), transparent 150px); background-size: 16px 16px, 100% 100%; }
+        .pdf-progress-track { height: 3px; background: #1B3A62; }
+        .pdf-progress-track span { height: 100%; display: block; background: #F78E1E; transition: width .2s ease; }
+        .pdf-scroll-region { height: min(82vh, 960px); min-height: 640px; overflow: auto; overscroll-behavior: contain; scrollbar-color: #8e9bab transparent; scrollbar-width: thin; background-color: #dfe5ec; background-image: radial-gradient(rgba(17,35,69,.11) .7px, transparent .7px), linear-gradient(180deg, rgba(255,255,255,.42), transparent 150px); background-size: 16px 16px, 100% 100%; }
         .pdf-scroll-region::-webkit-scrollbar { width: 10px; height: 10px; }
         .pdf-scroll-region::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; background: #8e9bab; background-clip: padding-box; }
         .pdf-pages { width: max-content; min-width: 100%; padding: 24px 28px 34px; box-sizing: border-box; flex-direction: column; align-items: center; gap: 24px; }
         :global(.pdf-page) { position: relative; overflow: hidden; flex: 0 0 auto; border-radius: 3px; background: #fff; box-shadow: 0 2px 3px rgba(26,39,55,.12), 0 16px 34px rgba(26,39,55,.2); line-height: 0; }
         :global(.pdf-page canvas) { display: block; }
-        :global(.pdf-page-label) { position: absolute; right: 10px; bottom: 10px; min-width: 24px; height: 24px; padding: 0 7px; display: grid; place-items: center; border-radius: 999px; background: rgba(23,43,70,.78); color: #fff; font: 600 9.5px/1 'JetBrains Mono', monospace; box-shadow: 0 2px 7px rgba(0,0,0,.16); opacity: 0; transition: opacity .15s; }
+        :global(.pdf-page-label) { position: absolute; right: 10px; bottom: 10px; min-width: 24px; height: 24px; padding: 0 7px; display: grid; place-items: center; border-radius: 999px; background: rgba(17,35,69,.78); color: #fff; font: 600 9.5px/1 'JetBrains Mono', monospace; box-shadow: 0 2px 7px rgba(0,0,0,.16); opacity: 0; transition: opacity .15s; }
         :global(.pdf-page:hover .pdf-page-label) { opacity: 1; }
         .pdf-loading-skeleton { min-height: 100%; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .pdf-loading-copy { height: 34px; margin-bottom: 12px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: rgba(255,255,255,.82); color: #48617e; box-shadow: 0 5px 16px rgba(26,53,92,.1); font-size: 11px; font-weight: 600; }
-        .pdf-loading-spinner { width: 13px; height: 13px; border: 2px solid #cbd5e1; border-top-color: #dd8b32; border-radius: 50%; animation: pdfSpin .75s linear infinite; }
+        .pdf-loading-copy { height: 34px; margin-bottom: 12px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: rgba(255,255,255,.82); color: #48617e; box-shadow: 0 5px 16px rgba(17,35,69,.1); font-size: 11px; font-weight: 600; }
+        .pdf-loading-spinner { width: 13px; height: 13px; border: 2px solid #cbd5e1; border-top-color: #F78E1E; border-radius: 50%; animation: pdfSpin .75s linear infinite; }
         :global(.pdf-loading-page) { width: min(82%, 650px); height: min(70vh, 820px); min-height: 540px; border-radius: 3px; background: #f7f8fa; box-shadow: 0 16px 34px rgba(26,39,55,.14); }
-        .pdf-empty-state, .pdf-error-state { min-height: 500px; padding: 42px; display: flex; align-items: center; justify-content: center; flex-direction: column; background: linear-gradient(180deg, #edf2f6, #e4eaf0); color: #1a355c; text-align: center; }
+        .pdf-empty-state, .pdf-error-state { min-height: 500px; padding: 42px; display: flex; align-items: center; justify-content: center; flex-direction: column; background: linear-gradient(180deg, #edf2f6, #e4eaf0); color: #112345; text-align: center; }
         .pdf-empty-state span, .pdf-error-state span { max-width: 440px; margin-top: 5px; color: #687a90; font-size: 12px; line-height: 1.5; }
-        .pdf-state-icon { width: 46px; height: 46px; margin-bottom: 13px; display: grid; place-items: center; border: 1px solid #cbd5e1; border-radius: 13px; background: #fff; color: #dd8b32; box-shadow: 0 7px 18px rgba(26,53,92,.09); font: 700 18px/1 'JetBrains Mono', monospace; }
-        .pdf-retry-button { margin-top: 16px; padding: 8px 14px; border: 0; border-radius: 7px; background: #1a355c; color: #fff; cursor: pointer; font-size: 11.5px; font-weight: 650; }
+        .pdf-state-icon { width: 46px; height: 46px; margin-bottom: 13px; display: grid; place-items: center; border: 1px solid #cbd5e1; border-radius: 13px; background: #fff; color: #F78E1E; box-shadow: 0 7px 18px rgba(17,35,69,.09); font: 700 18px/1 'JetBrains Mono', monospace; }
+        .pdf-retry-button { margin-top: 16px; padding: 8px 14px; border: 0; border-radius: 7px; background: #112345; color: #fff; cursor: pointer; font-size: 11.5px; font-weight: 650; }
         @keyframes pdfSpin { to { transform: rotate(360deg); } }
         @media (max-width: 1100px) {
           .pdf-toolbar { align-items: stretch; flex-direction: column; }

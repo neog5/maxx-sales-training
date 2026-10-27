@@ -37,7 +37,7 @@ export default function TopNav({ profile }) {
     <header className="site-nav">
       <div className="site-nav__inner">
         <Link href="/courses" className="site-brand">
-          <img className="site-brand__logo" src="/maxx-ortho-logo.webp" alt="Maxx Orthopedics" />
+          <img className="site-brand__logo" src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />
           <span className="tp-display site-brand__title">Sales Training</span>
         </Link>
 

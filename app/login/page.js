@@ -46,7 +46,7 @@ export default function LoginPage() {
       <div className="login-card tp-fade-in">
         <section className="login-brand">
           <div className="login-brand__top">
-            <img src="/maxx-ortho-logo.webp" alt="Maxx Orthopedics" />
+            <img src="/maxx-ortho-logo-white.png" alt="Maxx Orthopedics" />
             <span>Learning portal</span>
           </div>
           <div>
