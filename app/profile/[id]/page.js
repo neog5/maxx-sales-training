@@ -32,7 +32,7 @@ export default async function ProfilePage({ params }) {
     supabase.from("group_members").select("group_id").eq("user_id", id),
     supabase.from("groups").select("id, name").order("name"),
     supabase.from("courses").select("id, code, title, is_active, archived_at").order("code"),
-    supabase.from("certificates").select("id, course_title, course_code, issued_at").eq("user_id", id).order("issued_at", { ascending: false }),
+    supabase.from("certificates").select("id, course_title, course_code, issued_at, expires_at").eq("user_id", id).order("issued_at", { ascending: false }),
   ]);
   if (!person) notFound();
 
@@ -120,7 +120,7 @@ export default async function ProfilePage({ params }) {
               <div key={certificate.id} className="certificate-list__row">
                 <div>
                   <strong>{certificate.course_title}</strong>
-                  <small>{certificate.course_code} · completed <LocalDate value={certificate.issued_at} /></small>
+                  <small>{certificate.course_code} · completed <LocalDate value={certificate.issued_at} />{certificate.expires_at && <> · valid until <LocalDate value={certificate.expires_at} /></>}</small>
                 </div>
                 <Link href={`/certificates/${certificate.id}`} className="tp-btn tp-btn-ghost attempt-review-link">View</Link>
               </div>
