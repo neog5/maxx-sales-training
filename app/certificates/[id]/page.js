@@ -12,7 +12,7 @@ export default async function CertificatePage({ params }) {
   // Row-level security limits this to the viewer's own certificates, or anyone's for managers and admins.
   const { data: certificate } = await supabase
     .from("certificates")
-    .select("id, certificate_number, user_id, recipient_name, course_title, course_code, issued_at")
+    .select("id, certificate_number, user_id, recipient_name, course_title, course_code, issued_at, expires_at")
     .eq("id", id)
     .maybeSingle();
   if (!certificate) notFound();
@@ -29,7 +29,7 @@ export default async function CertificatePage({ params }) {
         <div className="page-heading">
           <div className="tp-label">Certificate of completion · {certificate.course_code}</div>
           <h1 className="tp-display">{certificate.course_title}</h1>
-          <p>{certificate.recipient_name} · completed <LocalDate value={certificate.issued_at} /> · {certificate.certificate_number}</p>
+          <p>{certificate.recipient_name} · completed <LocalDate value={certificate.issued_at} />{certificate.expires_at && <> · valid until <LocalDate value={certificate.expires_at} /></>} · {certificate.certificate_number}</p>
         </div>
         <CertificateViewer certificate={certificate} />
       </main>
