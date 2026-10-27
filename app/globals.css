@@ -1100,7 +1100,7 @@ body {
 .certificate-viewer { max-width: 980px; }
 .certificate-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .certificate-actions a { text-decoration: none; }
-.certificate-actions a[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+.certificate-actions [aria-disabled="true"] { opacity: .55; pointer-events: none; }
 .certificate-preview { position: relative; padding: 12px; overflow: hidden; }
 .certificate-preview canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
 .certificate-preview__skeleton { display: block; width: 100%; aspect-ratio: 297 / 210; border-radius: 4px; }

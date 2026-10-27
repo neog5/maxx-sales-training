@@ -3,7 +3,7 @@ import Link from "next/link";
 import LocalDate from "@/components/LocalDate";
 import TopNav from "@/components/TopNav";
 import { requireViewer } from "@/lib/auth";
-import CertificateViewer from "./CertificateViewer";
+import CertificateViewer from "./CertificateViewerLoader";
 
 export default async function CertificatePage({ params }) {
   const { id } = await params;
