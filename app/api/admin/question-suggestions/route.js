@@ -67,7 +67,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Only administrators can generate questions." }, { status: 403 });
   }
 
-  const { courseId, readingCount = 5, mainCount = 10 } = await request.json().catch(() => ({}));
+  const { courseId, materialId, readingCount = 5, mainCount = 10 } = await request.json().catch(() => ({}));
   if (!courseId) return NextResponse.json({ error: "A course is required." }, { status: 400 });
   if (!Number.isInteger(readingCount) || readingCount < 0 || readingCount > GENERATION_LIMITS.reading.max) {
     return NextResponse.json({ error: `Choose between 0 and ${GENERATION_LIMITS.reading.max} reading questions.` }, { status: 400 });
@@ -83,13 +83,18 @@ export async function POST(request) {
 
   const { data: course, error: courseError } = await supabase
     .from("courses")
-    .select("id, code, title, pdf_url")
+    .select("id, code, title")
     .eq("id", courseId)
     .single();
   if (courseError || !course) return NextResponse.json({ error: "Course not found." }, { status: 404 });
-  if (!course.pdf_url) return NextResponse.json({ error: "Upload a PDF before generating questions." }, { status: 400 });
-  if (!isPublicCoursePdfUrl(course.pdf_url, process.env.NEXT_PUBLIC_SUPABASE_URL)) {
-    return NextResponse.json({ error: "This course’s PDF is not available for suggestions. Re-upload it and try again." }, { status: 400 });
+
+  // Suggestions come from one deck: the one asked for, or the course's first deck.
+  let deckQuery = supabase.from("course_materials").select("id, title, pdf_url").eq("course_id", courseId);
+  deckQuery = materialId ? deckQuery.eq("id", materialId) : deckQuery.order("position").order("created_at");
+  const { data: deck } = await deckQuery.limit(1).maybeSingle();
+  if (!deck) return NextResponse.json({ error: "Upload a PDF before generating questions." }, { status: 400 });
+  if (!isPublicCoursePdfUrl(deck.pdf_url, process.env.NEXT_PUBLIC_SUPABASE_URL)) {
+    return NextResponse.json({ error: "This deck’s PDF is not available for suggestions. Re-upload it and try again." }, { status: 400 });
   }
   if (!process.env.OPENROUTER_API_KEY) {
     return NextResponse.json({ error: "Question suggestions are not configured. Contact the app administrator." }, { status: 503 });
@@ -98,13 +103,14 @@ export async function POST(request) {
   const model = process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
   const pdfEngine = process.env.OPENROUTER_PDF_ENGINE || "cloudflare-ai";
   try {
-    const pdfBytes = await checkPdf(course.pdf_url, request.signal);
+    const pdfBytes = await checkPdf(deck.pdf_url, request.signal);
     if (pdfEngine === "cloudflare-ai" && pdfBytes > FREE_PDF_PARSER_MAX_BYTES) {
       return NextResponse.json({ error: PDF_TOO_LARGE_MESSAGE }, { status: 413 });
     }
     const prompt = `You create accurate assessment questions for a professional training course.
 
 Course: ${course.code} — ${course.title}
+Document: ${deck.title}
 
 Read the attached PDF as a visual document. Examine all text, diagrams, labels, tables, callouts, and other page imagery. Questions may test important information communicated visually as well as in text.
 
@@ -119,7 +125,7 @@ Return only one valid JSON object with no Markdown or commentary. Use exactly th
         type: "file",
         file: {
           filename: `${course.code}.pdf`,
-          file_data: course.pdf_url,
+          file_data: deck.pdf_url,
         },
       },
     ];

@@ -12,11 +12,12 @@ export default async function ReadPage({ params }) {
   const { data: course } = await supabase.from("courses").select("*").eq("id", id).single();
   if (!course) notFound();
   if (course.archived_at) return <CourseUnavailable profile={profile} course={course} />;
+  const { data: materials } = await supabase.from("course_materials").select("id, position, title, pdf_url").eq("course_id", id).order("position").order("created_at");
 
   return (
     <div>
       <TopNav profile={profile} />
-      <ReadingGateClient course={course} userId={user.id} />
+      <ReadingGateClient course={course} materials={materials || []} userId={user.id} />
     </div>
   );
 }

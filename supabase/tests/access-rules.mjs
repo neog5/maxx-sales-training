@@ -146,3 +146,25 @@ test("watchlists are private to their creator", { skip }, async () => {
   assert.match((await as(users.admin, "insert into public.view_group_members (view_group_id, user_id) values ($1, $2)", [watchlist, users.admin])).error, /row-level security/);
   assert.match((await as(users.learner, "insert into public.view_groups (name) values ('Mine')")).error, /row-level security/);
 });
+
+test("reading decks: everyone reads them, only admins change them, reading questions use their own course's deck", { skip }, async () => {
+  const added = await as(users.admin, "insert into public.course_materials (course_id, position, title, pdf_url) values ($1, 1, 'Deck one', '/one.pdf') returning id", [ids.course]);
+  const deckId = added.rows[0].id;
+  assert.equal((await as(users.learner, "select count(*)::int as n from public.course_materials where course_id = $1", [ids.course])).rows[0].n, 1);
+  assert.match((await as(users.learner, "insert into public.course_materials (course_id, position, title, pdf_url) values ($1, 2, 'x', '/x.pdf')", [ids.course])).error, /row-level security/);
+  assert.equal((await as(users.manager, "update public.course_materials set title = 'x' where id = $1", [deckId])).count, 0);
+  const audit = await as(users.admin, "select action from public.audit_log where entity_type = 'course_materials' and details->>'course_id' = $1", [ids.course]);
+  assert.deepEqual(audit.rows.map((row) => row.action), ["course_materials.insert"]);
+
+  const question = "insert into public.questions (course_id, material_id, question_type, page_number, question_text, options, correct_index, explanation) values ($1, $2, $3, $4, 'Q', '[\"a\",\"b\"]', 0, 'E')";
+  assert.match((await as(users.admin, question, [ids.course, null, "reading_test", 1])).error, /questions_material_reading_check/);
+  assert.match((await as(users.admin, question, [ids.course, deckId, "main_test", null])).error, /questions_material_reading_check/);
+  const other = await asOwner("insert into public.courses (code, title) values ($1, 'Other') returning id", [`TEST-${randomUUID().slice(0, 6)}`]);
+  assert.match((await as(users.admin, question, [other.rows[0].id, deckId, "reading_test", 1])).error, /its own course/);
+  assert.equal((await as(users.admin, question, [ids.course, deckId, "reading_test", 1])).count, 1);
+  assert.equal((await as(users.learner, "select count(*)::int as n from public.get_reading_questions($1) where material_id = $2", [ids.course, deckId])).rows[0].n, 1);
+
+  // Removing a deck removes its reading questions.
+  assert.equal((await as(users.admin, "delete from public.course_materials where id = $1", [deckId])).count, 1);
+  assert.equal((await asOwner("select count(*)::int as n from public.questions where course_id = $1 and question_type = 'reading_test'", [ids.course])).rows[0].n, 0);
+});

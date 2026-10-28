@@ -5,24 +5,31 @@ begin;
 
 delete from public.courses where code = 'DEMO-101';
 
-with sample_course as (
-  insert into public.courses (code, title, description, pdf_url, pass_threshold, read_seconds, is_active)
-  values (
-    'DEMO-101',
-    'Product Conversation Fundamentals',
-    'A short sample course demonstrating the reading checkpoints and randomized assessment flow.',
-    '/sample-course.pdf',
-    80,
-    30,
-    true
-  )
-  returning id
+insert into public.courses (code, title, description, pass_threshold, read_seconds, is_active)
+values (
+  'DEMO-101',
+  'Product Conversation Fundamentals',
+  'A short sample course demonstrating the reading checkpoints and randomized assessment flow.',
+  80,
+  30,
+  true
+);
+
+insert into public.course_materials (course_id, position, title, pdf_url)
+select id, 1, 'Product Conversation Fundamentals', '/sample-course.pdf' from public.courses where code = 'DEMO-101';
+
+with sample_deck as (
+  select m.id, m.course_id
+  from public.course_materials m
+  join public.courses c on c.id = m.course_id
+  where c.code = 'DEMO-101'
 )
 insert into public.questions (
-  course_id, question_type, page_number, question_text, options, correct_index, explanation, is_mandatory
+  course_id, material_id, question_type, page_number, question_text, options, correct_index, explanation, is_mandatory
 )
-select id, question_type, page_number, question_text, options::jsonb, correct_index, explanation, is_mandatory
-from sample_course
+select sample_deck.course_id, case when question_type = 'reading_test' then sample_deck.id end,
+  question_type, page_number, question_text, options::jsonb, correct_index, explanation, is_mandatory
+from sample_deck
 cross join (values
   ('reading_test', 1, 'What is the recommended first step in a discovery conversation?', '["Present every available feature", "Understand the customer''s goal", "Discuss pricing immediately", "Schedule implementation"]', 1, 'Start by understanding the outcome the customer wants to achieve.', false),
   ('reading_test', 2, 'Which response best demonstrates active listening?', '["Changing the subject", "Repeating a script", "Summarizing the customer''s concern", "Offering a discount"]', 2, 'A concise summary confirms that the concern was heard and understood.', false),

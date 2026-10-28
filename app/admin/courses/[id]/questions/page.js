@@ -14,7 +14,10 @@ export default async function CourseQuestionsPage({ params, searchParams }) {
   const header = await loadCourseHeader(supabase, id);
   if (!header) notFound();
 
-  const { data: questions } = await supabase.from("questions").select("*").eq("course_id", id).order("created_at");
+  const [{ data: questions }, { data: materials }] = await Promise.all([
+    supabase.from("questions").select("*").eq("course_id", id).order("created_at"),
+    supabase.from("course_materials").select("id, position, title").eq("course_id", id).order("position").order("created_at"),
+  ]);
 
   return (
     <div>
@@ -28,6 +31,7 @@ export default async function CourseQuestionsPage({ params, searchParams }) {
           embedded
           readOnly={Boolean(header.course.archived_at)}
           courses={[header.course]}
+          materials={materials || []}
           initialQuestions={questions || []}
           initialCourseId={id}
           autoSuggest={suggest === "1" && !header.course.archived_at}

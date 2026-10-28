@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GENERATION_LIMITS } from "@/lib/question-suggestions.mjs";
 
 function emptyDraft(courseId) {
-  return { course_id: courseId, question_type: "main_test", page_number: null, question_text: "", image_url: null, is_mandatory: false, options: ["", "", "", ""], correct_index: 0, explanation: "" };
+  return { course_id: courseId, question_type: "main_test", material_id: null, page_number: null, question_text: "", image_url: null, is_mandatory: false, options: ["", "", "", ""], correct_index: 0, explanation: "" };
 }
 
 function generationCount(value, minimum, maximum, fallback) {
@@ -13,7 +13,14 @@ function generationCount(value, minimum, maximum, fallback) {
   return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
 }
 
-function QuestionEditor({ draft, setDraft, imageFile, setImageFile, editing, saving, formError, onSave, onCancel }) {
+// "Reading · p. 4", or "Reading · deck 2, p. 4" when the course has several decks.
+function readingLabel(question, materials) {
+  if (materials.length < 2) return `Reading · p. ${question.page_number}`;
+  const deck = materials.findIndex((material) => material.id === question.material_id) + 1;
+  return `Reading · deck ${deck || "?"}, p. ${question.page_number}`;
+}
+
+function QuestionEditor({ materials, draft, setDraft, imageFile, setImageFile, editing, saving, formError, onSave, onCancel }) {
   const imagePreview = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : draft.image_url, [imageFile, draft.image_url]);
 
   useEffect(() => {
@@ -27,16 +34,26 @@ function QuestionEditor({ draft, setDraft, imageFile, setImageFile, editing, sav
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
         <div>
           <div className="tp-label" style={{ marginBottom: 6 }}>Question bank</div>
-          <select className="tp-input" value={draft.question_type} onChange={(e) => setDraft({ ...draft, question_type: e.target.value, page_number: e.target.value === "reading_test" ? draft.page_number : null, is_mandatory: e.target.value === "main_test" ? draft.is_mandatory : false })}>
+          <select className="tp-input" value={draft.question_type} onChange={(e) => setDraft({ ...draft, question_type: e.target.value, material_id: e.target.value === "reading_test" ? draft.material_id || materials[0]?.id || null : null, page_number: e.target.value === "reading_test" ? draft.page_number : null, is_mandatory: e.target.value === "main_test" ? draft.is_mandatory : false })}>
             <option value="main_test">Main test</option>
             <option value="reading_test">Reading test</option>
           </select>
         </div>
       </div>
       {draft.question_type === "reading_test" && (
-        <div style={{ marginBottom: 12 }}>
-          <div className="tp-label" style={{ marginBottom: 6 }}>PDF page number</div>
-          <input className="tp-input" type="number" min="1" value={draft.page_number ?? ""} placeholder="e.g. 4" onChange={(e) => setDraft({ ...draft, page_number: e.target.value ? Number(e.target.value) : null })} />
+        <div style={{ display: "grid", gridTemplateColumns: materials.length > 1 ? "2fr 1fr" : "1fr", gap: 12, marginBottom: 12 }}>
+          {materials.length > 1 && (
+            <div>
+              <div className="tp-label" style={{ marginBottom: 6 }}>Deck</div>
+              <select className="tp-input" value={draft.material_id || ""} onChange={(e) => setDraft({ ...draft, material_id: e.target.value })}>
+                {materials.map((material, index) => <option key={material.id} value={material.id}>{index + 1}. {material.title}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <div className="tp-label" style={{ marginBottom: 6 }}>{materials.length > 1 ? "Page in that deck" : "PDF page number"}</div>
+            <input className="tp-input" type="number" min="1" value={draft.page_number ?? ""} placeholder="e.g. 4" onChange={(e) => setDraft({ ...draft, page_number: e.target.value ? Number(e.target.value) : null })} />
+          </div>
         </div>
       )}
       <div style={{ marginBottom: 12 }}>
@@ -88,7 +105,7 @@ function QuestionEditor({ draft, setDraft, imageFile, setImageFile, editing, sav
   );
 }
 
-function SuggestionPanel({ questions, selected, loading, importing, error, counts, onToggle, onSelectAll, onClear, onGenerate, onImport }) {
+function SuggestionPanel({ materials, deckId, questions, selected, loading, importing, error, counts, onToggle, onSelectAll, onClear, onGenerate, onImport }) {
   if (loading) {
     return (
       <section className="tp-card suggestion-panel suggestion-panel--loading" aria-live="polite">
@@ -125,7 +142,7 @@ function SuggestionPanel({ questions, selected, loading, importing, error, count
               <input type="checkbox" checked={isSelected} onChange={() => onToggle(index)} />
               <div className="suggestion-item__body">
                 <div className="suggestion-item__meta">
-                  <span className="tp-badge">{question.question_type === "reading_test" ? `Reading · p. ${question.page_number}` : "Main test"}</span>
+                  <span className="tp-badge">{question.question_type === "reading_test" ? readingLabel({ ...question, material_id: deckId }, materials) : "Main test"}</span>
                   {isTrueFalse && <span className="tp-badge">True / False</span>}
                 </div>
                 <strong>{question.question_text}</strong>
@@ -148,7 +165,7 @@ function SuggestionPanel({ questions, selected, loading, importing, error, count
 }
 
 // One course's questions, shown on the course's Questions tab. Archived courses are read-only.
-export default function QuestionBankClient({ courses, initialQuestions, initialCourseId, autoSuggest = false, initialGenerationCounts = {}, readOnly = false }) {
+export default function QuestionBankClient({ courses, materials = [], initialQuestions, initialCourseId, autoSuggest = false, initialGenerationCounts = {}, readOnly = false }) {
   const supabase = createClient();
   const [courseId, setCourseId] = useState(courses.some((course) => course.id === initialCourseId) ? initialCourseId : courses[0]?.id);
   const [questions, setQuestions] = useState(initialQuestions);
@@ -167,6 +184,9 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
     reading: generationCount(initialGenerationCounts.reading, 0, GENERATION_LIMITS.reading.max, 5),
     main: generationCount(initialGenerationCounts.main, 0, GENERATION_LIMITS.main.max, 10),
   });
+  const [generationDeckId, setGenerationDeckId] = useState(materials[0]?.id || null);
+  // The deck the current suggestions were generated from; their reading questions belong to it.
+  const [suggestionDeckId, setSuggestionDeckId] = useState(null);
   const autoSuggestStarted = useRef(false);
   const generationRequest = useRef(null);
 
@@ -186,11 +206,12 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
     setSuggestionError("");
     setSuggestions(null);
     setSelectedSuggestions(new Set());
+    setSuggestionDeckId(generationDeckId);
     try {
       const response = await fetch("/api/admin/question-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, readingCount: Number(generationCounts.reading), mainCount: Number(generationCounts.main) }),
+        body: JSON.stringify({ courseId, materialId: generationDeckId, readingCount: Number(generationCounts.reading), mainCount: Number(generationCounts.main) }),
         signal: controller.signal,
       });
       const payload = await response.json();
@@ -220,7 +241,7 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
   async function importSuggestions() {
     const chosen = suggestions
       .filter((_, index) => selectedSuggestions.has(index))
-      .map((question) => ({ ...question, course_id: courseId }));
+      .map((question) => ({ ...question, course_id: courseId, material_id: question.question_type === "reading_test" ? suggestionDeckId : null }));
     if (!chosen.length) return;
 
     setImporting(true);
@@ -244,6 +265,10 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
     }
     if (draft.question_type === "reading_test" && !draft.page_number) {
       setFormError("A reading-test question needs a PDF page number.");
+      return;
+    }
+    if (draft.question_type === "reading_test" && !draft.material_id) {
+      setFormError("Add a reading deck to this course before adding reading-test questions.");
       return;
     }
     if (imageFile && (imageFile.size > 5 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(imageFile.type))) {
@@ -315,9 +340,11 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
 
       {mutationError && <div className="notice" role="alert">{mutationError}</div>}
 
-      {!readOnly && !suggestions && !generating && !suggestionError && courses.find((course) => course.id === courseId)?.pdf_url && (
+      {!readOnly && !suggestions && !generating && !suggestionError && generationDeckId && (
         <div className="suggestion-launch">
-          <span>Generate from this course’s PDF</span>
+          {materials.length > 1 ? (
+            <label><b>Generate from deck</b><select className="tp-input" value={generationDeckId} onChange={(event) => setGenerationDeckId(event.target.value)}>{materials.map((material, index) => <option key={material.id} value={material.id}>{index + 1}. {material.title}</option>)}</select></label>
+          ) : <span>Generate from this course’s PDF</span>}
           <label><b>Reading</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.reading.max} value={generationCounts.reading} onChange={(event) => setGenerationCounts((current) => ({ ...current, reading: event.target.value }))} /></label>
           <label><b>Main test</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.main.max} value={generationCounts.main} onChange={(event) => setGenerationCounts((current) => ({ ...current, main: event.target.value }))} /></label>
           <button className="tp-btn tp-btn-ghost" onClick={generateSuggestions} disabled={!(Number(generationCounts.reading) + Number(generationCounts.main) > 0)}>Generate recommendations</button>
@@ -325,6 +352,8 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
       )}
 
       <SuggestionPanel
+        materials={materials}
+        deckId={suggestionDeckId}
         questions={suggestions}
         selected={selectedSuggestions}
         loading={generating}
@@ -344,16 +373,16 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
         </div>
       )}
 
-      {draft && !editingId && <QuestionEditor draft={draft} setDraft={setDraft} imageFile={imageFile} setImageFile={setImageFile} editing={false} saving={saving} formError={formError} onSave={saveDraft} onCancel={() => { setDraft(null); setImageFile(null); setEditingId(null); }} />}
+      {draft && !editingId && <QuestionEditor materials={materials} draft={draft} setDraft={setDraft} imageFile={imageFile} setImageFile={setImageFile} editing={false} saving={saving} formError={formError} onSave={saveDraft} onCancel={() => { setDraft(null); setImageFile(null); setEditingId(null); }} />}
 
       <div className="question-list">
         {filtered.map((q) => editingId === q.id && draft ? (
-          <QuestionEditor key={q.id} draft={draft} setDraft={setDraft} imageFile={imageFile} setImageFile={setImageFile} editing saving={saving} formError={formError} onSave={saveDraft} onCancel={() => { setDraft(null); setImageFile(null); setEditingId(null); }} />
+          <QuestionEditor key={q.id} materials={materials} draft={draft} setDraft={setDraft} imageFile={imageFile} setImageFile={setImageFile} editing saving={saving} formError={formError} onSave={saveDraft} onCancel={() => { setDraft(null); setImageFile(null); setEditingId(null); }} />
         ) : (
           <div key={q.id} className="tp-card question-item">
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                <span className="tp-badge" style={{ background: q.question_type === "reading_test" ? "var(--warn-dim)" : "var(--accent-dim)", color: q.question_type === "reading_test" ? "var(--warn)" : "var(--accent)" }}>{q.question_type === "reading_test" ? `Reading · p. ${q.page_number}` : "Main test"}</span>
+                <span className="tp-badge" style={{ background: q.question_type === "reading_test" ? "var(--warn-dim)" : "var(--accent-dim)", color: q.question_type === "reading_test" ? "var(--warn)" : "var(--accent)" }}>{q.question_type === "reading_test" ? readingLabel(q, materials) : "Main test"}</span>
                 <span className="tp-badge" style={{ background: "var(--surface3)", color: "var(--dim)" }}>{q.options?.length || 0} options</span>
                 {q.is_mandatory && <span className="tp-badge question-mandatory-badge">Mandatory</span>}
                 {q.image_url && <span className="tp-badge">Image</span>}
@@ -365,7 +394,7 @@ export default function QuestionBankClient({ courses, initialQuestions, initialC
               <button
                 className="tp-btn tp-btn-ghost"
                 style={{ padding: "6px 12px" }}
-                onClick={() => { setDraft({ course_id: q.course_id, question_type: q.question_type || "main_test", page_number: q.page_number, question_text: q.question_text, image_url: q.image_url || null, is_mandatory: Boolean(q.is_mandatory), options: [...q.options], correct_index: q.correct_index, explanation: q.explanation }); setImageFile(null); setEditingId(q.id); setFormError(""); }}
+                onClick={() => { setDraft({ course_id: q.course_id, question_type: q.question_type || "main_test", material_id: q.material_id || null, page_number: q.page_number, question_text: q.question_text, image_url: q.image_url || null, is_mandatory: Boolean(q.is_mandatory), options: [...q.options], correct_index: q.correct_index, explanation: q.explanation }); setImageFile(null); setEditingId(q.id); setFormError(""); }}
               >
                 Edit
               </button>

@@ -26,6 +26,7 @@ A Next.js 16 App Router application backed by Supabase. Learners read course PDF
    - `supabase/migrations/003_view_groups.sql` - private watchlists (`view_groups`), profile emails and manager scoping
    - `supabase/migrations/004_certificates.sql` - course completion certificates
    - `supabase/migrations/005_certificate_expiry.sql` - certificates valid for 2 years
+   - `supabase/migrations/006_course_materials.sql` - multi-deck courses (several PDFs per course, read in order)
    - `supabase/seed.sql` - one fictional sample course with reading and quiz questions
 
 3. Copy the environment template and add the public credentials from the Supabase project's API settings:

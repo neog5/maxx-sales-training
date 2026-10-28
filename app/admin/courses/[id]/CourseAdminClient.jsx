@@ -9,14 +9,10 @@ import { groupItems, personItems } from "@/lib/picker-items.mjs";
 import { describeAuditEntry } from "@/lib/audit.mjs";
 import LocalDate from "@/components/LocalDate";
 import { isSuperAdmin } from "@/lib/roles.mjs";
+import { COURSE_PDF_BUCKET, materialStoragePathFromUrl } from "@/lib/course-materials.mjs";
+import CourseMaterialsClient from "./CourseMaterialsClient";
 
-function coursePdfPath(pdfUrl) {
-  const marker = "/storage/v1/object/public/course-pdfs/";
-  const index = pdfUrl?.indexOf(marker) ?? -1;
-  return index >= 0 ? decodeURIComponent(pdfUrl.slice(index + marker.length)) : null;
-}
-
-export default function CourseAdminClient({ course, viewerRole, recordCount, initialAssignments, groups, people, history }) {
+export default function CourseAdminClient({ course, viewerRole, recordCount, materials, readingCounts, initialAssignments, groups, people, history }) {
   const supabase = createClient();
   const router = useRouter();
   const archived = Boolean(course.archived_at);
@@ -123,8 +119,8 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
       if (error) throw new Error(/foreign key/i.test(error.message) ? "This course has training records, so it can only be archived." : error.message);
       if (!data?.length) throw new Error("Only a super admin can delete courses.");
       // The course is gone; clean up its files on a best-effort basis.
-      const pdfPath = coursePdfPath(course.pdf_url);
-      if (pdfPath) await supabase.storage.from("course-pdfs").remove([pdfPath]);
+      const pdfPaths = materials.map((material) => materialStoragePathFromUrl(material.pdf_url)).filter(Boolean);
+      if (pdfPaths.length) await supabase.storage.from(COURSE_PDF_BUCKET).remove(pdfPaths);
       const { data: images } = await supabase.storage.from("question-images").list(course.id, { limit: 1000 });
       if (images?.length) await supabase.storage.from("question-images").remove(images.map((image) => `${course.id}/${image.name}`));
       router.push("/admin/courses");
@@ -188,6 +184,8 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
         </section>
       </div>
 
+      <CourseMaterialsClient course={course} materials={materials} readingCounts={readingCounts} readOnly={archived} />
+
       <section className="tp-card course-admin__danger">
         <div>
           <strong>{archived ? "Restore course" : "Archive course"}</strong>
@@ -209,7 +207,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, ini
             <span>
               {recordCount > 0
                 ? "This course has training records, so it can’t be deleted. Archive it instead."
-                : "Permanently removes the course, its questions, its assignments and its PDF. The deletion is recorded in the audit log."}
+                : "Permanently removes the course, its questions, its assignments and its PDF decks. The deletion is recorded in the audit log."}
             </span>
           </div>
           <button type="button" className="tp-btn tp-btn-danger" disabled={recordCount > 0 || Boolean(busy)} onClick={deleteCourse}>
