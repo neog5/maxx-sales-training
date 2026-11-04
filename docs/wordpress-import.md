@@ -31,10 +31,10 @@ All questions are imported as main test questions with the placeholder explanati
 | KNEE-PRIMARY-TECH | Freedom Primary Knee Technique | PDF (MXO-MP00005 R11) | 12 | Ready |
 | KNEE-PARTIAL-TECH | Freedom Partial Knee Technique | PDF (MXO-MP00054 R01) | 8 | Ready |
 | KNEE-REVISION-TECH | Revision Knee Surgical Technique | PDF (MXO-MP00023 R07, 5.8 MB) | 20 | Ready |
-| KNEE-KNOWLEDGE | Freedom Knee Knowledge Base | Google Slides | 18 | Needs slides PDF |
-| KNEE-ANATOMY | Knee Anatomy and Kinematics | Google Slides | 13 (14 minus 1 duplicate) | Needs slides PDF |
-| HIP-ANATOMY | Hip Anatomy | Google Slides | 8 | Needs slides PDF |
-| HIP-KNOWLEDGE | Libertas Hip Knowledge Base | Google Slides | 8 | Needs slides PDF |
+| KNEE-KNOWLEDGE | Freedom Knee Knowledge Base | Google Slides (PDF from PowerPoint) | 18 | Ready |
+| KNEE-ANATOMY | Knee Anatomy and Kinematics | Google Slides (PDF from PowerPoint) | 13 (14 minus 1 duplicate) | Ready |
+| HIP-ANATOMY | Hip Anatomy | Google Slides (PDF from PowerPoint) | 8 | Ready |
+| HIP-KNOWLEDGE | Libertas Hip Knowledge Base | Google Slides (PDF from PowerPoint) | 8 | Ready |
 
 The codes are proposals; change them in `scripts/wp-import/build-manifest.mjs` before the first import, since the import uses the code to match courses.
 
@@ -85,7 +85,7 @@ Published Slides links can't be exported to PDF, so each deck has to be download
 | `337-2-fire-safety.pdf` | [Fire Safety](https://docs.google.com/presentation/d/e/2PACX-1vSpHM2FSSlPXosa8XnLtpo1QjMtJUjUT3znHs3Kdl6OkglGtWr3ROparydGytNbRmLn0BgxuBUkWzVW/pub) |
 | `337-3-national-patient-safety-goals.pdf` | [National Patient Safety Goals](https://docs.google.com/presentation/d/e/2PACX-1vQkheDCG_fS9eC0L6a5d9GpT4izzJNIVRlAHt9qo_fC_4VEGniGpcElGloPIkOl4fnbHdKGp_2G6U6L/pub) |
 
-The first 4 are needed for the courses being imported now. The rest are for the courses parked above.
+The first 4 were exported from PowerPoint to PDF on 2026-11-04 and imported. The rest are for the courses parked above.
 
 ## Loading the courses
 
