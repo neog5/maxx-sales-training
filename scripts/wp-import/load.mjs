@@ -52,6 +52,7 @@ for (const course of courses) {
       description: course.description,
       pass_threshold: course.pass_threshold,
       read_seconds: course.read_seconds,
+      view_only: course.view_only,
       is_active: false,
     }).select("id").single());
   }
