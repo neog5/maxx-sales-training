@@ -168,3 +168,31 @@ test("reading decks: everyone reads them, only admins change them, reading quest
   assert.equal((await as(users.admin, "delete from public.course_materials where id = $1", [deckId])).count, 1);
   assert.equal((await asOwner("select count(*)::int as n from public.questions where course_id = $1 and question_type = 'reading_test'", [ids.course])).rows[0].n, 0);
 });
+
+test("attempt limit: three failed attempts, then an admin must approve more", { skip }, async () => {
+  const course = (await asOwner("insert into public.courses (code, title) values ($1, 'Limit test') returning id", [`TEST-${randomUUID().slice(0, 6)}`])).rows[0].id;
+  const attempt = (passed) => as(users.other, "insert into public.quiz_attempts (user_id, course_id, status, submitted_at, score, passed) values ($1, $2, 'completed', clock_timestamp(), $3, $4)", [users.other, course, passed ? 90 : 10, passed]);
+  const left = async () => (await as(users.other, "select public.attempts_remaining($1, $2) as n", [users.other, course])).rows[0].n;
+
+  assert.equal(await left(), 3);
+  for (let i = 0; i < 3; i++) assert.equal((await attempt(false)).count, 1);
+  assert.equal(await left(), 0);
+  assert.match((await attempt(true)).error, /row-level security/);
+
+  // Learners and managers can't approve themselves or others; admins can, and it's audited.
+  assert.match((await as(users.other, "insert into public.attempt_unlocks (user_id, course_id, granted_by) values ($1, $2, $1)", [users.other, course])).error, /row-level security/);
+  assert.match((await as(users.manager, "insert into public.attempt_unlocks (user_id, course_id, granted_by) values ($1, $2, $3)", [users.other, course, users.manager])).error, /row-level security/);
+  assert.match((await as(users.admin, "insert into public.attempt_unlocks (user_id, course_id, granted_by) values ($1, $2, $3)", [users.other, course, users.manager])).error, /row-level security/);
+  assert.equal((await as(users.admin, "insert into public.attempt_unlocks (user_id, course_id, granted_by, granted_at) values ($1, $2, $3, clock_timestamp())", [users.other, course, users.admin])).count, 1); // one transaction, so now() is frozen
+  assert.equal(await left(), 3);
+  const audit = await as(users.admin, "select action, actor_id from public.audit_log where entity_type = 'attempt_unlocks' and details->>'course_id' = $1", [course]);
+  assert.deepEqual(audit.rows, [{ action: "attempt_unlocks.insert", actor_id: users.admin }]);
+
+  // Passing resets the count; others can't read someone's allowance.
+  assert.equal((await attempt(false)).count, 1);
+  assert.equal(await left(), 2);
+  assert.equal((await attempt(true)).count, 1);
+  assert.equal(await left(), 3);
+  assert.equal((await as(users.learner, "select public.attempts_remaining($1, $2) as n", [users.other, course])).rows[0].n, null);
+  assert.equal((await as(users.manager, "select public.attempts_remaining($1, $2) as n", [users.other, course])).rows[0].n, 3);
+});

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Dial from "@/components/Dial";
 import { AssessmentSkeleton } from "@/components/Skeleton";
 import { gradeAssessment } from "@/lib/assessment.mjs";
+import { MAX_ATTEMPTS } from "@/lib/attempts.mjs";
 import { createClient } from "@/lib/supabase/client";
 
 // Options ship shuffled per question so the correct answer isn't always in the same slot.
@@ -16,7 +17,19 @@ function shuffleOptions(q) {
   return { ...q, shuffled: options };
 }
 
-export default function QuizClient({ course, userId, lastAttempt }) {
+function LockedNotice({ course }) {
+  return (
+    <div className="assessment-page tp-fade-in" style={{ textAlign: "center", paddingTop: 60 }}>
+      <div className="tp-display" style={{ fontSize: 18, fontWeight: 700, margin: "20px 0 6px" }}>Assessment locked</div>
+      <div style={{ color: "var(--faint)", fontSize: 13, maxWidth: 420, margin: "0 auto 20px" }}>
+        You have used all {MAX_ATTEMPTS} attempts for {course.code}. Ask an admin to approve more attempts. In the meantime, revisit the course material.
+      </div>
+      <Link href="/courses" className="tp-btn tp-btn-ghost back-link">← Back to courses</Link>
+    </div>
+  );
+}
+
+export default function QuizClient({ course, userId, attemptsLeft }) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
@@ -24,24 +37,16 @@ export default function QuizClient({ course, userId, lastAttempt }) {
   const [certificateId, setCertificateId] = useState(null);
   const [result, setResult] = useState(null); // { score, passed, graded: [...] }
   const [submitting, setSubmitting] = useState(false);
-
-  const failStreak = lastAttempt && !lastAttempt.passed ? lastAttempt.fail_streak || 0 : 0;
-  const cooldownSeconds = failStreak > 0 ? Math.min(10 * Math.pow(2, failStreak - 1), 40) : 0;
-  const [remaining, setRemaining] = useState(cooldownSeconds);
+  const [submitError, setSubmitError] = useState("");
+  const locked = attemptsLeft <= 0;
 
   useEffect(() => {
-    if (remaining <= 0) return;
-    const t = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
-    return () => clearInterval(t);
-  }, [remaining]);
-
-  useEffect(() => {
-    if (remaining > 0) return;
+    if (locked) return;
     supabase.rpc("get_quiz_questions", { p_course_id: course.id }).then(({ data, error }) => {
       if (!error && data) setQuestions(data.map(shuffleOptions));
       setLoading(false);
     });
-  }, [remaining]);
+  }, [locked]);
 
   const allAnswered = questions.length > 0 && questions.every((q) => answers[q.id] !== undefined);
 
@@ -50,15 +55,22 @@ export default function QuizClient({ course, userId, lastAttempt }) {
     const assessmentResult = gradeAssessment(questions, answers, course.pass_threshold);
     const { graded, score, passed } = assessmentResult;
 
-    const { data: attempt } = await supabase
+    setSubmitError("");
+    const { data: attempt, error } = await supabase
       .from("quiz_attempts")
       .insert({
         user_id: userId, course_id: course.id, status: "completed",
         submitted_at: new Date().toISOString(), score, passed,
-        fail_streak: passed ? 0 : failStreak + 1,
       })
       .select()
       .single();
+
+    // The database refuses the attempt when no attempts are left (e.g. another tab used the last one).
+    if (error || !attempt) {
+      setSubmitError("Your attempt could not be saved. You may be out of attempts — refresh the page to check.");
+      setSubmitting(false);
+      return;
+    }
 
     if (attempt) {
       await supabase.from("attempt_questions").insert(
@@ -88,17 +100,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
     setSubmitting(false);
   }
 
-  if (remaining > 0) {
-    return (
-      <div className="assessment-page tp-fade-in" style={{ textAlign: "center", paddingTop: 60 }}>
-        <Dial pct={100 - (remaining / cooldownSeconds) * 100} size={110} color="var(--warn)" label={remaining} sub="seconds" />
-        <div className="tp-display" style={{ fontSize: 18, fontWeight: 700, margin: "20px 0 6px" }}>Retake available shortly</div>
-        <div style={{ color: "var(--faint)", fontSize: 13, maxWidth: 420, margin: "0 auto" }}>
-          Cooldown escalates after each failed attempt on this course — this gives time to revisit the material instead of guessing again immediately.
-        </div>
-      </div>
-    );
-  }
+  if (locked) return <LockedNotice course={course} />;
 
   if (loading) {
     return <AssessmentSkeleton showNav={false} />;
@@ -131,11 +133,19 @@ export default function QuizClient({ course, userId, lastAttempt }) {
                 </Link>
               </div>
             )}
-            {!result.passed && (
+            {!result.passed && attemptsLeft > 1 && (
               <div style={{ marginTop: 14 }}>
+                <div className="assessment-result-card__detail" style={{ marginBottom: 8 }}>
+                  {attemptsLeft - 1} of {MAX_ATTEMPTS} attempts left
+                </div>
                 <Link href={`/courses/${course.id}/quiz`} className="tp-btn tp-btn-primary" style={{ textDecoration: "none" }} onClick={() => window.location.reload()}>
                   Retake assessment
                 </Link>
+              </div>
+            )}
+            {!result.passed && attemptsLeft <= 1 && (
+              <div className="assessment-result-card__detail" style={{ marginTop: 14 }}>
+                You have used all {MAX_ATTEMPTS} attempts. Ask an admin to approve more attempts.
               </div>
             )}
           </div>
@@ -183,7 +193,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         <div className="assessment-progress" aria-label={`${Object.keys(answers).length} of ${questions.length} questions answered`}>
           <span style={{ width: `${questions.length ? (Object.keys(answers).length / questions.length) * 100 : 0}%` }} />
         </div>
-        <p>Choose the best answer for each question. You must meet the score threshold and answer every mandatory question correctly to pass.</p>
+        <p>Choose the best answer for each question. You must meet the score threshold and answer every mandatory question correctly to pass. Attempts left: {attemptsLeft} of {MAX_ATTEMPTS}.</p>
       </header>
 
       <div className="assessment-list">
@@ -219,6 +229,7 @@ export default function QuizClient({ course, userId, lastAttempt }) {
         <button className="tp-btn tp-btn-primary" style={{ padding: "12px 26px" }} disabled={!allAnswered || submitting} onClick={submit}>
           {submitting ? "Submitting…" : allAnswered ? "Submit assessment" : `Answer all to submit (${questions.length - Object.keys(answers).length} left)`}
         </button>
+        {submitError && <div role="alert" style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 10 }}>{submitError}</div>}
       </div>
     </div>
   );

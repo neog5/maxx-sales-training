@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/server";
 import RoleEditor from "./RoleEditor";
 import { fetchAssignmentsForUser } from "@/lib/assignments";
 import RequiredTraining from "./RequiredTraining";
+import LockedAssessments from "./LockedAssessments";
+import { attemptAllowance } from "@/lib/attempts.mjs";
 
 export default async function ProfilePage({ params }) {
   const { id } = await params;
@@ -21,7 +23,7 @@ export default async function ProfilePage({ params }) {
   if (!viewer) redirect("/login");
   if (!canViewReports(viewer?.role) && user.id !== id) redirect(`/profile/${user.id}`);
 
-  const [{ data: person }, { data: attempts }, { data: memberships }, { data: groups }, { data: courses }, { data: certificates }] = await Promise.all([
+  const [{ data: person }, { data: attempts }, { data: memberships }, { data: groups }, { data: courses }, { data: certificates }, { data: unlocks }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role").eq("id", id).single(),
     supabase
       .from("quiz_attempts")
@@ -33,6 +35,7 @@ export default async function ProfilePage({ params }) {
     supabase.from("groups").select("id, name").order("name"),
     supabase.from("courses").select("id, code, title, is_active, archived_at").order("code"),
     supabase.from("certificates").select("id, course_title, course_code, issued_at, expires_at").eq("user_id", id).order("issued_at", { ascending: false }),
+    supabase.from("attempt_unlocks").select("course_id, granted_at").eq("user_id", id),
   ]);
   if (!person) notFound();
 
@@ -43,6 +46,17 @@ export default async function ProfilePage({ params }) {
   ]);
   const passedCourseIds = new Set((attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id));
   const requirableCourses = (courses || []).filter(isRequirableCourse);
+
+  const attemptsByCourse = new Map();
+  for (const attempt of attempts || []) {
+    attemptsByCourse.set(attempt.course_id, [...(attemptsByCourse.get(attempt.course_id) || []), attempt]);
+  }
+  const lockedCourses = [];
+  for (const [courseId, courseAttempts] of attemptsByCourse) {
+    const allowance = attemptAllowance(courseAttempts, (unlocks || []).filter((unlock) => unlock.course_id === courseId));
+    const course = courseAttempts[0].courses;
+    if (allowance.locked) lockedCourses.push({ id: courseId, title: course?.title || "Course", code: course?.code || "", failed: allowance.failed });
+  }
 
   const attemptIds = (attempts || []).map((attempt) => attempt.id);
   let attemptQuestions = [];
@@ -107,6 +121,8 @@ export default async function ProfilePage({ params }) {
           initialAssignments={assignments}
           passedCourseIds={[...passedCourseIds]}
         />
+
+        <LockedAssessments personId={person.id} viewerId={viewer.id} courses={lockedCourses} canApprove={isAdmin(viewer.role)} />
 
         <section className="profile-report-section">
           <div className="section-heading-row">

@@ -203,11 +203,11 @@ This code is suitable for demonstration and further development, but quiz outcom
 
 - Grading and attempt creation happen in the browser, so an authenticated user can alter submitted results, and with them earn a certificate.
 - Quiz RPC responses include correct answers and explanations before submission.
-- Reading completion and retry cooldown enforcement are client-side and can be bypassed.
+- Reading completion enforcement is client-side and can be bypassed. The three-attempt limit is enforced by the database (`attempts_remaining()` in migration 007).
 - The results screen may appear even if attempt persistence fails.
 - Public course PDFs and question images are readable by anyone with their URL. Use private buckets and signed URLs if course material is confidential.
 
-Move grading, attempt persistence, reading-gate enforcement, and cooldown enforcement to trusted server-side code before production use.
+Move grading, attempt persistence, and reading-gate enforcement to trusted server-side code before production use.
 
 ## Publishing checklist
 

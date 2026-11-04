@@ -20,7 +20,7 @@ export default async function CourseAdminPage({ params }) {
     supabase
       .from("audit_log")
       .select("id, created_at, actor_name, action, entity_type, details")
-      .or(`and(entity_type.eq.course,entity_id.eq.${id}),and(entity_type.eq.course_assignment,details->>course_id.eq.${id}),and(entity_type.eq.course_materials,details->>course_id.eq.${id})`)
+      .or(`and(entity_type.eq.course,entity_id.eq.${id}),and(entity_type.eq.course_assignment,details->>course_id.eq.${id}),and(entity_type.eq.course_materials,details->>course_id.eq.${id}),and(entity_type.eq.attempt_unlocks,details->>course_id.eq.${id})`)
       .order("created_at", { ascending: false })
       .limit(50),
     supabase.from("course_materials").select("id, position, title, pdf_url").eq("course_id", id).order("position").order("created_at"),
