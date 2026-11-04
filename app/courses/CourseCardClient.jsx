@@ -9,9 +9,12 @@ export default function CourseCardClient({ course, userId, initiallyEnrolled, re
   const [enrolled, setEnrolled] = useState(initiallyEnrolled);
   const [enrolling, setEnrolling] = useState(false);
   const [error, setError] = useState("");
+  const viewOnly = course.view_only;
   const lastPass = history.find((attempt) => attempt.passed);
-  const progress = lastPass ? 100 : readingComplete ? 66 : enrolled ? 24 : 0;
-  const status = lastPass ? "passed" : history.length ? "retry" : enrolled ? "enrolled" : "available";
+  // A view-only course has no test: reading it issues the certificate.
+  const complete = viewOnly ? Boolean(certificateId) : Boolean(lastPass);
+  const progress = complete ? 100 : readingComplete ? 66 : enrolled ? 24 : 0;
+  const status = complete ? "passed" : history.length && !viewOnly ? "retry" : enrolled ? "enrolled" : "available";
 
   async function enroll() {
     setEnrolling(true);
@@ -34,9 +37,11 @@ export default function CourseCardClient({ course, userId, initiallyEnrolled, re
       <div className="course-card__content">
         <div className="course-card__meta">
           <span className="course-card__code">{course.code}</span>
-          {lastPass ? (
+          {viewOnly && complete ? (
+            <span className="tp-badge" style={{ background: "var(--success-dim)", color: "var(--success)" }}>Completed</span>
+          ) : lastPass ? (
             <span className="tp-badge" style={{ background: "var(--success-dim)", color: "var(--success)" }}>Passed · {lastPass.score}%</span>
-          ) : history.length ? (
+          ) : history.length && !viewOnly ? (
             <span className="tp-badge" style={{ background: "var(--danger-dim)", color: "var(--danger)" }}>Not yet passed</span>
           ) : enrolled ? (
             <span className="tp-badge" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>Enrolled</span>
@@ -56,10 +61,18 @@ export default function CourseCardClient({ course, userId, initiallyEnrolled, re
           <div className="course-steps" aria-label="Course steps">
             <Link href={`/courses/${course.id}/read`} className="course-step">
               <span className="course-step__number">1</span>
-              <span><strong>PDF reading</strong><small>{readingComplete ? "Completed" : "Read and answer checkpoints"}</small></span>
+              <span><strong>PDF reading</strong><small>{readingComplete ? "Completed" : viewOnly ? "Read the course material" : "Read and answer checkpoints"}</small></span>
               <span className="course-step__arrow" aria-hidden="true">→</span>
             </Link>
-            {readingComplete ? (
+            {viewOnly ? (
+              !certificateId && (
+                <div className="course-step is-locked" aria-disabled="true">
+                  <span className="course-step__number">2</span>
+                  <span><strong>Certificate</strong><small>Issued when you finish the reading</small></span>
+                  <span className="course-step__lock" aria-hidden="true">Locked</span>
+                </div>
+              )
+            ) : readingComplete ? (
               <Link href={`/courses/${course.id}/quiz`} className="course-step">
                 <span className="course-step__number">2</span>
                 <span><strong>Assessment</strong><small>{lastPass ? "Passed" : history.length ? "Retake available" : "Ready to begin"}</small></span>
@@ -74,7 +87,7 @@ export default function CourseCardClient({ course, userId, initiallyEnrolled, re
             )}
             {certificateId && (
               <Link href={`/certificates/${certificateId}`} className="course-step">
-                <span className="course-step__number">3</span>
+                <span className="course-step__number">{viewOnly ? 2 : 3}</span>
                 <span><strong>Certificate</strong><small>View and download</small></span>
                 <span className="course-step__arrow" aria-hidden="true">→</span>
               </Link>

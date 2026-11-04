@@ -33,8 +33,8 @@ export default async function ProfilePage({ params }) {
       .order("submitted_at", { ascending: false }),
     supabase.from("group_members").select("group_id").eq("user_id", id),
     supabase.from("groups").select("id, name").order("name"),
-    supabase.from("courses").select("id, code, title, is_active, archived_at").order("code"),
-    supabase.from("certificates").select("id, course_title, course_code, issued_at, expires_at").eq("user_id", id).order("issued_at", { ascending: false }),
+    supabase.from("courses").select("id, code, title, is_active, archived_at, view_only").order("code"),
+    supabase.from("certificates").select("id, course_id, course_title, course_code, issued_at, expires_at").eq("user_id", id).order("issued_at", { ascending: false }),
     supabase.from("attempt_unlocks").select("course_id, granted_at").eq("user_id", id),
   ]);
   if (!person) notFound();
@@ -44,7 +44,11 @@ export default async function ProfilePage({ params }) {
     fetchAssignmentsForUser(supabase, id, groupIds),
     supabase.rpc("required_courses").eq("user_id", id),
   ]);
-  const passedCourseIds = new Set((attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id));
+  // A certificate also completes a course: view-only courses have no attempts.
+  const passedCourseIds = new Set([
+    ...(attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id),
+    ...(certificates || []).map((certificate) => certificate.course_id),
+  ]);
   const requirableCourses = (courses || []).filter(isRequirableCourse);
 
   const attemptsByCourse = new Map();
@@ -128,7 +132,7 @@ export default async function ProfilePage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Certificates</div>
-              <span>Issued automatically the first time a course is passed</span>
+              <span>Issued automatically the first time a course is passed or a view-only course is read</span>
             </div>
           </div>
           <div className="tp-card certificate-list">

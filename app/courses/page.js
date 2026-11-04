@@ -31,7 +31,11 @@ export default async function CoursesPage() {
   const activeCourses = courses || [];
   const requiredCourses = activeCourses.filter((course) => requiredIds.has(course.id));
   const otherCourses = activeCourses.filter((course) => !requiredIds.has(course.id));
-  const passedCourseIds = new Set((attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id));
+  // View-only courses have no test; their certificate is the completion.
+  const passedCourseIds = new Set([
+    ...(attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id),
+    ...(certificates || []).map((certificate) => certificate.course_id),
+  ]);
   const requiredPassed = requiredCourses.filter((course) => passedCourseIds.has(course.id)).length;
   const readingCompleteIds = new Set((readingSessions || []).filter((session) => session.checkpoint_passed).map((session) => session.course_id));
   const firstName = profile?.full_name?.trim()?.split(/\s+/)[0] || "there";
@@ -67,7 +71,7 @@ export default async function CoursesPage() {
           <div className="courses-hero__summary" aria-label="Training summary">
             <div><strong className="tp-display">{requiredCourses.length}</strong><span>Required</span></div>
             <div><strong className="tp-display">{readingCompleteIds.size}</strong><span>Readings done</span></div>
-            <div><strong className="tp-display">{passedCourseIds.size}</strong><span>Passed</span></div>
+            <div><strong className="tp-display">{passedCourseIds.size}</strong><span>Completed</span></div>
           </div>
         </section>
 

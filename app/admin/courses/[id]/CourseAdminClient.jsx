@@ -22,6 +22,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
     pass_threshold: course.pass_threshold,
     read_seconds: course.read_seconds,
     is_active: course.is_active,
+    view_only: course.view_only,
   });
   const [assignments, setAssignments] = useState(initialAssignments);
   const [busy, setBusy] = useState("");
@@ -69,6 +70,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
         pass_threshold: Number(details.pass_threshold),
         read_seconds: Number(details.read_seconds),
         is_active: details.is_active,
+        view_only: details.view_only,
       }).eq("id", course.id);
       if (error) throw error;
     }, "Course details saved.");
@@ -140,9 +142,13 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
             <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Title</div><input className="tp-input" value={details.title} onChange={(event) => setDetails({ ...details, title: event.target.value })} required /></label>
             <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><textarea className="tp-input" rows={3} value={details.description} onChange={(event) => setDetails({ ...details, description: event.target.value })} /></label>
             <div className="tp-form-grid tp-form-grid--equal">
-              <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={details.pass_threshold} onChange={(event) => setDetails({ ...details, pass_threshold: event.target.value })} required /></label>
+              <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={details.pass_threshold} disabled={details.view_only} onChange={(event) => setDetails({ ...details, pass_threshold: event.target.value })} required /></label>
               <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={details.read_seconds} onChange={(event) => setDetails({ ...details, read_seconds: event.target.value })} required /></label>
             </div>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 10 }}>
+              <input type="checkbox" checked={details.view_only} onChange={(event) => setDetails({ ...details, view_only: event.target.checked })} />
+              View only: no test, the certificate is issued when the reading is finished
+            </label>
             <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 18 }}>
               <input type="checkbox" checked={details.is_active} onChange={(event) => setDetails({ ...details, is_active: event.target.checked })} />
               Visible to learners

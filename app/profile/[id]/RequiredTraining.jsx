@@ -10,6 +10,9 @@ import { courseItems, groupItems } from "@/lib/picker-items.mjs";
 // Lists the courses this person must complete. `requiredCourseIds` comes from the
 // database's required_courses(). Group membership and the reason for each course are
 // shown only to admins and to the person themself (`showGroups`); admins can edit them.
+// View-only courses have no test, so they are completed rather than passed.
+const doneLabel = (course) => (course.view_only ? "Completed" : "Passed");
+
 export default function RequiredTraining({ personId, canEdit, showGroups, groups, initialGroupIds, courses, requiredCourseIds, initialAssignments, passedCourseIds }) {
   const supabase = createClient();
   const router = useRouter();
@@ -86,7 +89,7 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
         <div className="required-course-list">
           {required.map((course) => (
             <div className="required-course" key={course.id}>
-              <span className={`required-course__mark ${course.passed ? "is-passed" : ""}`} aria-label={course.passed ? "Passed" : "Not yet passed"}>{course.passed ? "✓" : ""}</span>
+              <span className={`required-course__mark ${course.passed ? "is-passed" : ""}`} aria-label={course.passed ? doneLabel(course) : "Not yet completed"}>{course.passed ? "✓" : ""}</span>
               <span className="required-course__name">
                 <strong>{course.title}</strong>
                 <small>
@@ -94,7 +97,7 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
                   {showGroups && course.reasons.length > 0 && ` · ${course.reasons.map((reason) => (reason.group_id ? groupNames.get(reason.group_id) : "Assigned individually")).join(", ")}`}
                 </small>
               </span>
-              <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? "Passed" : "Outstanding"}</span>
+              <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : "Outstanding"}</span>
               {canEdit && directCourseIds.includes(course.id) && (
                 <button type="button" className="tp-btn tp-btn-ghost required-course__remove" disabled={busy}
                   onClick={() => mutate(() => supabase.from("course_assignments").delete().eq("course_id", course.id).eq("user_id", personId))}>

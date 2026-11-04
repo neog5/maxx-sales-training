@@ -23,6 +23,7 @@ export default async function AdminDashboardPage({ searchParams }) {
     { data: centralMembers },
     { data: viewGroups },
     { data: viewMembers },
+    { data: certificates },
   ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, role").order("full_name"),
     supabase.rpc("required_courses"),
@@ -32,6 +33,7 @@ export default async function AdminDashboardPage({ searchParams }) {
     admin ? supabase.from("group_members").select("group_id, user_id") : none,
     supabase.from("view_groups").select("id, name").order("name"),
     supabase.from("view_group_members").select("view_group_id, user_id"),
+    supabase.from("certificates").select("user_id, course_id"),
   ]);
 
   const groups = [
@@ -49,6 +51,7 @@ export default async function AdminDashboardPage({ searchParams }) {
     requiredPairs: requiredPairs || [],
     courses: courses || [],
     attempts: attempts || [],
+    certificates: certificates || [],
   });
   const courseLabels = Object.fromEntries((courses || []).map((course) => [course.id, `${course.code} · ${course.title}`]));
 

@@ -22,7 +22,7 @@ Everything downloaded lives in `tmp/wp-import/`:
 | `manifest.json` | What will be imported (built by `node scripts/wp-import/build-manifest.mjs`). |
 | `review.csv` | One row per question with its correct answer, for a manual check. Opens in Excel. |
 
-## Courses to import (have a quiz)
+## Courses with a quiz
 
 All questions are imported as main test questions with the placeholder explanation *"Review the course material for this topic."* The quiz draws 5 questions at random from each pool.
 
@@ -40,25 +40,26 @@ The codes are proposals; change them in `scripts/wp-import/build-manifest.mjs` b
 
 Knee Anatomy question 266 is an exact copy of question 265, so it is skipped. Hip Anatomy and Knee Anatomy also share two identical intro questions (body planes, "medial"); those stay, because they are in different courses.
 
-## Courses not imported yet (no quiz)
+## View-only courses (no quiz)
 
-These need test questions before they can be imported, because a course can only be passed through its test.
+These had no quiz in WordPress, only a Cognito Forms acknowledgement. They are imported as view-only courses: there is no test, and finishing the reading issues the certificate (migration 008). The descriptions are placeholders, since WordPress had none worth keeping.
 
-| WP ID | Course | Reading material | WordPress completion |
-| --- | --- | --- | --- |
-| 348 | Libertas Acetabular Cup Surgical Technique | PDF (MXO_LH00004 R03) — downloaded | Cognito form 371 |
-| 352 | Libertas HA Uncemented Stem | PDF (MXO_LH00007 R03) — downloaded | Cognito form 372 |
-| 356 | Libertas TR Stem Surgical Technique | PDF (MXO_LH00019 R01) — downloaded | Cognito form 373 |
-| 169 | Primary PCK Tech | PDF (MXO-MP00067 R02) — downloaded | Cognito form 346 |
-| 175 | Mechanical Properties and Wear | Google Slides | Cognito form 347 |
-| 207 | Complaint Handling | Google Slides | Cognito form 351 |
-| 180 | Employee Travel & Expense | Google Slides | Cognito form 348 |
-| 328 | Hospital Protocol | 4 Google Slides decks: Aseptic Techniques, Bloodborne Pathogens, HIPAA, OR Protocols | Cognito form 365 |
-| 337 | Safety | 3 Google Slides decks: Electrical Safety, Fire Safety, National Patient Safety Goals | Cognito form 366 |
-| 185 | Sales Territory Map | One image (map dated 15 Apr 2025) — downloaded | Cognito form 349 |
-| 202 | Business Conduct Standards | None. The lesson is only the acknowledgement form. | Cognito form 350 |
+| WP ID | Code | Course | Reading material | Status |
+| --- | --- | --- | --- | --- |
+| 348 | HIP-CUP-TECH | Libertas Acetabular Cup Surgical Technique | PDF (MXO_LH00004 R03) | Ready |
+| 352 | HIP-HA-STEM-TECH | Libertas HA Uncemented Stem | PDF (MXO_LH00007 R03) | Ready |
+| 356 | HIP-TR-STEM-TECH | Libertas TR Stem Surgical Technique | PDF (MXO_LH00019 R01) | Ready |
+| 169 | KNEE-PCK-TECH | Freedom Primary PCK Technique | PDF (MXO-MP00067 R02) | Ready |
+| 185 | TERRITORY-MAP | Sales Territory Map | Map image (15 Apr 2025), turned into a one-page PDF | Ready |
+| 175 | MECH-PROPERTIES | Mechanical Properties and Wear | Google Slides | Needs slides PDF |
+| 207 | COMPLAINT-HANDLING | Complaint Handling | Google Slides | Needs slides PDF |
+| 180 | TRAVEL-EXPENSE | Employee Travel & Expense | Google Slides | Needs slides PDF |
+| 328 | HOSPITAL-PROTOCOL | Hospital Protocol | 4 decks: Aseptic Techniques, Bloodborne Pathogens, HIPAA, OR Protocols | Needs 4 slides PDFs |
+| 337 | SAFETY | Safety | 3 decks: Electrical Safety, Fire Safety, National Patient Safety Goals | Needs 3 slides PDFs |
 
-The 4 PDF courses can get draft questions from the existing AI suggestions feature once they are created in the app.
+Business Conduct Standards (WP 202) is not imported: its only lesson was the acknowledgement form, so there is nothing to read.
+
+Any of these can become a tested course later: untick "View only" on its admin page and add questions (the AI suggestions feature works from its PDF).
 
 ## Not imported
 
@@ -85,7 +86,7 @@ Published Slides links can't be exported to PDF, so each deck has to be download
 | `337-2-fire-safety.pdf` | [Fire Safety](https://docs.google.com/presentation/d/e/2PACX-1vSpHM2FSSlPXosa8XnLtpo1QjMtJUjUT3znHs3Kdl6OkglGtWr3ROparydGytNbRmLn0BgxuBUkWzVW/pub) |
 | `337-3-national-patient-safety-goals.pdf` | [National Patient Safety Goals](https://docs.google.com/presentation/d/e/2PACX-1vQkheDCG_fS9eC0L6a5d9GpT4izzJNIVRlAHt9qo_fC_4VEGniGpcElGloPIkOl4fnbHdKGp_2G6U6L/pub) |
 
-The first 4 were exported from PowerPoint to PDF on 2026-11-04 and imported. The rest are for the courses parked above.
+The first 4 were exported from PowerPoint to PDF on 2026-11-04 and imported. The rest are for the view-only courses above.
 
 ## Loading the courses
 

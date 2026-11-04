@@ -17,7 +17,7 @@ export default async function CoursesAdminPage() {
   const [{ data: courses }, { data: attempts }, { data: questions }, { data: assignments }] = await Promise.all([
     supabase
       .from("courses")
-      .select("id, code, title, is_active, created_at, archived_at, archiver:profiles!courses_archived_by_fkey(full_name)")
+      .select("id, code, title, is_active, view_only, created_at, archived_at, archiver:profiles!courses_archived_by_fkey(full_name)")
       .order("code"),
     supabase.from("quiz_attempts").select("course_id").eq("status", "completed"),
     supabase.from("questions").select("course_id"),
@@ -54,7 +54,7 @@ export default async function CoursesAdminPage() {
                 <span className="course-status course-status--hidden">Hidden</span>
               )}
             </div>
-            <div className="tp-mono">{questionCounts.get(course.id) || 0}</div>
+            <div className="tp-mono">{course.view_only ? <small>View only</small> : questionCounts.get(course.id) || 0}</div>
             <div className="tp-mono">{assignmentCounts.get(course.id) || 0}</div>
             <div className="tp-mono">{attemptCounts.get(course.id) || 0}</div>
             <div><Link href={`/admin/courses/${course.id}`} className="tp-btn tp-btn-ghost people-view-link">Manage</Link></div>

@@ -32,8 +32,11 @@ export default function ReadingGateClient({ course, materials, userId }) {
   const [answerChecked, setAnswerChecked] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [progressError, setProgressError] = useState("");
+  // Saving can be retried, unlike failing to load the session or checkpoints.
+  const [saveError, setSaveError] = useState("");
 
   const total = course.read_seconds;
+  const viewOnly = course.view_only;
   const deck = materials[deckIndex];
   const multiDeck = materials.length > 1;
   const deckNumber = (materialId) => materials.findIndex((material) => material.id === materialId) + 1;
@@ -94,14 +97,21 @@ export default function ReadingGateClient({ course, materials, userId }) {
   async function proceed() {
     if (!sessionId || completing) return;
     setCompleting(true);
-    setProgressError("");
+    setSaveError("");
     const { error } = await supabase.from("reading_sessions").update({ checkpoint_passed: true, completed_at: new Date().toISOString() }).eq("id", sessionId);
     if (error) {
-      setProgressError("We couldn’t save your reading progress. Please try again.");
+      setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time isn’t complete yet. Keep reading, then try again." : "We couldn’t save your reading progress. Please try again.");
       setCompleting(false);
       return;
     }
-    router.push(`/courses/${course.id}/quiz`);
+    if (!viewOnly) {
+      router.push(`/courses/${course.id}/quiz`);
+      return;
+    }
+    // The database issues the certificate when the reading of a view-only course is finished.
+    const { data: certificate } = await supabase.from("certificates").select("id").eq("user_id", userId).eq("course_id", course.id).maybeSingle();
+    router.push(certificate ? `/certificates/${certificate.id}` : "/courses");
+    router.refresh();
   }
 
   function continueReading() {
@@ -130,7 +140,7 @@ export default function ReadingGateClient({ course, materials, userId }) {
           <div className="tp-label">{course.code} · Step 01</div>
           <h1 className="tp-display">{course.title}</h1>
         </div>
-        <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> Assessment</div>
+        <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>
       </header>
 
       <div className="reading-workspace">
@@ -220,8 +230,8 @@ export default function ReadingGateClient({ course, materials, userId }) {
       </div>
 
       <div className="reading-footer">
-        <span>{progressError || (done ? "All requirements complete" : "Complete the reading requirements to unlock your assessment.")}</span>
-        <button className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>{completing ? "Saving progress…" : done ? "Start assessment →" : elapsed < total ? `Continue reading · ${total - elapsed}s left` : answeredIds.length < readingQuestions.length ? `Complete ${readingQuestions.length - answeredIds.length} checkpoint${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}` : `Open ${unopenedDecks} more deck${unopenedDecks === 1 ? "" : "s"}`}</button>
+        <span>{progressError || saveError || (done ? "All requirements complete" : (viewOnly ? "Complete the reading requirements to get your certificate." : "Complete the reading requirements to unlock your assessment."))}</span>
+        <button className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>{completing ? "Saving progress…" : done ? (viewOnly ? "Finish and get certificate →" : "Start assessment →") : elapsed < total ? `Continue reading · ${total - elapsed}s left` : answeredIds.length < readingQuestions.length ? `Complete ${readingQuestions.length - answeredIds.length} checkpoint${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}` : `Open ${unopenedDecks} more deck${unopenedDecks === 1 ? "" : "s"}`}</button>
       </div>
       <style jsx>{`
         .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }

@@ -196,3 +196,28 @@ test("attempt limit: three failed attempts, then an admin must approve more", { 
   assert.equal((await as(users.learner, "select public.attempts_remaining($1, $2) as n", [users.other, course])).rows[0].n, null);
   assert.equal((await as(users.manager, "select public.attempts_remaining($1, $2) as n", [users.other, course])).rows[0].n, 3);
 });
+
+test("view-only courses: finishing the reading issues one certificate, only after the reading time", { skip }, async () => {
+  const course = (await asOwner("insert into public.courses (code, title, view_only, read_seconds) values ($1, 'View only', true, 600) returning id", [`TEST-${randomUUID().slice(0, 6)}`])).rows[0].id;
+  const certificates = async (courseId) => (await asOwner("select count(*)::int as n, max(reading_session_id::text) as session from public.certificates where user_id = $1 and course_id = $2", [users.other, courseId])).rows[0];
+
+  // Learners can't backdate a session to skip the reading time.
+  const session = (await as(users.other, "insert into public.reading_sessions (user_id, course_id, started_at) values ($1, $2, now() - interval '1 day') returning id", [users.other, course])).rows[0].id;
+  await as(users.other, "update public.reading_sessions set started_at = now() - interval '1 day' where id = $1", [session]);
+  const finish = "update public.reading_sessions set checkpoint_passed = true, completed_at = now() where id = $1";
+  assert.match((await as(users.other, finish, [session])).error, /minimum reading time/);
+  assert.equal((await certificates(course)).n, 0);
+
+  await asOwner("update public.courses set read_seconds = 0 where id = $1", [course]);
+  assert.equal((await as(users.other, finish, [session])).count, 1);
+  assert.deepEqual(await certificates(course), { n: 1, session });
+  const again = (await as(users.other, "insert into public.reading_sessions (user_id, course_id) values ($1, $2) returning id", [users.other, course])).rows[0].id;
+  await as(users.other, finish, [again]);
+  assert.equal((await certificates(course)).n, 1);
+
+  // Courses with a test still need the test.
+  const tested = (await asOwner("insert into public.courses (code, title, read_seconds) values ($1, 'Tested', 0) returning id", [`TEST-${randomUUID().slice(0, 6)}`])).rows[0].id;
+  const testedSession = (await as(users.other, "insert into public.reading_sessions (user_id, course_id) values ($1, $2) returning id", [users.other, tested])).rows[0].id;
+  await as(users.other, finish, [testedSession]);
+  assert.equal((await certificates(tested)).n, 0);
+});
