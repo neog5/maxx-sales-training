@@ -44,7 +44,7 @@ export default async function ProfilePage({ params }) {
     fetchAssignmentsForUser(supabase, id, groupIds),
     supabase.rpc("required_courses").eq("user_id", id),
   ]);
-  // A certificate also completes a course: view-only courses have no attempts.
+  // A certificate also completes a course: reading-only courses have no attempts.
   const passedCourseIds = new Set([
     ...(attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id),
     ...(certificates || []).map((certificate) => certificate.course_id),
@@ -132,7 +132,7 @@ export default async function ProfilePage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Certificates</div>
-              <span>Issued automatically the first time a course is passed or a view-only course is read</span>
+              <span>Issued automatically the first time a course is passed or a reading-only course is read</span>
             </div>
           </div>
           <div className="tp-card certificate-list">

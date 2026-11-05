@@ -40,9 +40,9 @@ The codes are proposals; change them in `scripts/wp-import/build-manifest.mjs` b
 
 Knee Anatomy question 266 is an exact copy of question 265, so it is skipped. Hip Anatomy and Knee Anatomy also share two identical intro questions (body planes, "medial"); those stay, because they are in different courses.
 
-## View-only courses (no quiz)
+## Reading-only courses (no quiz)
 
-These had no quiz in WordPress, only a Cognito Forms acknowledgement. They are imported as view-only courses: there is no test, and finishing the reading issues the certificate (migration 008). The descriptions are placeholders, since WordPress had none worth keeping.
+These had no quiz in WordPress, only a Cognito Forms acknowledgement. They are imported as reading-only courses: there is no test, and finishing the reading issues the certificate (migration 008). The descriptions are placeholders, since WordPress had none worth keeping.
 
 | WP ID | Code | Course | Reading material | Status |
 | --- | --- | --- | --- | --- |
@@ -59,7 +59,7 @@ These had no quiz in WordPress, only a Cognito Forms acknowledgement. They are i
 
 Business Conduct Standards (WP 202) is not imported: its only lesson was the acknowledgement form, so there is nothing to read.
 
-Any of these can become a tested course later: untick "View only" on its admin page and add questions (the AI suggestions feature works from its PDF).
+Any of these can become a tested course later: untick "Reading only" on its admin page and add questions (the AI suggestions feature works from its PDF).
 
 ## Not imported
 
@@ -86,7 +86,7 @@ Published Slides links can't be exported to PDF, so each deck has to be download
 | `337-2-fire-safety.pdf` | [Fire Safety](https://docs.google.com/presentation/d/e/2PACX-1vSpHM2FSSlPXosa8XnLtpo1QjMtJUjUT3znHs3Kdl6OkglGtWr3ROparydGytNbRmLn0BgxuBUkWzVW/pub) |
 | `337-3-national-patient-safety-goals.pdf` | [National Patient Safety Goals](https://docs.google.com/presentation/d/e/2PACX-1vQkheDCG_fS9eC0L6a5d9GpT4izzJNIVRlAHt9qo_fC_4VEGniGpcElGloPIkOl4fnbHdKGp_2G6U6L/pub) |
 
-The first 4 were exported from PowerPoint to PDF on 2026-11-04 and imported. The rest are for the view-only courses above.
+The first 4 were exported from PowerPoint to PDF on 2026-11-04 and imported. The rest are for the reading-only courses above.
 
 ## Loading the courses
 

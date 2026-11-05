@@ -31,7 +31,7 @@ export default async function CoursesPage() {
   const activeCourses = courses || [];
   const requiredCourses = activeCourses.filter((course) => requiredIds.has(course.id));
   const otherCourses = activeCourses.filter((course) => !requiredIds.has(course.id));
-  // View-only courses have no test; their certificate is the completion.
+  // Reading-only courses have no test; their certificate is the completion.
   const passedCourseIds = new Set([
     ...(attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id),
     ...(certificates || []).map((certificate) => certificate.course_id),

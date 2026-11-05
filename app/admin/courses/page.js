@@ -54,7 +54,7 @@ export default async function CoursesAdminPage() {
                 <span className="course-status course-status--hidden">Hidden</span>
               )}
             </div>
-            <div className="tp-mono">{course.view_only ? <small>View only</small> : questionCounts.get(course.id) || 0}</div>
+            <div className="tp-mono">{course.view_only ? <small>Reading only</small> : questionCounts.get(course.id) || 0}</div>
             <div className="tp-mono">{assignmentCounts.get(course.id) || 0}</div>
             <div className="tp-mono">{attemptCounts.get(course.id) || 0}</div>
             <div><Link href={`/admin/courses/${course.id}`} className="tp-btn tp-btn-ghost people-view-link">Manage</Link></div>

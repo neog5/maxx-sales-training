@@ -1,5 +1,5 @@
--- Undo 008 · View-only courses
--- Certificates already issued for view-only courses are kept.
+-- Undo 008 · Reading-only courses
+-- Certificates already issued for reading-only courses are kept.
 
 begin;
 

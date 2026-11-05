@@ -10,7 +10,7 @@ import { courseItems, groupItems } from "@/lib/picker-items.mjs";
 // Lists the courses this person must complete. `requiredCourseIds` comes from the
 // database's required_courses(). Group membership and the reason for each course are
 // shown only to admins and to the person themself (`showGroups`); admins can edit them.
-// View-only courses have no test, so they are completed rather than passed.
+// Reading-only courses have no test, so they are completed rather than passed.
 const doneLabel = (course) => (course.view_only ? "Completed" : "Passed");
 
 export default function RequiredTraining({ personId, canEdit, showGroups, groups, initialGroupIds, courses, requiredCourseIds, initialAssignments, passedCourseIds }) {

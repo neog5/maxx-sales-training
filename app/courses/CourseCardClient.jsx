@@ -11,7 +11,7 @@ export default function CourseCardClient({ course, userId, initiallyEnrolled, re
   const [error, setError] = useState("");
   const viewOnly = course.view_only;
   const lastPass = history.find((attempt) => attempt.passed);
-  // A view-only course has no test: reading it issues the certificate.
+  // A reading-only course has no test: reading it issues the certificate.
   const complete = viewOnly ? Boolean(certificateId) : Boolean(lastPass);
   const progress = complete ? 100 : readingComplete ? 66 : enrolled ? 24 : 0;
   const status = complete ? "passed" : history.length && !viewOnly ? "retry" : enrolled ? "enrolled" : "available";

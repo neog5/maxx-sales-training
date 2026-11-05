@@ -1,5 +1,5 @@
--- 008 · View-only courses
--- A view-only course has no test: finishing the reading completes it and issues the
+-- 008 · Reading-only courses
+-- A reading-only course has no test: finishing the reading completes it and issues the
 -- certificate. The database issues it only once the course's minimum reading time has
 -- passed since the reading session started, and learners can't move that start time.
 -- Requires 004 and 006. Undo: supabase/migrations/008_view_only_courses.undo.sql
@@ -31,7 +31,7 @@ create trigger protect_reading_started_at
   before insert or update on public.reading_sessions
   for each row execute function public.protect_reading_started_at();
 
--- Finishing the reading of a view-only course issues its certificate, unless the person
+-- Finishing the reading of a reading-only course issues its certificate, unless the person
 -- already has one. Finishing too early is refused, so the learner sees why.
 create or replace function public.issue_reading_certificate()
 returns trigger

@@ -6,7 +6,7 @@
 // Writes tmp/wp-import/manifest.json and tmp/wp-import/review.csv
 //
 // Courses that had a LearnDash quiz are imported with their questions; the rest are
-// imported as view-only courses (see VIEW_ONLY_COURSES).
+// imported as reading-only courses (see VIEW_ONLY_COURSES).
 import fs from "node:fs";
 import path from "node:path";
 
@@ -25,7 +25,7 @@ const COURSES = {
   379: { code: "HIP-KNOWLEDGE", title: "Libertas Hip Knowledge Base", description: "This course covers general knowledge of the Libertas Hip portfolio.", decks: [{ title: "Libertas Hip Knowledge Base", file: "379-libertas-hip-knowledge-base.pdf", slides: "https://docs.google.com/presentation/d/e/2PACX-1vSzkZ7gqwAGkgDcmRyRQuGyN8vc5D05GeB3hGsLems0NpaS6semyddGwnbD8U3hlFq5JF03E4vTHJ9H/pub" }] },
 };
 
-// View-only courses had no LearnDash quiz: reading them completes them and issues the
+// Reading-only courses had no LearnDash quiz: reading them completes them and issues the
 // certificate. Business Conduct Standards (WP 202) is left out, since it had no reading material.
 const VIEW_ONLY_COURSES = {
   348: { code: "HIP-CUP-TECH", title: "Libertas Acetabular Cup Surgical Technique", description: "Read the Libertas Acetabular Cup surgical technique.", decks: [{ title: "Libertas Acetabular Cup Surgical Technique", file: "348-MXO_LH00004_R03_LibertasAcetabularCup_SurgicalTechnique_22jul2022_web.pdf" }] },
@@ -84,6 +84,6 @@ const cell = (value) => `"${String(value).replaceAll('"', '""')}"`;
 fs.writeFileSync(path.join(dir, "review.csv"), "\uFEFF" + csv.map((row) => row.map(cell).join(",")).join("\r\n"));
 
 for (const course of courses) {
-  const kind = course.view_only ? "view only   " : `${String(course.questions.length).padStart(2)} questions`;
+  const kind = course.view_only ? "reading only" : `${String(course.questions.length).padStart(2)} questions`;
   console.log(`${course.code.padEnd(20)} ${kind}  ${course.ready ? "ready" : `waiting for ${course.decks.filter((deck) => !deck.downloaded).length} slides PDF(s)`}`);
 }

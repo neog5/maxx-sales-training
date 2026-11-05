@@ -13,7 +13,7 @@ export default async function QuizPage({ params }) {
   const { data: course } = await supabase.from("courses").select("*").eq("id", id).single();
   if (!course) notFound();
   if (course.archived_at) return <CourseUnavailable profile={profile} course={course} />;
-  // View-only courses have no test; finishing the reading completes them.
+  // Reading-only courses have no test; finishing the reading completes them.
   if (course.view_only) redirect(`/courses/${course.id}/read`);
   const { data: completedReading } = await supabase
     .from("reading_sessions")

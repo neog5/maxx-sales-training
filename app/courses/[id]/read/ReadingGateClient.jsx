@@ -108,7 +108,7 @@ export default function ReadingGateClient({ course, materials, userId }) {
       router.push(`/courses/${course.id}/quiz`);
       return;
     }
-    // The database issues the certificate when the reading of a view-only course is finished.
+    // The database issues the certificate when the reading of a reading-only course is finished.
     const { data: certificate } = await supabase.from("certificates").select("id").eq("user_id", userId).eq("course_id", course.id).maybeSingle();
     router.push(certificate ? `/certificates/${certificate.id}` : "/courses");
     router.refresh();

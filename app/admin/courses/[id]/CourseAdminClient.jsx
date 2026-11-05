@@ -147,7 +147,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
             </div>
             <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 10 }}>
               <input type="checkbox" checked={details.view_only} onChange={(event) => setDetails({ ...details, view_only: event.target.checked })} />
-              View only: no test, the certificate is issued when the reading is finished
+              Reading only: no test, the certificate is issued when the reading is finished
             </label>
             <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 18 }}>
               <input type="checkbox" checked={details.is_active} onChange={(event) => setDetails({ ...details, is_active: event.target.checked })} />
