@@ -13,6 +13,7 @@
 // yet are skipped.
 import fs from "node:fs";
 import path from "node:path";
+import { parseEnv } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 
 const [envFile, ...flags] = process.argv.slice(2);
@@ -20,10 +21,7 @@ if (!envFile) throw new Error("Usage: node scripts/wp-import/load.mjs <env file>
 const apply = flags.includes("--apply");
 const only = flags.includes("--only") ? flags[flags.indexOf("--only") + 1] : null;
 
-const env = Object.fromEntries(fs.readFileSync(envFile, "utf8").split(/\r?\n/).filter((line) => /^[A-Z_]+=/.test(line)).map((line) => {
-  const index = line.indexOf("=");
-  return [line.slice(0, index), line.slice(index + 1).trim().replace(/^"|"$/g, "")];
-}));
+const env = parseEnv(fs.readFileSync(envFile, "utf8"));
 if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error(`${envFile} needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY`);
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 

@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
-import TopNav from "@/components/TopNav";
 import { requireViewer } from "@/lib/auth";
-import { isAdmin } from "@/lib/roles.mjs";
-import AdminTabs from "../../../AdminTabs";
+import { fetchAll } from "@/lib/db";
+import { fetchCourseMaterials } from "@/lib/queries";
+import { generationCountFromParam } from "@/lib/question-suggestions";
+import { isAdmin } from "@/lib/roles";
+import AdminPage from "../../../AdminPage";
 import QuestionBankClient from "../../../questions/QuestionBankClient";
 import CourseHeader from "../CourseHeader";
 import { loadCourseHeader } from "../course-data";
@@ -13,31 +15,26 @@ export default async function CourseQuestionsPage({ params, searchParams }) {
   const { supabase, profile } = await requireViewer(isAdmin);
   const header = await loadCourseHeader(supabase, id);
   if (!header) notFound();
+  const archived = Boolean(header.course.archived_at);
 
-  const [{ data: questions }, { data: materials }] = await Promise.all([
-    supabase.from("questions").select("*").eq("course_id", id).order("created_at"),
-    supabase.from("course_materials").select("id, position, title").eq("course_id", id).order("position").order("created_at"),
+  const [questions, materials] = await Promise.all([
+    fetchAll(() => supabase.from("questions").select("*").eq("course_id", id).order("created_at").order("id"), "questions"),
+    fetchCourseMaterials(supabase, id, "id, position, title"),
   ]);
 
   return (
-    <div>
-      <TopNav profile={profile} />
-      <div className="admin-nav tp-fade-in">
-        <AdminTabs active="courses" role={profile.role} />
-      </div>
+    <AdminPage profile={profile}>
       <main className="tp-page tp-fade-in">
         <CourseHeader {...header} active="questions" />
         <QuestionBankClient
-          embedded
-          readOnly={Boolean(header.course.archived_at)}
-          courses={[header.course]}
-          materials={materials || []}
-          initialQuestions={questions || []}
-          initialCourseId={id}
-          autoSuggest={suggest === "1" && !header.course.archived_at}
-          initialGenerationCounts={{ reading, main }}
+          course={header.course}
+          readOnly={archived}
+          materials={materials}
+          initialQuestions={questions}
+          autoSuggest={suggest === "1" && !archived}
+          initialGenerationCounts={{ reading: generationCountFromParam(reading, "reading"), main: generationCountFromParam(main, "main") }}
         />
       </main>
-    </div>
+    </AdminPage>
   );
 }

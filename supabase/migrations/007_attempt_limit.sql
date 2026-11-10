@@ -1,7 +1,7 @@
 -- 007 · Attempt limit
 -- Replaces the escalating retry cooldown (fail_streak) with a simple rule: three failed
 -- attempts per course, then an admin must approve more. Each approval gives a fresh three.
--- Passing the course also resets the count. lib/attempts.mjs mirrors this rule for the UI.
+-- Passing the course also resets the count. lib/attempts.js mirrors this rule for the UI.
 -- Undo: supabase/migrations/007_attempt_limit.undo.sql
 
 begin;

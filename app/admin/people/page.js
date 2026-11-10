@@ -1,63 +1,30 @@
 import { requireViewer } from "@/lib/auth";
-import { canViewReports } from "@/lib/roles.mjs";
-import TopNav from "@/components/TopNav";
-import AdminTabs from "../AdminTabs";
+import { ATTENTION_STATUSES, summarizeAttemptsByUser } from "@/lib/attempt-stats";
+import { fetchAll } from "@/lib/db";
+import { fetchPeople } from "@/lib/queries";
+import { canViewReports } from "@/lib/roles";
+import AdminPage from "../AdminPage";
 import PeopleDirectoryClient from "./PeopleDirectoryClient";
 
 export default async function PeoplePage({ searchParams }) {
   const { status } = await searchParams;
   const { supabase, profile } = await requireViewer(canViewReports);
 
-  const [{ data: people }, { data: attempts }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, role, created_at")
-      .order("full_name"),
-    supabase
-      .from("quiz_attempts")
-      .select("id, user_id, score, passed, submitted_at")
-      .eq("status", "completed")
-      .order("submitted_at", { ascending: false }),
+  const [people, attempts] = await Promise.all([
+    fetchPeople(supabase, "id, full_name, email, role, created_at"),
+    fetchAll(
+      () => supabase.from("quiz_attempts").select("user_id, score, passed, submitted_at").eq("status", "completed").order("id"),
+      "completed attempts"
+    ),
   ]);
-
-  const attemptsByPerson = new Map();
-  for (const attempt of attempts || []) {
-    const personAttempts = attemptsByPerson.get(attempt.user_id) || [];
-    personAttempts.push(attempt);
-    attemptsByPerson.set(attempt.user_id, personAttempts);
-  }
-
-  const directory = (people || []).map((person) => {
-    const personAttempts = attemptsByPerson.get(person.id) || [];
-    const passed = personAttempts.filter((attempt) => attempt.passed).length;
-    const averageScore = personAttempts.length
-      ? Math.round(personAttempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / personAttempts.length)
-      : null;
-
-    return {
-      ...person,
-      attemptCount: personAttempts.length,
-      averageScore,
-      passRate: personAttempts.length ? Math.round((passed / personAttempts.length) * 100) : null,
-      lastActiveAt: personAttempts[0]?.submitted_at || null,
-      attentionStatus: personAttempts.length === 0
-        ? "not-started"
-        : personAttempts[0].passed
-          ? "on-track"
-          : "needs-attention",
-    };
-  });
+  const statsFor = summarizeAttemptsByUser(attempts);
 
   return (
-    <div>
-      <TopNav profile={profile} />
-      <div className="admin-nav tp-fade-in">
-        <AdminTabs active="people" role={profile.role} />
-      </div>
+    <AdminPage profile={profile}>
       <PeopleDirectoryClient
-        people={directory}
-        initialStatus={["on-track", "needs-attention", "not-started"].includes(status) ? status : "all"}
+        people={people.map((person) => ({ ...person, ...statsFor(person.id) }))}
+        initialStatus={ATTENTION_STATUSES.includes(status) ? status : "all"}
       />
-    </div>
+    </AdminPage>
   );
 }

@@ -1,44 +1,58 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Notice from "@/components/Notice";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
+
+const COPY = {
+  signin: { title: "Welcome back", intro: "Sign in to continue your assigned training.", submit: "Sign in" },
+  signup: { title: "Create your account", intro: "Set up your account to begin training.", submit: "Create account" },
+};
 
 export default function LoginPage() {
   const supabase = createClient();
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [mode, setMode] = useState("signin"); // signin | signup
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [confirmationSent, setConfirmationSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const copy = COPY[mode];
 
-  async function submit(e) {
-    e.preventDefault();
-    if (loading) return;
-
+  function switchMode(nextMode) {
+    setMode(nextMode);
     setError("");
+    setConfirmationSent(false);
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    if (loading) return;
+    setError("");
+    setConfirmationSent(false);
     setLoading(true);
     try {
-      const { error } = mode === "signin"
+      const { data, error: authError } = mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email, password,
-            options: { data: { full_name: fullName } },
-          });
+        : await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
 
-      if (error) {
-        setError(error.message);
-        setLoading(false);
+      if (authError) {
+        setError(authError.message);
+      } else if (!data.session) {
+        // Sign-up with email confirmation turned on: there is no session until the link is clicked.
+        setConfirmationSent(true);
+      } else {
+        router.push(routes.courses);
+        router.refresh();
         return;
       }
-
-      router.push("/courses");
-      router.refresh();
     } catch {
       setError("Unable to connect. Please try again.");
-      setLoading(false);
     }
+    setLoading(false);
   }
 
   return (
@@ -63,37 +77,40 @@ export default function LoginPage() {
         </section>
         <section className="login-form">
           <div className="login-form__eyebrow">Secure access</div>
-          <h2 className="tp-display">{mode === "signin" ? "Welcome back" : "Create your account"}</h2>
-          <p className="login-form__intro">{mode === "signin" ? "Sign in to continue your assigned training." : "Set up your account to begin training."}</p>
+          <h2 className="tp-display">{copy.title}</h2>
+          <p className="login-form__intro">{copy.intro}</p>
 
-        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {mode === "signup" && (
-            <div>
-              <div className="tp-label" style={{ marginBottom: 6 }}>Full name</div>
-              <input className="tp-input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Smith" autoComplete="name" required />
+          <form onSubmit={submit} className="login-fields">
+            {mode === "signup" && (
+              <div className="login-field">
+                <label className="tp-label" htmlFor="login-name">Full name</label>
+                <input id="login-name" className="tp-input" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Jane Smith" autoComplete="name" required />
+              </div>
+            )}
+            <div className="login-field">
+              <label className="tp-label" htmlFor="login-email">Email</label>
+              <input id="login-email" className="tp-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required />
             </div>
-          )}
-          <div>
-            <div className="tp-label" style={{ marginBottom: 6 }}>Email</div>
-            <input className="tp-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" required />
-          </div>
-          <div>
-            <div className="tp-label" style={{ marginBottom: 6 }}>Password</div>
-            <input className="tp-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} />
-          </div>
-          {error && <div style={{ color: "var(--danger)", fontSize: 12.5 }}>{error}</div>}
-          <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} aria-busy={loading} style={{ marginTop: 4 }}>
-            {loading ? "Loading…" : mode === "signin" ? "Sign in" : "Create account"}
-          </button>
-        </form>
+            <div className="login-field">
+              <label className="tp-label" htmlFor="login-password">Password</label>
+              <input id="login-password" className="tp-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} />
+            </div>
+            <Notice tone="error" className="login-notice">{error}</Notice>
+            {confirmationSent && (
+              <Notice tone="success" className="login-notice">Check your email to confirm your account, then sign in.</Notice>
+            )}
+            <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} aria-busy={loading}>
+              {loading ? "Loading…" : copy.submit}
+            </button>
+          </form>
 
-        <div style={{ marginTop: 16, fontSize: 12.5, color: "var(--faint)", textAlign: "center" }}>
-          {mode === "signin" ? (
-            <>New to the portal? <button type="button" className="login-mode-switch" onClick={() => setMode("signup")}>Create an account</button></>
-          ) : (
-            <>Already have an account? <button type="button" className="login-mode-switch" onClick={() => setMode("signin")}>Sign in</button></>
-          )}
-        </div>
+          <div className="login-switch">
+            {mode === "signin" ? (
+              <>New to the portal? <button type="button" className="login-mode-switch" onClick={() => switchMode("signup")}>Create an account</button></>
+            ) : (
+              <>Already have an account? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Sign in</button></>
+            )}
+          </div>
         </section>
       </div>
     </main>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ROLE_LABELS } from "@/lib/roles.mjs";
+import { ROLE_LABELS } from "@/lib/roles";
 
 export default function RoleEditor({ profileId, initialRole, roles }) {
   const [role, setRole] = useState(initialRole);

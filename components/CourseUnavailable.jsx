@@ -1,5 +1,6 @@
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
+import { routes } from "@/lib/routes";
 
 export default function CourseUnavailable({ profile, course }) {
   return (
@@ -11,7 +12,7 @@ export default function CourseUnavailable({ profile, course }) {
           <h1 className="tp-display">{course.title}</h1>
           <p>This course has been archived and can no longer be started. Your past results are still saved on your profile.</p>
         </div>
-        <Link href="/courses" className="tp-btn tp-btn-primary">Back to your courses</Link>
+        <Link href={routes.courses} className="tp-btn tp-btn-primary">Back to your courses</Link>
       </main>
     </div>
   );

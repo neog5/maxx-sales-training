@@ -1,78 +1,68 @@
-import TopNav from "@/components/TopNav";
 import { requireViewer } from "@/lib/auth";
-import { buildComplianceReport } from "@/lib/compliance.mjs";
-import { canViewReports, isAdmin } from "@/lib/roles.mjs";
-import AdminTabs from "./AdminTabs";
+import { COMPLIANCE_STATUSES, buildComplianceReport } from "@/lib/compliance";
+import { fetchAll, must } from "@/lib/db";
+import { fetchPeople } from "@/lib/queries";
+import { canViewReports, isAdmin } from "@/lib/roles";
+import AdminPage from "./AdminPage";
 import ComplianceDashboardClient from "./ComplianceDashboardClient";
 
 export default async function AdminDashboardPage({ searchParams }) {
   const { group, status } = await searchParams;
   const { supabase, profile } = await requireViewer(canViewReports);
   const admin = isAdmin(profile.role);
-  const none = Promise.resolve({ data: [] });
 
   // Who must complete what comes from required_courses(), which expands groups in the
   // database, so managers get accurate compliance without seeing central groups.
   // Filters use training groups (admins only) plus the viewer's own private watchlists.
-  const [
-    { data: people },
-    { data: requiredPairs },
-    { data: courses },
-    { data: attempts },
-    { data: centralGroups },
-    { data: centralMembers },
-    { data: viewGroups },
-    { data: viewMembers },
-    { data: certificates },
-  ] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email, role").order("full_name"),
-    supabase.rpc("required_courses"),
-    supabase.from("courses").select("id, code, title, is_active, archived_at"),
-    supabase.from("quiz_attempts").select("user_id, course_id, passed").eq("status", "completed").eq("passed", true),
-    admin ? supabase.from("groups").select("id, name").order("name") : none,
-    admin ? supabase.from("group_members").select("group_id, user_id") : none,
-    supabase.from("view_groups").select("id, name").order("name"),
-    supabase.from("view_group_members").select("view_group_id, user_id"),
-    supabase.from("certificates").select("user_id, course_id"),
+  const [people, requiredPairs, courses, attempts, centralGroups, centralMembers, viewGroups, viewMembers, certificates] = await Promise.all([
+    fetchPeople(supabase),
+    fetchAll(() => supabase.rpc("required_courses").order("user_id").order("course_id"), "required courses"),
+    supabase.from("courses").select("id, code, title, is_active, archived_at").then((result) => must(result, "courses")),
+    fetchAll(
+      () => supabase.from("quiz_attempts").select("user_id, course_id, passed").eq("status", "completed").eq("passed", true).order("id"),
+      "passed attempts"
+    ),
+    admin ? supabase.from("groups").select("id, name").order("name").then((result) => must(result, "training groups")) : [],
+    admin ? fetchAll(() => supabase.from("group_members").select("group_id, user_id").order("group_id").order("user_id"), "training group members") : [],
+    supabase.from("view_groups").select("id, name").order("name").then((result) => must(result, "watchlists")),
+    fetchAll(() => supabase.from("view_group_members").select("view_group_id, user_id").order("view_group_id").order("user_id"), "watchlist members"),
+    fetchAll(() => supabase.from("certificates").select("user_id, course_id").order("id"), "certificates"),
   ]);
 
   const groups = [
-    ...(viewGroups || []).map((viewGroup) => ({ ...viewGroup, kind: "view" })),
-    ...(centralGroups || []).map((centralGroup) => ({ ...centralGroup, kind: "central" })),
+    ...viewGroups.map((viewGroup) => ({ ...viewGroup, kind: "view" })),
+    ...centralGroups.map((centralGroup) => ({ ...centralGroup, kind: "central" })),
   ];
   const memberships = [
-    ...(centralMembers || []),
-    ...(viewMembers || []).map((member) => ({ group_id: member.view_group_id, user_id: member.user_id })),
+    ...centralMembers,
+    ...viewMembers.map((member) => ({ group_id: member.view_group_id, user_id: member.user_id })),
   ];
   const { rows, groupSummaries } = buildComplianceReport({
-    people: people || [],
+    people,
     groups,
     memberships,
-    requiredPairs: requiredPairs || [],
-    courses: courses || [],
-    attempts: attempts || [],
-    certificates: certificates || [],
+    requiredPairs,
+    courses,
+    attempts,
+    certificates,
   });
-  const courseLabels = Object.fromEntries((courses || []).map((course) => [course.id, `${course.code} · ${course.title}`]));
+  const courseLabels = Object.fromEntries(courses.map((course) => [course.id, `${course.code} · ${course.title}`]));
+  const watchlists = viewGroups.map((viewGroup) => ({
+    ...viewGroup,
+    memberIds: viewMembers.filter((member) => member.view_group_id === viewGroup.id).map((member) => member.user_id),
+  }));
 
   return (
-    <div>
-      <TopNav profile={profile} />
-      <div className="admin-nav tp-fade-in">
-        <AdminTabs active="dashboard" role={profile.role} />
-      </div>
+    <AdminPage profile={profile}>
       <ComplianceDashboardClient
         rows={rows}
         groupSummaries={groupSummaries}
         courseLabels={courseLabels}
         showCentralGroups={admin}
-        watchlists={(viewGroups || []).map((viewGroup) => ({
-          ...viewGroup,
-          memberIds: (viewMembers || []).filter((member) => member.view_group_id === viewGroup.id).map((member) => member.user_id),
-        }))}
+        watchlists={watchlists}
         initialGroup={groupSummaries.some((summary) => summary.id === group) ? group : "all"}
-        initialStatus={["compliant", "non_compliant", "none"].includes(status) ? status : "all"}
+        initialStatus={COMPLIANCE_STATUSES.includes(status) ? status : "all"}
       />
-    </div>
+    </AdminPage>
   );
 }

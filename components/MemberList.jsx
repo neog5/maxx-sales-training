@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { displayName } from "@/lib/people";
+import { routes } from "@/lib/routes";
 
 const PAGE_SIZE = 25;
 
 // Searchable, paged list of people for groups that can hold hundreds of members.
-export default function MemberList({ people, onRemove, busy = false, emptyText = "No one yet", linkProfiles = true }) {
+export default function MemberList({ people, onRemove, busy = false, emptyText = "No one yet" }) {
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
 
@@ -30,10 +32,10 @@ export default function MemberList({ people, onRemove, busy = false, emptyText =
         {filtered.slice(0, limit).map((person) => (
           <div className="member-list__row" key={person.id}>
             <span>
-              {linkProfiles ? <Link className="profile-link" href={`/profile/${person.id}`}>{person.full_name}</Link> : <strong>{person.full_name}</strong>}
+              <Link className="profile-link" href={routes.profile(person.id)}>{displayName(person)}</Link>
               {person.email && <small>{person.email}</small>}
             </span>
-            {onRemove && <button type="button" className="tp-btn tp-btn-ghost member-list__remove" aria-label={`Remove ${person.full_name}`} disabled={busy} onClick={() => onRemove(person)}>Remove</button>}
+            {onRemove && <button type="button" className="tp-btn tp-btn-ghost member-list__remove" aria-label={`Remove ${displayName(person)}`} disabled={busy} onClick={() => onRemove(person)}>Remove</button>}
           </div>
         ))}
         {filtered.length === 0 && <div className="chip-list__empty member-list__empty">No members match.</div>}

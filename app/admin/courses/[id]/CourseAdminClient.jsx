@@ -2,97 +2,99 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import LocalDate from "@/components/LocalDate";
 import MemberList from "@/components/MemberList";
 import MultiPicker from "@/components/MultiPicker";
+import { describeAuditEntry } from "@/lib/audit";
+import { COURSE_PDF_BUCKET, materialStoragePathFromUrl } from "@/lib/course-materials";
+import { byName, displayName } from "@/lib/people";
+import { groupItems, personItems } from "@/lib/picker-items";
+import { QUESTION_IMAGE_BUCKET } from "@/lib/question-images";
+import { isSuperAdmin } from "@/lib/roles";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
-import { groupItems, personItems } from "@/lib/picker-items.mjs";
-import { describeAuditEntry } from "@/lib/audit.mjs";
-import LocalDate from "@/components/LocalDate";
-import { isSuperAdmin } from "@/lib/roles.mjs";
-import { COURSE_PDF_BUCKET, materialStoragePathFromUrl } from "@/lib/course-materials.mjs";
+import useAdminMutation from "../../useAdminMutation";
 import CourseMaterialsClient from "./CourseMaterialsClient";
+import { removeStoredFiles } from "@/lib/storage";
 
-export default function CourseAdminClient({ course, viewerRole, recordCount, materials, readingCounts, initialAssignments, groups, people, history }) {
-  const supabase = createClient();
-  const router = useRouter();
-  const archived = Boolean(course.archived_at);
-  const [details, setDetails] = useState({
+const ASSIGNMENT_NOUNS = { group_id: ["training group", "training groups"], user_id: ["person", "people"] };
+
+function detailsFrom(course) {
+  return {
     title: course.title,
     description: course.description || "",
     pass_threshold: course.pass_threshold,
     read_seconds: course.read_seconds,
     is_active: course.is_active,
     view_only: course.view_only,
-  });
-  const [assignments, setAssignments] = useState(initialAssignments);
-  const [busy, setBusy] = useState("");
-  const [message, setMessage] = useState({ type: "", text: "" });
+  };
+}
+
+// Deletes a deleted course's deck PDFs and question images. Best effort: the course is
+// already gone, so a failure only leaves unused files behind.
+async function removeCourseFiles(supabase, course, materials) {
+  await removeStoredFiles(supabase, COURSE_PDF_BUCKET, materials.map((material) => materialStoragePathFromUrl(material.pdf_url)));
+  const { data: files } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).list(course.id, { limit: 1000 });
+  await removeStoredFiles(supabase, QUESTION_IMAGE_BUCKET, (files || []).map((file) => `${course.id}/${file.name}`));
+}
+
+// A course's details, assignments, decks and history. The assignments, decks, header and
+// history all come from the server, so each change re-renders the page from there.
+export default function CourseAdminClient({ course, viewerRole, recordCount, materials, readingCounts, assignments, groups, people, history }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const { run, busy, fail, notices } = useAdminMutation();
+  const archived = Boolean(course.archived_at);
+  const [details, setDetails] = useState(() => detailsFrom(course));
 
   const groupNames = useMemo(() => new Map(groups.map((group) => [group.id, group.name])), [groups]);
-  const peopleNames = useMemo(() => new Map(people.map((person) => [person.id, person.full_name])), [people]);
-  const names = { groups: groupNames, people: peopleNames, courses: new Map([[course.id, course.title]]) };
-  const assignedGroups = assignments.filter((assignment) => assignment.group_id);
-  const assignedPeople = assignments.filter((assignment) => assignment.user_id);
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const personOptions = useMemo(() => personItems(people), [people]);
   const groupOptions = useMemo(() => groupItems(groups), [groups]);
-  const assignedPeopleList = assignedPeople
-    .map((assignment) => peopleById.get(assignment.user_id))
-    .filter(Boolean)
-    .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+  const names = {
+    groups: groupNames,
+    people: new Map(people.map((person) => [person.id, displayName(person)])),
+    courses: new Map([[course.id, course.title]]),
+  };
+  const assignedGroups = assignments.filter((assignment) => assignment.group_id);
+  const assignedPeople = assignments.filter((assignment) => assignment.user_id);
+  const assignedPeopleList = assignedPeople.map((assignment) => peopleById.get(assignment.user_id)).filter(Boolean).sort(byName);
 
-  async function run(label, action, success, { refresh = true } = {}) {
-    setBusy(label);
-    setMessage({ type: "", text: "" });
-    try {
-      await action();
-      if (success) setMessage({ type: "success", text: success });
-      if (refresh) router.refresh();
-      return true;
-    } catch (error) {
-      setMessage({ type: "error", text: error.message || "Something went wrong. Please try again." });
-      return false;
-    } finally {
-      setBusy("");
-    }
+  // Runs a change and, when it worked, re-renders the page with fresh server data.
+  async function change(label, action, messages) {
+    const data = await run(label, action, messages);
+    if (data) router.refresh();
+    return data;
+  }
+
+  function updateDetail(field, value) {
+    setDetails((current) => ({ ...current, [field]: value }));
   }
 
   function saveDetails(event) {
     event.preventDefault();
     if (!details.title.trim()) {
-      setMessage({ type: "error", text: "Enter a course title." });
+      fail("Enter a course title.");
       return;
     }
-    run("details", async () => {
-      const { error } = await supabase.from("courses").update({
-        title: details.title.trim(),
-        description: details.description.trim() || null,
-        pass_threshold: Number(details.pass_threshold),
-        read_seconds: Number(details.read_seconds),
-        is_active: details.is_active,
-        view_only: details.view_only,
-      }).eq("id", course.id);
-      if (error) throw error;
-    }, "Course details saved.");
+    change("details", () => supabase.from("courses").update({
+      title: details.title.trim(),
+      description: details.description.trim() || null,
+      pass_threshold: Number(details.pass_threshold),
+      read_seconds: Number(details.read_seconds),
+      is_active: details.is_active,
+      view_only: details.view_only,
+    }).eq("id", course.id), { success: "Course details saved." });
   }
 
   function addAssignments(field, ids) {
-    return run("assign", async () => {
-      const { data, error } = await supabase
-        .from("course_assignments")
-        .insert(ids.map((id) => ({ course_id: course.id, [field]: id })))
-        .select("id, group_id, user_id, assigned_at");
-      if (error) throw error;
-      setAssignments((current) => [...current, ...data]);
-    }, `Assigned to ${ids.length} ${field === "group_id" ? (ids.length === 1 ? "training group" : "training groups") : (ids.length === 1 ? "person" : "people")}.`);
+    const [one, many] = ASSIGNMENT_NOUNS[field];
+    return change("assign", () => supabase.from("course_assignments").insert(ids.map((id) => ({ course_id: course.id, [field]: id }))),
+      { success: `Assigned to ${ids.length} ${ids.length === 1 ? one : many}.` });
   }
 
   function removeAssignment(assignment) {
-    run("assign", async () => {
-      const { error } = await supabase.from("course_assignments").delete().eq("id", assignment.id);
-      if (error) throw error;
-      setAssignments((current) => current.filter((row) => row.id !== assignment.id));
-    });
+    return change("assign", () => supabase.from("course_assignments").delete().eq("id", assignment.id));
   }
 
   function setArchived(nextArchived) {
@@ -100,57 +102,47 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
       ? `Archive ${course.code}? Learners will no longer see it or be required to complete it. All training records are kept, and you can restore it later.`
       : `Restore ${course.code} from the archive?`;
     if (!window.confirm(prompt)) return;
-    run("archive", async () => {
-      const { error } = await supabase
-        .from("courses")
-        .update({ archived_at: nextArchived ? new Date().toISOString() : null })
-        .eq("id", course.id);
-      if (error) throw error;
-    }, nextArchived ? "Course archived." : "Course restored.");
+    change("archive", () => supabase.from("courses").update({ archived_at: nextArchived ? new Date().toISOString() : null }).eq("id", course.id),
+      { success: nextArchived ? "Course archived." : "Course restored." });
   }
 
-  function deleteCourse() {
+  async function deleteCourse() {
     const typed = window.prompt(`This permanently deletes ${course.code}, its questions and its assignments. Type the course code to confirm.`);
     if (typed === null) return;
     if (typed.trim().toUpperCase() !== course.code.toUpperCase()) {
-      setMessage({ type: "error", text: "The course code didn’t match, so nothing was deleted." });
+      fail("The course code didn’t match, so nothing was deleted.");
       return;
     }
-    run("delete", async () => {
-      const { data, error } = await supabase.from("courses").delete().eq("id", course.id).select("id");
-      if (error) throw new Error(/foreign key/i.test(error.message) ? "This course has training records, so it can only be archived." : error.message);
-      if (!data?.length) throw new Error("Only a super admin can delete courses.");
-      // The course is gone; clean up its files on a best-effort basis.
-      const pdfPaths = materials.map((material) => materialStoragePathFromUrl(material.pdf_url)).filter(Boolean);
-      if (pdfPaths.length) await supabase.storage.from(COURSE_PDF_BUCKET).remove(pdfPaths);
-      const { data: images } = await supabase.storage.from("question-images").list(course.id, { limit: 1000 });
-      if (images?.length) await supabase.storage.from("question-images").remove(images.map((image) => `${course.id}/${image.name}`));
-      router.push("/admin/courses");
-    }, "", { refresh: false });
+    const deleted = await run("delete", async () => {
+      const result = await supabase.from("courses").delete().eq("id", course.id).select("id");
+      if (!result.error && !result.data?.length) throw new Error("Only a super admin can delete courses.");
+      return result;
+    }, { inUse: "This course has training records, so it can only be archived." });
+    if (!deleted) return;
+    await removeCourseFiles(supabase, course, materials);
+    router.push(routes.adminCourses);
   }
 
   return (
     <div className="course-admin">
-      {message.text && (
-        <div className={message.type === "error" ? "notice notice--error" : "notice notice--success"} role={message.type === "error" ? "alert" : "status"}>{message.text}</div>
-      )}
+      {notices}
 
       <div className="course-admin__grid">
         <form className="tp-card tp-form-card" onSubmit={saveDetails}>
-          <div className="tp-label" style={{ marginBottom: 14 }}>Course details</div>
+          <div className="tp-label form-section-label">Course details</div>
           <fieldset disabled={archived || busy === "details"} className="course-admin__fieldset">
-            <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Title</div><input className="tp-input" value={details.title} onChange={(event) => setDetails({ ...details, title: event.target.value })} required /></label>
-            <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><textarea className="tp-input" rows={3} value={details.description} onChange={(event) => setDetails({ ...details, description: event.target.value })} /></label>
+            <label className="tp-form-field"><div className="tp-label form-label">Title</div><input className="tp-input" value={details.title} onChange={(event) => updateDetail("title", event.target.value)} required /></label>
+            <label className="tp-form-field"><div className="tp-label form-label">Description</div><textarea className="tp-input" rows={3} value={details.description} onChange={(event) => updateDetail("description", event.target.value)} /></label>
             <div className="tp-form-grid tp-form-grid--equal">
-              <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={details.pass_threshold} disabled={details.view_only} onChange={(event) => setDetails({ ...details, pass_threshold: event.target.value })} required /></label>
-              <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={details.read_seconds} onChange={(event) => setDetails({ ...details, read_seconds: event.target.value })} required /></label>
+              <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={details.pass_threshold} disabled={details.view_only} onChange={(event) => updateDetail("pass_threshold", event.target.value)} required /></label>
+              <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={details.read_seconds} onChange={(event) => updateDetail("read_seconds", event.target.value)} required /></label>
             </div>
-            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 10 }}>
-              <input type="checkbox" checked={details.view_only} onChange={(event) => setDetails({ ...details, view_only: event.target.checked })} />
+            <label className="check-row">
+              <input type="checkbox" checked={details.view_only} onChange={(event) => updateDetail("view_only", event.target.checked)} />
               Reading only: no test, the certificate is issued when the reading is finished
             </label>
-            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 18 }}>
-              <input type="checkbox" checked={details.is_active} onChange={(event) => setDetails({ ...details, is_active: event.target.checked })} />
+            <label className="check-row check-row--last">
+              <input type="checkbox" checked={details.is_active} onChange={(event) => updateDetail("is_active", event.target.checked)} />
               Visible to learners
             </label>
             <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit">{busy === "details" ? "Saving…" : "Save details"}</button></div>
@@ -158,7 +150,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
         </form>
 
         <section className="tp-card tp-form-card">
-          <div className="tp-label" style={{ marginBottom: 4 }}>Who must complete this course</div>
+          <div className="tp-label form-section-label--tight">Who must complete this course</div>
           <p className="course-admin__hint">Everyone in an assigned training group must complete it. Add a single person for one-off requirements.</p>
 
           <div className="course-admin__subhead">Training groups</div>

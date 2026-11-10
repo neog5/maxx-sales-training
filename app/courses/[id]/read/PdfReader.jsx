@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import Skeleton from "@/components/Skeleton";
-
-GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
+import { loadPdfjs } from "@/components/pdfjs";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
@@ -38,6 +36,8 @@ export default function PdfReader({ url, title, onPageChange }) {
       setStatus("loading");
       setError("");
       try {
+        const { getDocument } = await loadPdfjs();
+        if (cancelled) return;
         loadingTask = getDocument({ url });
         const loadedDocument = await loadingTask.promise;
         if (!cancelled) setPdfDocument(loadedDocument);
@@ -57,6 +57,9 @@ export default function PdfReader({ url, title, onPageChange }) {
       loadingTask?.destroy();
     };
   }, [url, reloadKey]);
+
+  // After a re-render (new document or zoom), return to the page being read.
+  const restoreScroll = useEffectEvent(() => scrollToPage(currentPageRef.current, "auto"));
 
   useEffect(() => {
     if (!pdfDocument) return;
@@ -101,7 +104,7 @@ export default function PdfReader({ url, title, onPageChange }) {
         }
 
         setStatus("ready");
-        requestAnimationFrame(() => scrollToPage(currentPageRef.current, "auto"));
+        requestAnimationFrame(restoreScroll);
       } catch (cause) {
         if (renderRunRef.current === run) {
           setError(cause.message || "The PDF could not be rendered.");
@@ -182,10 +185,10 @@ export default function PdfReader({ url, title, onPageChange }) {
 
   if (!url) {
     return (
-      <div style={{ minHeight: 500, padding: 42, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", background: "linear-gradient(180deg, #edf2f6, #e4eaf0)", color: "#112345", textAlign: "center" }}>
-        <div aria-hidden="true" style={{ width: 46, height: 46, marginBottom: 13, display: "grid", placeItems: "center", border: "1px solid #cbd5e1", borderRadius: 13, background: "#fff", color: "#F78E1E", boxShadow: "0 7px 18px rgba(17,35,69,.09)", font: "700 18px/1 'JetBrains Mono', monospace" }}>▤</div>
+      <div className="pdf-empty-state">
+        <div className="pdf-state-icon" aria-hidden="true">▤</div>
         <strong>No document yet</strong>
-        <span style={{ marginTop: 5, color: "#687a90", fontSize: 12 }}>No PDF has been added to this course.</span>
+        <span>No PDF has been added to this course.</span>
       </div>
     );
   }
@@ -221,13 +224,12 @@ export default function PdfReader({ url, title, onPageChange }) {
 
       <div
         ref={scrollRef}
-        className="pdf-scroll-region"
+        className={`pdf-scroll-region ${zoom > 1 ? "is-pannable" : ""} ${isPanning ? "is-panning" : ""}`}
         onScroll={trackPage}
         onPointerDown={startPan}
         onPointerMove={panDocument}
         onPointerUp={stopPan}
         onPointerCancel={stopPan}
-        style={{ cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "auto", userSelect: isPanning ? "none" : "auto" }}
         aria-label={`${title} PDF reader`}
       >
         {status === "loading" && (
@@ -245,70 +247,8 @@ export default function PdfReader({ url, title, onPageChange }) {
             <button type="button" className="pdf-retry-button" onClick={() => setReloadKey((value) => value + 1)}>Try again</button>
           </div>
         )}
-        <div ref={pagesRef} className="pdf-pages" style={{ display: status === "ready" ? "flex" : "none" }} />
+        <div ref={pagesRef} className={status === "ready" ? "pdf-pages is-ready" : "pdf-pages"} />
       </div>
-
-      <style jsx>{`
-        .pdf-viewer-shell { overflow: hidden; background: #dfe5ec; color: #fff; }
-        .pdf-toolbar { min-height: 62px; padding: 10px 12px 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid rgba(255,255,255,.08); background: #112345; }
-        .pdf-document-meta { min-width: 0; display: flex; align-items: center; gap: 10px; }
-        .pdf-document-icon { width: 34px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.2); border-radius: 7px; background: rgba(255,255,255,.09); color: #f4b46f; font: 700 9px/1 'JetBrains Mono', monospace; letter-spacing: .08em; }
-        .pdf-document-copy { min-width: 0; display: flex; flex-direction: column; }
-        .pdf-document-copy strong { max-width: 260px; overflow: hidden; color: #fff; font-size: 12.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-        .pdf-document-copy span { margin-top: 2px; color: #aebed0; font-size: 10.5px; }
-        .pdf-toolbar-actions, .pdf-control-group { display: flex; align-items: center; }
-        .pdf-toolbar-actions { gap: 8px; }
-        .pdf-control-group { overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.06); }
-        :global(.pdf-toolbar-button) { width: 31px; height: 30px; padding: 0; display: grid; place-items: center; border: 0; border-right: 1px solid rgba(255,255,255,.12); background: transparent; color: #edf3f8; cursor: pointer; font-size: 18px; line-height: 1; transition: background .15s, color .15s; }
-        :global(.pdf-toolbar-button:last-child) { border-right: 0; }
-        :global(.pdf-toolbar-button:hover:not(:disabled)) { background: rgba(255,255,255,.12); color: #fff; }
-        :global(.pdf-toolbar-button:disabled) { color: rgba(255,255,255,.28); cursor: not-allowed; }
-        :global(.pdf-zoom-value) { width: 52px; font: 600 10.5px/1 'JetBrains Mono', monospace; }
-        .pdf-page-counter { min-width: 54px; height: 30px; padding: 0 7px; display: flex; align-items: center; justify-content: center; gap: 5px; border-right: 1px solid rgba(255,255,255,.12); color: #aebed0; font: 500 10.5px/1 'JetBrains Mono', monospace; }
-        .pdf-page-counter b { color: #fff; font-weight: 600; }
-        .pdf-toolbar-divider { width: 1px; height: 22px; margin: 0 1px; background: rgba(255,255,255,.13); }
-        .pdf-open-link { height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; color: #dce7f1; font-size: 10.5px; font-weight: 650; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s; }
-        .pdf-open-link:hover { border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; }
-        .pdf-progress-track { height: 3px; background: #1B3A62; }
-        .pdf-progress-track span { height: 100%; display: block; background: #F78E1E; transition: width .2s ease; }
-        .pdf-scroll-region { height: min(82vh, 960px); min-height: 640px; overflow: auto; overscroll-behavior: contain; scrollbar-color: #8e9bab transparent; scrollbar-width: thin; background-color: #dfe5ec; background-image: radial-gradient(rgba(17,35,69,.11) .7px, transparent .7px), linear-gradient(180deg, rgba(255,255,255,.42), transparent 150px); background-size: 16px 16px, 100% 100%; }
-        .pdf-scroll-region::-webkit-scrollbar { width: 10px; height: 10px; }
-        .pdf-scroll-region::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; background: #8e9bab; background-clip: padding-box; }
-        .pdf-pages { width: max-content; min-width: 100%; padding: 24px 28px 34px; box-sizing: border-box; flex-direction: column; align-items: center; gap: 24px; }
-        :global(.pdf-page) { position: relative; overflow: hidden; flex: 0 0 auto; border-radius: 3px; background: #fff; box-shadow: 0 2px 3px rgba(26,39,55,.12), 0 16px 34px rgba(26,39,55,.2); line-height: 0; }
-        :global(.pdf-page canvas) { display: block; }
-        :global(.pdf-page-label) { position: absolute; right: 10px; bottom: 10px; min-width: 24px; height: 24px; padding: 0 7px; display: grid; place-items: center; border-radius: 999px; background: rgba(17,35,69,.78); color: #fff; font: 600 9.5px/1 'JetBrains Mono', monospace; box-shadow: 0 2px 7px rgba(0,0,0,.16); opacity: 0; transition: opacity .15s; }
-        :global(.pdf-page:hover .pdf-page-label) { opacity: 1; }
-        .pdf-loading-skeleton { min-height: 100%; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .pdf-loading-copy { height: 34px; margin-bottom: 12px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: rgba(255,255,255,.82); color: #48617e; box-shadow: 0 5px 16px rgba(17,35,69,.1); font-size: 11px; font-weight: 600; }
-        .pdf-loading-spinner { width: 13px; height: 13px; border: 2px solid #cbd5e1; border-top-color: #F78E1E; border-radius: 50%; animation: pdfSpin .75s linear infinite; }
-        :global(.pdf-loading-page) { width: min(82%, 650px); height: min(70vh, 820px); min-height: 540px; border-radius: 3px; background: #f7f8fa; box-shadow: 0 16px 34px rgba(26,39,55,.14); }
-        .pdf-empty-state, .pdf-error-state { min-height: 500px; padding: 42px; display: flex; align-items: center; justify-content: center; flex-direction: column; background: linear-gradient(180deg, #edf2f6, #e4eaf0); color: #112345; text-align: center; }
-        .pdf-empty-state span, .pdf-error-state span { max-width: 440px; margin-top: 5px; color: #687a90; font-size: 12px; line-height: 1.5; }
-        .pdf-state-icon { width: 46px; height: 46px; margin-bottom: 13px; display: grid; place-items: center; border: 1px solid #cbd5e1; border-radius: 13px; background: #fff; color: #F78E1E; box-shadow: 0 7px 18px rgba(17,35,69,.09); font: 700 18px/1 'JetBrains Mono', monospace; }
-        .pdf-retry-button { margin-top: 16px; padding: 8px 14px; border: 0; border-radius: 7px; background: #112345; color: #fff; cursor: pointer; font-size: 11.5px; font-weight: 650; }
-        @keyframes pdfSpin { to { transform: rotate(360deg); } }
-        @media (max-width: 1100px) {
-          .pdf-toolbar { align-items: stretch; flex-direction: column; }
-          .pdf-document-meta { padding: 0 2px; }
-          .pdf-document-copy strong { max-width: calc(100vw - 130px); }
-          .pdf-toolbar-actions { justify-content: space-between; }
-          .pdf-toolbar-divider { display: none; }
-          .pdf-open-link { margin-left: auto; }
-        }
-        @media (max-width: 680px) {
-          .pdf-scroll-region { min-height: 520px; height: 72vh; }
-          .pdf-pages { padding: 14px 12px 28px; gap: 14px; }
-        }
-        @media (max-width: 430px) {
-          .pdf-open-link { width: 32px; padding: 0; justify-content: center; font-size: 0; }
-          .pdf-open-link span { font-size: 13px; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .pdf-progress-track span, :global(.pdf-page-label) { transition: none; }
-          .pdf-loading-spinner { animation-duration: 1.5s; }
-        }
-      `}</style>
     </div>
   );
 }

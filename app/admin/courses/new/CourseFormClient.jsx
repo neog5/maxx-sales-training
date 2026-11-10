@@ -2,25 +2,76 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Notice from "@/components/Notice";
+import { COURSE_PDF_BUCKET, MAX_PDF_BYTES, deckFileError, megabytes, titleFromFileName, uploadCourseDeck } from "@/lib/course-materials";
+import { friendlyDbError } from "@/lib/db";
+import {
+  DEFAULT_GENERATION_COUNTS,
+  FREE_PDF_PARSER_LIMIT_TEXT,
+  FREE_PDF_PARSER_MAX_BYTES,
+  GENERATION_LIMITS,
+  generationCountError,
+} from "@/lib/question-suggestions";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
-import { FREE_PDF_PARSER_MAX_BYTES, GENERATION_LIMITS } from "@/lib/question-suggestions.mjs";
-import { COURSE_PDF_BUCKET, materialStoragePath, titleFromFileName } from "@/lib/course-materials.mjs";
+import { removeStoredFiles } from "@/lib/storage";
 
 const initialCourse = { code: "", title: "", description: "", pass_threshold: 80, read_seconds: 60, is_active: true, view_only: false };
-const initialRecommendationCounts = { reading: 5, main: 10 };
+
+function CountField({ label, kind, value, onChange }) {
+  const limits = GENERATION_LIMITS[kind];
+  return (
+    <label className="tp-form-field">
+      <div className="tp-label form-label">{label}</div>
+      <input className="tp-input" type="number" min={limits.createMin} max={limits.max} value={value} onChange={(event) => onChange(kind, event.target.value)} required />
+    </label>
+  );
+}
 
 export default function CourseFormClient() {
   const router = useRouter();
   const supabase = createClient();
   const [course, setCourse] = useState(initialCourse);
   const [pdfs, setPdfs] = useState([]);
-  const pdf = pdfs[0];
-  const [recommendationCounts, setRecommendationCounts] = useState(initialRecommendationCounts);
+  const [counts, setCounts] = useState(DEFAULT_GENERATION_COUNTS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Suggestions are generated from the first deck, which the free PDF parser must accept.
+  const pdf = pdfs[0];
+  const pdfTooLargeForSuggestions = pdf?.size > FREE_PDF_PARSER_MAX_BYTES;
+  const suggest = Boolean(pdf) && !course.view_only && !pdfTooLargeForSuggestions;
+
   function update(field, value) {
     setCourse((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateCount(kind, value) {
+    setCounts((current) => ({ ...current, [kind]: value }));
+  }
+
+  // Uploads every chosen PDF and returns the deck rows to insert, plus the stored paths.
+  async function uploadDecks(code) {
+    const decks = [];
+    const paths = [];
+    try {
+      for (const file of pdfs) {
+        const { path, pdfUrl } = await uploadCourseDeck(supabase, code, file);
+        paths.push(path);
+        decks.push({ position: decks.length + 1, title: pdfs.length === 1 ? course.title.trim() : titleFromFileName(file.name), pdf_url: pdfUrl });
+      }
+    } catch (uploadError) {
+      await removeStoredFiles(supabase, COURSE_PDF_BUCKET, paths);
+      throw uploadError;
+    }
+    return { decks, paths };
+  }
+
+  function nextPage(courseId) {
+    if (course.view_only) return routes.adminCourse(courseId);
+    if (!suggest) return routes.adminCourseQuestions(courseId);
+    const params = new URLSearchParams({ suggest: "1", reading: String(counts.reading), main: String(counts.main) });
+    return `${routes.adminCourseQuestions(courseId)}?${params}`;
   }
 
   async function createCourse(event) {
@@ -30,31 +81,26 @@ export default function CourseFormClient() {
       setError("Enter a course code and title.");
       return;
     }
-    if (pdfs.some((file) => file.type !== "application/pdf")) {
-      setError("Please choose PDF files only.");
+    const fileError = pdfs.map(deckFileError).find(Boolean);
+    if (fileError) {
+      setError(fileError);
       return;
     }
-    const readingCount = Number(recommendationCounts.reading);
-    const mainCount = Number(recommendationCounts.main);
-    if (pdf && !course.view_only && !(Number.isInteger(readingCount) && readingCount >= GENERATION_LIMITS.reading.createMin && readingCount <= GENERATION_LIMITS.reading.max
-      && Number.isInteger(mainCount) && mainCount >= GENERATION_LIMITS.main.createMin && mainCount <= GENERATION_LIMITS.main.max)) {
-      setError(`A new course needs ${GENERATION_LIMITS.reading.createMin}–${GENERATION_LIMITS.reading.max} reading and ${GENERATION_LIMITS.main.createMin}–${GENERATION_LIMITS.main.max} main-test suggestions. You can generate more, in any amount, from the question bank later.`);
-      return;
+    if (suggest) {
+      const countError = generationCountError({ reading: Number(counts.reading), main: Number(counts.main) }, { forNewCourse: true });
+      if (countError) {
+        setError(countError);
+        return;
+      }
     }
 
     setError("");
     setSaving(true);
-    const uploadedPaths = [];
+    let uploadedPaths = [];
     let createdId;
     try {
-      const decks = [];
-      for (const file of pdfs) {
-        const path = materialStoragePath(code, file.name);
-        const { error: uploadError } = await supabase.storage.from(COURSE_PDF_BUCKET).upload(path, file, { contentType: "application/pdf" });
-        if (uploadError) throw uploadError;
-        uploadedPaths.push(path);
-        decks.push({ position: decks.length + 1, title: pdfs.length === 1 ? course.title.trim() : titleFromFileName(file.name), pdf_url: supabase.storage.from(COURSE_PDF_BUCKET).getPublicUrl(path).data.publicUrl });
-      }
+      const { decks, paths } = await uploadDecks(code);
+      uploadedPaths = paths;
 
       const { data: created, error: insertError } = await supabase.from("courses").insert({
         ...course,
@@ -70,15 +116,12 @@ export default function CourseFormClient() {
         const { error: deckError } = await supabase.from("course_materials").insert(decks.map((deck) => ({ ...deck, course_id: created.id })));
         if (deckError) throw deckError;
       }
-      const suggestionQuery = pdf
-        ? `&suggest=1&reading=${recommendationCounts.reading}&main=${recommendationCounts.main}`
-        : "";
-      router.push(course.view_only ? `/admin/courses/${created.id}` : `/admin/courses/${created.id}/questions${suggestionQuery.replace(/^&/, "?")}`);
+      router.push(nextPage(created.id));
       router.refresh();
     } catch (cause) {
       if (createdId) await supabase.from("courses").delete().eq("id", createdId);
-      if (uploadedPaths.length) await supabase.storage.from(COURSE_PDF_BUCKET).remove(uploadedPaths);
-      setError(cause.message || "Could not create the course. Please try again.");
+      await removeStoredFiles(supabase, COURSE_PDF_BUCKET, uploadedPaths);
+      setError(friendlyDbError(cause, { duplicate: `A course with the code ${code} already exists.`, fallback: cause?.message || "Could not create the course. Please try again." }));
       setSaving(false);
     }
   }
@@ -93,23 +136,37 @@ export default function CourseFormClient() {
 
       <form className="tp-card tp-form-card" onSubmit={createCourse}>
         <div className="tp-form-grid">
-          <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Course code</div><input className="tp-input" value={course.code} placeholder="SALES-101" onChange={(e) => update("code", e.target.value)} required /></label>
-          <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Course title</div><input className="tp-input" value={course.title} placeholder="Sales foundations" onChange={(e) => update("title", e.target.value)} required /></label>
+          <label className="tp-form-field"><div className="tp-label form-label">Course code</div><input className="tp-input" value={course.code} placeholder="SALES-101" onChange={(event) => update("code", event.target.value)} required /></label>
+          <label className="tp-form-field"><div className="tp-label form-label">Course title</div><input className="tp-input" value={course.title} placeholder="Sales foundations" onChange={(event) => update("title", event.target.value)} required /></label>
         </div>
-        <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><textarea className="tp-input" rows={3} value={course.description} placeholder="What learners will learn in this course." onChange={(e) => update("description", e.target.value)} /></label>
-        <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Training PDFs</div><input className="tp-input" type="file" accept="application/pdf,.pdf" multiple onChange={(e) => setPdfs(Array.from(e.target.files || []))} /><div style={{ color: "var(--faint)", fontSize: 11.5, marginTop: 6 }}>Optional · Choose several PDFs for a course with more than one deck; you can rename and reorder them after the course is created. Each PDF can be up to 50 MB. Suggestions are generated from the first deck, which must be under 5 MB.</div>{pdfs.length > 1 && <ol style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12, color: "var(--dim)" }}>{pdfs.map((file) => <li key={file.name}>{file.name}</li>)}</ol>}{pdf?.size > FREE_PDF_PARSER_MAX_BYTES && <div role="alert" style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{pdfs.length > 1 ? "The first PDF" : "This PDF"} is {(pdf.size / (1024 * 1024)).toFixed(1)} MB. AI question suggestions only work for PDFs up to 5 MB, so compress it (for example with Acrobat’s Reduce File Size) before uploading. You can still create the course and add questions manually.</div>}</label>
-        {pdf && !course.view_only && <div className="tp-form-grid tp-form-grid--equal">
-          <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Reading recommendations</div><input className="tp-input" type="number" min={GENERATION_LIMITS.reading.createMin} max={GENERATION_LIMITS.reading.max} value={recommendationCounts.reading} onChange={(e) => setRecommendationCounts((current) => ({ ...current, reading: e.target.value }))} required /></label>
-          <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Main-test recommendations</div><input className="tp-input" type="number" min={GENERATION_LIMITS.main.createMin} max={GENERATION_LIMITS.main.max} value={recommendationCounts.main} onChange={(e) => setRecommendationCounts((current) => ({ ...current, main: e.target.value }))} required /></label>
-        </div>}
-        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 14 }}><input type="checkbox" checked={course.view_only} onChange={(e) => update("view_only", e.target.checked)} /> Reading only: no test, the certificate is issued when the reading is finished</label>
+        <label className="tp-form-field"><div className="tp-label form-label">Description</div><textarea className="tp-input" rows={3} value={course.description} placeholder="What learners will learn in this course." onChange={(event) => update("description", event.target.value)} /></label>
+        <label className="tp-form-field">
+          <div className="tp-label form-label">Training PDFs</div>
+          <input className="tp-input" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => setPdfs(Array.from(event.target.files || []))} />
+          <div className="form-hint">
+            Optional · Choose several PDFs for a course with more than one deck; you can rename and reorder them after the course is created. Each PDF can be up to {megabytes(MAX_PDF_BYTES)} MB. Suggestions are generated from the first deck, which must be under {FREE_PDF_PARSER_LIMIT_TEXT}.
+          </div>
+          {pdfs.length > 1 && <ol className="form-file-list">{pdfs.map((file) => <li key={file.name}>{file.name}</li>)}</ol>}
+          {pdfTooLargeForSuggestions && (
+            <div role="alert" className="form-error">
+              {pdfs.length > 1 ? "The first PDF" : "This PDF"} is {megabytes(pdf.size)} MB. AI question suggestions only work for PDFs up to {FREE_PDF_PARSER_LIMIT_TEXT}, so compress it (for example with Acrobat’s Reduce File Size) before uploading. You can still create the course and add questions manually.
+            </div>
+          )}
+        </label>
+        {suggest && (
+          <div className="tp-form-grid tp-form-grid--equal">
+            <CountField label="Reading recommendations" kind="reading" value={counts.reading} onChange={updateCount} />
+            <CountField label="Main-test recommendations" kind="main" value={counts.main} onChange={updateCount} />
+          </div>
+        )}
+        <label className="check-row"><input type="checkbox" checked={course.view_only} onChange={(event) => update("view_only", event.target.checked)} /> Reading only: no test, the certificate is issued when the reading is finished</label>
         <div className="tp-form-grid tp-form-grid--equal">
-          <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={course.pass_threshold} disabled={course.view_only} onChange={(e) => update("pass_threshold", e.target.value)} required /></label>
-          <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={course.read_seconds} onChange={(e) => update("read_seconds", e.target.value)} required /></label>
+          <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={course.pass_threshold} disabled={course.view_only} onChange={(event) => update("pass_threshold", event.target.value)} required /></label>
+          <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={course.read_seconds} onChange={(event) => update("read_seconds", event.target.value)} required /></label>
         </div>
-        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 18 }}><input type="checkbox" checked={course.is_active} onChange={(e) => update("is_active", e.target.checked)} /> Make this course available to learners</label>
-        <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit" disabled={saving}>{saving ? "Creating…" : course.view_only ? "Create course" : pdf ? "Create course and generate questions" : "Create course and add questions"}</button></div>
-        {error && <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 10 }}>{error}</div>}
+        <label className="check-row check-row--last"><input type="checkbox" checked={course.is_active} onChange={(event) => update("is_active", event.target.checked)} /> Make this course available to learners</label>
+        <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit" disabled={saving}>{saving ? "Creating…" : course.view_only ? "Create course" : suggest ? "Create course and generate questions" : "Create course and add questions"}</button></div>
+        <Notice tone="error" className="form-notice">{error}</Notice>
       </form>
     </main>
   );

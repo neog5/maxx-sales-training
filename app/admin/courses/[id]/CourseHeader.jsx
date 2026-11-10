@@ -1,12 +1,13 @@
 import Link from "next/link";
 import LocalDate from "@/components/LocalDate";
+import { routes } from "@/lib/routes";
 
 // Shared heading and sub-tabs for a course's Overview and Questions pages.
 export default function CourseHeader({ course, active, questionCount, recordCount }) {
   const archived = Boolean(course.archived_at);
   return (
     <>
-      <Link href="/admin/courses" className="tp-btn tp-btn-ghost back-link">← All courses</Link>
+      <Link href={routes.adminCourses} className="tp-btn tp-btn-ghost back-link">← All courses</Link>
       <div className="page-heading">
         <div className="tp-label tp-mono">{course.code}</div>
         <h1 className="tp-display">{course.title}</h1>
@@ -17,8 +18,8 @@ export default function CourseHeader({ course, active, questionCount, recordCoun
         </p>
       </div>
       <nav className="course-tabs" aria-label="Course sections">
-        <Link href={`/admin/courses/${course.id}`} aria-current={active === "overview" ? "page" : undefined}>Overview</Link>
-        <Link href={`/admin/courses/${course.id}/questions`} aria-current={active === "questions" ? "page" : undefined}>
+        <Link href={routes.adminCourse(course.id)} aria-current={active === "overview" ? "page" : undefined}>Overview</Link>
+        <Link href={routes.adminCourseQuestions(course.id)} aria-current={active === "questions" ? "page" : undefined}>
           Questions<small>{questionCount}</small>
         </Link>
       </nav>

@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import MultiPicker from "@/components/MultiPicker";
+import Notice from "@/components/Notice";
+import useMutation from "@/hooks/useMutation";
+import { COMPLIANCE_LABELS, complianceStatus } from "@/lib/compliance";
+import { courseItems, groupItems } from "@/lib/picker-items";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
-import { courseItems, groupItems } from "@/lib/picker-items.mjs";
 
 // Lists the courses this person must complete. `requiredCourseIds` comes from the
 // database's required_courses(). Group membership and the reason for each course are
@@ -17,35 +21,28 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
   const supabase = createClient();
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const busy = saving || refreshing;
+  const { run, busy: saving, error } = useMutation();
+  const busy = Boolean(saving) || refreshing;
 
   const groupNames = new Map(groups.map((group) => [group.id, group.name]));
   const passed = new Set(passedCourseIds);
-  const memberGroupIds = new Set(initialGroupIds);
   const requiredIds = new Set(requiredCourseIds);
-  const reasonsFor = (courseId) => initialAssignments.filter((assignment) => assignment.course_id === courseId
-    && (assignment.user_id === personId || memberGroupIds.has(assignment.group_id)));
+  // initialAssignments already holds only this person's own and their groups' assignments.
+  const reasonsFor = (courseId) => initialAssignments.filter((assignment) => assignment.course_id === courseId);
   const required = courses
     .filter((course) => requiredIds.has(course.id))
     .map((course) => ({ ...course, reasons: reasonsFor(course.id), passed: passed.has(course.id) }));
   const completed = required.filter((course) => course.passed).length;
+  const status = complianceStatus(required.length, completed);
   const directCourseIds = initialAssignments.filter((assignment) => assignment.user_id === personId).map((assignment) => assignment.course_id);
   const groupOptions = useMemo(() => groupItems(groups), [groups]);
   const courseOptions = useMemo(() => courseItems(courses), [courses]);
 
-  async function mutate(action) {
-    setSaving(true);
-    setError("");
-    const { error: mutationError } = await action();
-    setSaving(false);
-    if (mutationError) {
-      setError(mutationError.message || "Something went wrong. Please try again.");
-      return false;
-    }
-    startRefresh(() => router.refresh());
-    return true;
+  // Saves, then re-reads the page's server data; stays busy until that refresh lands.
+  async function mutate(label, action) {
+    const saved = await run(label, action);
+    if (saved) startRefresh(() => router.refresh());
+    return Boolean(saved);
   }
 
   return (
@@ -55,9 +52,9 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
           <div className="tp-label">Required training</div>
           <span>{required.length ? `${completed} of ${required.length} required courses passed` : "No courses assigned"}</span>
         </div>
-        {required.length > 0 && (
-          <span className={`training-status training-status--${completed === required.length ? "compliant" : "non_compliant"}`}>
-            <span aria-hidden="true"></span>{completed === required.length ? "Compliant" : "Not compliant"}
+        {status !== "none" && (
+          <span className={`training-status training-status--${status}`}>
+            <span aria-hidden="true"></span>{COMPLIANCE_LABELS[status]}
           </span>
         )}
       </div>
@@ -65,14 +62,14 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
       <div className="tp-card tp-form-card required-training">
         {showGroups && (
           <>
-            <div className="course-admin__subhead" style={{ marginTop: 0 }}>Training groups</div>
+            <div className="course-admin__subhead course-admin__subhead--first">Training groups</div>
             <div className="chip-list">
               {initialGroupIds.map((groupId) => (
                 <span className="chip" key={groupId}>
-                  {canEdit ? <Link href={`/admin/training-groups?group=${groupId}`}>{groupNames.get(groupId)}</Link> : groupNames.get(groupId)}
+                  {canEdit ? <Link href={`${routes.trainingGroups}?group=${groupId}`}>{groupNames.get(groupId)}</Link> : groupNames.get(groupId)}
                   {canEdit && (
                     <button type="button" aria-label={`Remove from ${groupNames.get(groupId)}`} disabled={busy}
-                      onClick={() => mutate(() => supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", personId))}>×</button>
+                      onClick={() => mutate("leave-group", () => supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", personId))}>×</button>
                   )}
                 </span>
               ))}
@@ -80,12 +77,12 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
             </div>
             {canEdit && (
               <MultiPicker items={groupOptions} excludeIds={initialGroupIds} placeholder="Add to training groups…" noun="training group" busy={busy}
-                onAdd={(ids) => mutate(() => supabase.from("group_members").insert(ids.map((groupId) => ({ group_id: groupId, user_id: personId }))))} />
+                onAdd={(ids) => mutate("join-groups", () => supabase.from("group_members").insert(ids.map((groupId) => ({ group_id: groupId, user_id: personId }))))} />
             )}
           </>
         )}
 
-        <div className="course-admin__subhead" style={showGroups ? undefined : { marginTop: 0 }}>Courses</div>
+        <div className={showGroups ? "course-admin__subhead" : "course-admin__subhead course-admin__subhead--first"}>Courses</div>
         <div className="required-course-list">
           {required.map((course) => (
             <div className="required-course" key={course.id}>
@@ -100,7 +97,7 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
               <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : "Outstanding"}</span>
               {canEdit && directCourseIds.includes(course.id) && (
                 <button type="button" className="tp-btn tp-btn-ghost required-course__remove" disabled={busy}
-                  onClick={() => mutate(() => supabase.from("course_assignments").delete().eq("course_id", course.id).eq("user_id", personId))}>
+                  onClick={() => mutate("unassign-course", () => supabase.from("course_assignments").delete().eq("course_id", course.id).eq("user_id", personId))}>
                   Remove individual assignment
                 </button>
               )}
@@ -110,9 +107,9 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
         </div>
         {canEdit && (
           <MultiPicker items={courseOptions} excludeIds={directCourseIds} placeholder="Assign extra courses to this person…" addLabel="Assign" noun="course" busy={busy}
-            onAdd={(ids) => mutate(() => supabase.from("course_assignments").insert(ids.map((courseId) => ({ course_id: courseId, user_id: personId }))))} />
+            onAdd={(ids) => mutate("assign-courses", () => supabase.from("course_assignments").insert(ids.map((courseId) => ({ course_id: courseId, user_id: personId }))))} />
         )}
-        {error && <div className="notice notice--error" role="alert" style={{ marginTop: 12, marginBottom: 0 }}>{error}</div>}
+        <Notice tone="error" className="required-training__error">{error}</Notice>
       </div>
     </section>
   );

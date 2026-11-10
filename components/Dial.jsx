@@ -1,32 +1,34 @@
+const STROKE = 8;
+const TICK_COUNT = 24;
+
+// A circular progress dial with tick marks, a value label and an optional caption.
 export default function Dial({ pct, size = 120, color = "var(--accent)", label, sub }) {
-  const stroke = 8;
-  const r = (size - stroke) / 2;
+  const center = size / 2;
+  const r = (size - STROKE) / 2;
   const c = 2 * Math.PI * r;
   const offset = c - (Math.min(pct, 100) / 100) * c;
-  const ticks = Array.from({ length: 24 });
+  const ticks = Array.from({ length: TICK_COUNT }, (_, i) => {
+    const angle = (i / TICK_COUNT) * 2 * Math.PI - Math.PI / 2;
+    const point = (radius) => [center + radius * Math.cos(angle), center + radius * Math.sin(angle)];
+    const [x1, y1] = point(r + STROKE / 2 + 2);
+    const [x2, y2] = point(r + STROKE / 2 + 6);
+    return { x1, y1, x2, y2, active: i / TICK_COUNT <= pct / 100 };
+  });
   return (
-    <div style={{ position: "relative", width: size, height: size }}>
-      <svg width={size} height={size} style={{ position: "absolute", inset: 0 }}>
-        {ticks.map((_, i) => {
-          const angle = (i / ticks.length) * 2 * Math.PI - Math.PI / 2;
-          const active = i / ticks.length <= pct / 100;
-          const x1 = size / 2 + (r + stroke / 2 + 2) * Math.cos(angle);
-          const y1 = size / 2 + (r + stroke / 2 + 2) * Math.sin(angle);
-          const x2 = size / 2 + (r + stroke / 2 + 6) * Math.cos(angle);
-          const y2 = size / 2 + (r + stroke / 2 + 6) * Math.sin(angle);
-          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={active ? color : "var(--border)"} strokeWidth={1.5} />;
-        })}
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface2)" strokeWidth={stroke} />
+    <div className="dial" style={{ width: size, height: size }}>
+      <svg className="dial__svg" width={size} height={size}>
+        {ticks.map(({ active, ...line }, i) => <line key={i} {...line} stroke={active ? color : "var(--border)"} strokeWidth={1.5} />)}
+        <circle cx={center} cy={center} r={r} fill="none" stroke="var(--surface2)" strokeWidth={STROKE} />
         <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          className="dial__progress"
+          cx={center} cy={center} r={r} fill="none" stroke={color} strokeWidth={STROKE}
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{ transition: "stroke-dashoffset .4s ease" }}
+          transform={`rotate(-90 ${center} ${center})`}
         />
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <div className="tp-mono" style={{ fontSize: size * 0.2, fontWeight: 600, color: "var(--text)" }}>{label}</div>
-        {sub && <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 2, textTransform: "uppercase", letterSpacing: ".06em" }}>{sub}</div>}
+      <div className="dial__label">
+        <div className="tp-mono dial__value" style={{ fontSize: size * 0.2 }}>{label}</div>
+        {sub && <div className="dial__sub">{sub}</div>}
       </div>
     </div>
   );

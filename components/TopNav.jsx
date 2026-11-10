@@ -2,11 +2,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { initial } from "@/lib/people";
+import { ROLE_LABELS, canViewReports, isAdmin } from "@/lib/roles";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
-import { ROLE_LABELS, canViewReports, isAdmin } from "@/lib/roles.mjs";
 
+// `profile` is the signed-in viewer ({ id, full_name, role }) from requireViewer().
 export default function TopNav({ profile }) {
-  const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -28,15 +30,15 @@ export default function TopNav({ profile }) {
   }, []);
 
   async function signOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
+    await createClient().auth.signOut();
+    router.push(routes.login);
     router.refresh();
   }
 
   return (
     <header className="site-nav">
       <div className="site-nav__inner">
-        <Link href="/courses" className="site-brand">
+        <Link href={routes.courses} className="site-brand">
           <img className="site-brand__logo" src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />
           <span className="tp-display site-brand__title">Sales Training</span>
         </Link>
@@ -44,8 +46,8 @@ export default function TopNav({ profile }) {
         <div className="site-nav__actions">
           {canViewReports(profile?.role) && (
             <nav className="site-nav__primary" aria-label="Primary navigation">
-              <Link href="/courses" className={`site-nav__link ${pathname.startsWith("/courses") ? "is-active" : ""}`}>Courses</Link>
-              <Link href="/admin" className={`site-nav__link ${pathname.startsWith("/admin") ? "is-active" : ""}`}>{isAdmin(profile?.role) ? "Admin" : "Team"}</Link>
+              <Link href={routes.courses} className={`site-nav__link ${pathname.startsWith(routes.courses) ? "is-active" : ""}`}>Courses</Link>
+              <Link href={routes.admin} className={`site-nav__link ${pathname.startsWith(routes.admin) ? "is-active" : ""}`}>{isAdmin(profile?.role) ? "Admin" : "Team"}</Link>
             </nav>
           )}
           <div className="site-nav__account" ref={accountRef}>
@@ -53,22 +55,23 @@ export default function TopNav({ profile }) {
               type="button"
               className="site-nav__avatar"
               aria-label="Open profile menu"
-              aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((open) => !open)}
             >
-              {profile?.full_name?.trim()?.charAt(0)?.toUpperCase() || "U"}
+              {initial(profile?.full_name)}
             </button>
             {menuOpen && (
-              <div className="site-nav__menu" role="menu">
+              <div className="site-nav__menu">
                 <div className="site-nav__menu-name">
                   <span>{profile?.full_name || "User"}</span>
                   <small>{ROLE_LABELS[profile?.role] || "Learner"}</small>
                 </div>
-                <Link href={`/profile/${profile?.id}`} className="site-nav__menu-link" role="menuitem" onClick={() => setMenuOpen(false)}>
-                  <span aria-hidden="true">○</span> View profile
-                </Link>
-                <button type="button" className="site-nav__menu-link is-signout" role="menuitem" onClick={signOut}>
+                {profile?.id && (
+                  <Link href={routes.profile(profile.id)} className="site-nav__menu-link" onClick={() => setMenuOpen(false)}>
+                    <span aria-hidden="true">○</span> View profile
+                  </Link>
+                )}
+                <button type="button" className="site-nav__menu-link is-signout" onClick={signOut}>
                   <span aria-hidden="true">↗</span> Sign out
                 </button>
               </div>

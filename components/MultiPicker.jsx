@@ -16,6 +16,7 @@ function normalize(value) {
 // Tick several results, or "select all matching", then add them in one go.
 // items: [{ id, label, sublabel?, keywords? }]. With `pasteEmails`, people can also be
 // matched from a pasted list of email addresses (sublabel holds the email).
+// `onAdd(ids)` resolves to something truthy on success; the selection is kept on failure.
 export default function MultiPicker({ items, excludeIds = [], onAdd, placeholder = "Search…", addLabel = "Add", noun = "item", busy = false, pasteEmails = false }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -84,8 +85,7 @@ export default function MultiPicker({ items, excludeIds = [], onAdd, placeholder
   async function add() {
     const ids = [...selected].filter((id) => !excluded.has(id));
     if (!ids.length) return;
-    const ok = await onAdd(ids);
-    if (ok !== false) {
+    if (await onAdd(ids)) {
       setSelected(new Set());
       setQuery("");
       setOpen(false);

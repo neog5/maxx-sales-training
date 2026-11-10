@@ -1,5 +1,5 @@
-import { AppSkeleton } from "@/components/Skeleton";
+import { CoursesSkeleton } from "@/components/Skeleton";
 
 export default function Loading() {
-  return <AppSkeleton />;
+  return <CoursesSkeleton />;
 }

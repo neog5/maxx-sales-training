@@ -1,11 +1,16 @@
-// Data shared by a course's Overview and Questions tabs.
+import { must } from "@/lib/db";
+
+// Data shared by a course's Overview and Questions tabs. Returns null when there's no such course.
 export async function loadCourseHeader(supabase, id) {
-  const [{ data: course }, { count: attemptCount }, { count: readingCount }, { count: questionCount }] = await Promise.all([
+  const count = (table) => supabase.from(table).select("id", { count: "exact", head: true }).eq("course_id", id);
+  const [courseResult, attempts, readings, questions] = await Promise.all([
     supabase.from("courses").select("*, archiver:profiles!courses_archived_by_fkey(full_name)").eq("id", id).maybeSingle(),
-    supabase.from("quiz_attempts").select("id", { count: "exact", head: true }).eq("course_id", id),
-    supabase.from("reading_sessions").select("id", { count: "exact", head: true }).eq("course_id", id),
-    supabase.from("questions").select("id", { count: "exact", head: true }).eq("course_id", id),
+    count("quiz_attempts"),
+    count("reading_sessions"),
+    count("questions"),
   ]);
+  const course = must(courseResult, "the course");
   if (!course) return null;
-  return { course, recordCount: (attemptCount || 0) + (readingCount || 0), questionCount: questionCount || 0 };
+  for (const [result, what] of [[attempts, "attempts"], [readings, "reading sessions"], [questions, "questions"]]) must(result, what);
+  return { course, recordCount: (attempts.count || 0) + (readings.count || 0), questionCount: questions.count || 0 };
 }

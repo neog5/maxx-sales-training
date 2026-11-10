@@ -2,130 +2,117 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import MemberList from "@/components/MemberList";
 import MultiPicker from "@/components/MultiPicker";
+import { byName } from "@/lib/people";
+import { courseItems, personItems } from "@/lib/picker-items";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
-import { courseItems, personItems } from "@/lib/picker-items.mjs";
+import useAdminMutation from "../useAdminMutation";
+
+const GROUP_COLUMNS = "id, name, description, created_at";
+const DUPLICATE_NAME = "A training group with that name already exists.";
+
+function byGroupName(a, b) {
+  return a.name.localeCompare(b.name);
+}
+
+function plural(count, one, many) {
+  return `${count} ${count === 1 ? one : many}`;
+}
 
 // Training groups decide who must complete which courses. Admins manage their members
-// and the courses assigned to each group here.
+// and the courses assigned to each group here. The page loads everything once; changes
+// update this local copy, so nothing else needs re-rendering.
 export default function GroupsClient({ initialGroups, initialMemberships, people, courses = [], initialAssignments = [], initialGroupId }) {
   const supabase = createClient();
-  const router = useRouter();
+  const { run, busy: busyLabel, clear, notices } = useAdminMutation();
+  const busy = Boolean(busyLabel);
   const [groups, setGroups] = useState(initialGroups);
   const [memberships, setMemberships] = useState(initialMemberships);
   const [assignments, setAssignments] = useState(initialAssignments);
   const [selectedId, setSelectedId] = useState(initialGroups.some((group) => group.id === initialGroupId) ? initialGroupId : initialGroups[0]?.id);
   const [newGroup, setNewGroup] = useState("");
   const [edit, setEdit] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState({ type: "", text: "" });
 
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const coursesById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
   const personOptions = useMemo(() => personItems(people), [people]);
   const courseOptions = useMemo(() => courseItems(courses), [courses]);
   const selected = groups.find((group) => group.id === selectedId);
-  const memberIds = memberships.filter((membership) => membership.group_id === selectedId).map((membership) => membership.user_id);
-  const members = memberIds.map((id) => peopleById.get(id)).filter(Boolean).sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
-  const groupAssignments = assignments.filter((assignment) => assignment.group_id === selectedId && coursesById.has(assignment.course_id));
-
-  async function run(action, success) {
-    setBusy(true);
-    setMessage({ type: "", text: "" });
-    try {
-      await action();
-      if (success) setMessage({ type: "success", text: success });
-      router.refresh();
-      return true;
-    } catch (error) {
-      const text = /duplicate key|unique/i.test(error.message || "") ? "A training group with that name already exists." : error.message;
-      setMessage({ type: "error", text: text || "Something went wrong. Please try again." });
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
+  const memberIdsOf = (groupId) => memberships.filter((membership) => membership.group_id === groupId).map((membership) => membership.user_id);
+  const assignmentsOf = (groupId) => assignments.filter((assignment) => assignment.group_id === groupId && coursesById.has(assignment.course_id));
+  const memberIds = memberIdsOf(selectedId);
+  const members = memberIds.map((id) => peopleById.get(id)).filter(Boolean).sort(byName);
+  const groupAssignments = assignmentsOf(selectedId);
 
   function selectGroup(groupId) {
     setSelectedId(groupId);
     setEdit(null);
-    setMessage({ type: "", text: "" });
+    clear();
   }
 
-  function createGroup(event) {
+  async function createGroup(event) {
     event.preventDefault();
     const name = newGroup.trim();
     if (!name) return;
-    run(async () => {
-      const { data, error } = await supabase.from("groups").insert({ name }).select("id, name, description, created_at").single();
-      if (error) throw error;
-      setGroups((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewGroup("");
-      setSelectedId(data.id);
-    }, `Created “${name}”. Add people below.`);
+    const created = await run("create", () => supabase.from("groups").insert({ name }).select(GROUP_COLUMNS).single(),
+      { success: `Created “${name}”. Add people below.`, duplicate: DUPLICATE_NAME });
+    if (!created) return;
+    setGroups((current) => [...current, created].sort(byGroupName));
+    setNewGroup("");
+    setSelectedId(created.id);
   }
 
-  function saveGroup(event) {
+  async function saveGroup(event) {
     event.preventDefault();
     if (!edit.name.trim()) return;
     const changes = { name: edit.name.trim(), description: edit.description.trim() || null };
-    run(async () => {
-      const { data, error } = await supabase.from("groups").update(changes).eq("id", selectedId).select("id, name, description, created_at").single();
-      if (error) throw error;
-      setGroups((current) => current.map((group) => (group.id === data.id ? data : group)).sort((a, b) => a.name.localeCompare(b.name)));
-      setEdit(null);
-    }, "Saved.");
+    const saved = await run("save", () => supabase.from("groups").update(changes).eq("id", selectedId).select(GROUP_COLUMNS).single(),
+      { success: "Saved.", duplicate: DUPLICATE_NAME });
+    if (!saved) return;
+    setGroups((current) => current.map((group) => (group.id === saved.id ? saved : group)).sort(byGroupName));
+    setEdit(null);
   }
 
-  function deleteGroup() {
+  async function deleteGroup() {
     const warning = `Delete the training group “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`;
     if (!window.confirm(warning)) return;
-    run(async () => {
-      const { error } = await supabase.from("groups").delete().eq("id", selectedId);
-      if (error) throw error;
-      const remaining = groups.filter((group) => group.id !== selectedId);
-      setGroups(remaining);
-      setMemberships((current) => current.filter((membership) => membership.group_id !== selectedId));
-      setAssignments((current) => current.filter((assignment) => assignment.group_id !== selectedId));
-      setSelectedId(remaining[0]?.id);
-    }, "Deleted.");
+    const deletedId = selectedId;
+    if (!await run("delete", () => supabase.from("groups").delete().eq("id", deletedId), { success: "Deleted." })) return;
+    const remaining = groups.filter((group) => group.id !== deletedId);
+    setGroups(remaining);
+    setMemberships((current) => current.filter((membership) => membership.group_id !== deletedId));
+    setAssignments((current) => current.filter((assignment) => assignment.group_id !== deletedId));
+    setSelectedId(remaining[0]?.id);
   }
 
-  function addMembers(userIds) {
-    return run(async () => {
-      const { error } = await supabase.from("group_members").insert(userIds.map((userId) => ({ group_id: selectedId, user_id: userId })));
-      if (error) throw error;
-      setMemberships((current) => [...current, ...userIds.map((userId) => ({ group_id: selectedId, user_id: userId }))]);
-    }, `Added ${userIds.length} ${userIds.length === 1 ? "person" : "people"}.`);
+  async function addMembers(userIds) {
+    const rows = userIds.map((userId) => ({ group_id: selectedId, user_id: userId }));
+    const added = await run("members", () => supabase.from("group_members").insert(rows),
+      { success: `Added ${plural(userIds.length, "person", "people")}.` });
+    if (added) setMemberships((current) => [...current, ...rows]);
+    return added;
   }
 
-  function removeMember(person) {
-    run(async () => {
-      const { error } = await supabase.from("group_members").delete().eq("group_id", selectedId).eq("user_id", person.id);
-      if (error) throw error;
-      setMemberships((current) => current.filter((membership) => !(membership.group_id === selectedId && membership.user_id === person.id)));
-    });
+  async function removeMember(person) {
+    const groupId = selectedId;
+    if (!await run("members", () => supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", person.id))) return;
+    setMemberships((current) => current.filter((membership) => !(membership.group_id === groupId && membership.user_id === person.id)));
   }
 
-  function assignCourses(courseIds) {
-    return run(async () => {
-      const { data, error } = await supabase
-        .from("course_assignments")
-        .insert(courseIds.map((courseId) => ({ course_id: courseId, group_id: selectedId })))
-        .select("id, course_id, group_id");
-      if (error) throw error;
-      setAssignments((current) => [...current, ...data]);
-    });
+  async function assignCourses(courseIds) {
+    const created = await run("courses", () => supabase
+      .from("course_assignments")
+      .insert(courseIds.map((courseId) => ({ course_id: courseId, group_id: selectedId })))
+      .select("id, course_id, group_id"));
+    if (created) setAssignments((current) => [...current, ...created]);
+    return created;
   }
 
-  function unassignCourse(assignmentId) {
-    run(async () => {
-      const { error } = await supabase.from("course_assignments").delete().eq("id", assignmentId);
-      if (error) throw error;
-      setAssignments((current) => current.filter((assignment) => assignment.id !== assignmentId));
-    });
+  async function unassignCourse(assignmentId) {
+    if (!await run("courses", () => supabase.from("course_assignments").delete().eq("id", assignmentId))) return;
+    setAssignments((current) => current.filter((assignment) => assignment.id !== assignmentId));
   }
 
   return (
@@ -136,9 +123,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
         <p>Training groups decide what people must complete. Put people in a group, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several training groups.</p>
       </div>
 
-      {message.text && (
-        <div className={message.type === "error" ? "notice notice--error" : "notice notice--success"} role={message.type === "error" ? "alert" : "status"}>{message.text}</div>
-      )}
+      {notices}
 
       <div className="groups-layout">
         <aside className="tp-card groups-list">
@@ -146,25 +131,21 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
             <input className="tp-input" aria-label="New training group name" placeholder="New training group" value={newGroup} onChange={(event) => setNewGroup(event.target.value)} />
             <button className="tp-btn tp-btn-primary" type="submit" disabled={busy || !newGroup.trim()}>Add</button>
           </form>
-          {groups.map((group) => {
-            const memberCount = memberships.filter((membership) => membership.group_id === group.id).length;
-            const courseCount = assignments.filter((assignment) => assignment.group_id === group.id && coursesById.has(assignment.course_id)).length;
-            return (
-              <button type="button" key={group.id} className={`groups-list__item ${group.id === selectedId ? "is-selected" : ""}`} onClick={() => selectGroup(group.id)}>
-                <strong>{group.name}</strong>
-                <small>{memberCount} {memberCount === 1 ? "member" : "members"} · {courseCount} {courseCount === 1 ? "course" : "courses"}</small>
-              </button>
-            );
-          })}
-          {groups.length === 0 && <div className="chip-list__empty" style={{ padding: 14 }}>No training groups yet.</div>}
+          {groups.map((group) => (
+            <button type="button" key={group.id} className={`groups-list__item ${group.id === selectedId ? "is-selected" : ""}`} onClick={() => selectGroup(group.id)}>
+              <strong>{group.name}</strong>
+              <small>{plural(memberIdsOf(group.id).length, "member", "members")} · {plural(assignmentsOf(group.id).length, "course", "courses")}</small>
+            </button>
+          ))}
+          {groups.length === 0 && <div className="chip-list__empty groups-list__empty">No training groups yet.</div>}
         </aside>
 
         {selected ? (
           <section className="tp-card tp-form-card group-detail">
             {edit ? (
               <form onSubmit={saveGroup} className="group-detail__edit">
-                <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Name</div><input className="tp-input" value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} required /></label>
-                <label className="tp-form-field"><div className="tp-label" style={{ marginBottom: 6 }}>Description</div><input className="tp-input" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label>
+                <label className="tp-form-field"><div className="tp-label form-label">Name</div><input className="tp-input" value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} required /></label>
+                <label className="tp-form-field"><div className="tp-label form-label">Description</div><input className="tp-input" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label>
                 <div className="tp-form-actions">
                   <button className="tp-btn tp-btn-primary" type="submit" disabled={busy}>Save</button>
                   <button className="tp-btn tp-btn-ghost" type="button" onClick={() => setEdit(null)}>Cancel</button>
@@ -177,7 +158,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
                   {selected.description && <p>{selected.description}</p>}
                 </div>
                 <div className="group-detail__actions">
-                  <Link className="tp-btn tp-btn-ghost" href={`/admin?group=${selected.id}`}>View compliance</Link>
+                  <Link className="tp-btn tp-btn-ghost" href={`${routes.admin}?${new URLSearchParams({ group: selected.id })}`}>View compliance</Link>
                   <button type="button" className="tp-btn tp-btn-ghost" onClick={() => setEdit({ name: selected.name, description: selected.description || "" })}>Edit</button>
                   <button type="button" className="tp-btn tp-btn-danger" disabled={busy} onClick={deleteGroup}>Delete</button>
                 </div>
@@ -194,7 +175,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
                 const course = coursesById.get(assignment.course_id);
                 return (
                   <span className="chip" key={assignment.id}>
-                    <Link href={`/admin/courses/${course.id}`}><span className="tp-mono">{course.code}</span> · {course.title}</Link>
+                    <Link href={routes.adminCourse(course.id)}><span className="tp-mono">{course.code}</span> · {course.title}</Link>
                     <button type="button" aria-label={`Unassign ${course.title}`} disabled={busy} onClick={() => unassignCourse(assignment.id)}>×</button>
                   </span>
                 );

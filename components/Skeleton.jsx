@@ -2,7 +2,7 @@ function Skeleton({ className = "", style }) {
   return <span className={`tp-skeleton ${className}`.trim()} style={style} aria-hidden="true" />;
 }
 
-export function SkeletonPage({ children, className = "" }) {
+function SkeletonPage({ children, className = "" }) {
   return (
     <div className={`tp-skeleton-page ${className}`.trim()} aria-busy="true" aria-label="Loading content">
       {children}
@@ -11,7 +11,7 @@ export function SkeletonPage({ children, className = "" }) {
   );
 }
 
-export function TopNavSkeleton() {
+function TopNavSkeleton() {
   return (
     <header className="site-nav" aria-hidden="true">
       <div className="site-nav__inner">
@@ -194,10 +194,6 @@ export function ProfileSkeleton() {
       </main>
     </SkeletonPage>
   );
-}
-
-export function AppSkeleton() {
-  return <CoursesSkeleton />;
 }
 
 export default Skeleton;

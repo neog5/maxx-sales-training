@@ -1,226 +1,113 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import Notice from "@/components/Notice";
+import StatusBadge from "@/components/StatusBadge";
+import useMutation from "@/hooks/useMutation";
+import { assessmentMix } from "@/lib/assessment";
+import { removeUnusedQuestionImage, uploadQuestionImage, QUESTION_IMAGE_BUCKET } from "@/lib/question-images";
 import { createClient } from "@/lib/supabase/client";
-import { GENERATION_LIMITS } from "@/lib/question-suggestions.mjs";
+import QuestionEditor, { draftError, draftFromQuestion, emptyDraft, questionPayload } from "./QuestionEditor";
+import SuggestionLauncher from "./SuggestionLauncher";
+import SuggestionPanel from "./SuggestionPanel";
+import { readingLabel } from "./reading-label";
+import { removeStoredFiles } from "@/lib/storage";
 
-function emptyDraft(courseId) {
-  return { course_id: courseId, question_type: "main_test", material_id: null, page_number: null, question_text: "", image_url: null, is_mandatory: false, options: ["", "", "", ""], correct_index: 0, explanation: "" };
+const IMPORT_FAILED = { fallback: "We couldn’t add the selected questions. Please try again." };
+const DELETE_FAILED = { fallback: "We couldn’t delete that question. Please try again." };
+
+// Asks the server for suggested questions from one deck.
+async function requestSuggestions({ courseId, materialId, counts, signal }) {
+  const response = await fetch("/api/admin/question-suggestions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ courseId, materialId, readingCount: Number(counts.reading), mainCount: Number(counts.main) }),
+    signal,
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Could not generate question suggestions.");
+  return payload.questions;
 }
 
-function generationCount(value, minimum, maximum, fallback) {
-  if (value === undefined || value === null || value === "") return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
-}
-
-// "Reading · p. 4", or "Reading · deck 2, p. 4" when the course has several decks.
-function readingLabel(question, materials) {
-  if (materials.length < 2) return `Reading · p. ${question.page_number}`;
-  const deck = materials.findIndex((material) => material.id === question.material_id) + 1;
-  return `Reading · deck ${deck || "?"}, p. ${question.page_number}`;
-}
-
-function QuestionEditor({ materials, draft, setDraft, imageFile, setImageFile, editing, saving, formError, onSave, onCancel }) {
-  const imagePreview = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : draft.image_url, [imageFile, draft.image_url]);
-
-  useEffect(() => {
-    if (!imageFile || !imagePreview) return;
-    return () => URL.revokeObjectURL(imagePreview);
-  }, [imageFile, imagePreview]);
-
+function QuestionItem({ question, materials, readOnly, deleting, onEdit, onDelete }) {
+  const reading = question.question_type === "reading_test";
   return (
-    <div className={`tp-card question-editor tp-fade-in ${editing ? "is-inline" : ""}`}>
-      <div className="tp-label" style={{ marginBottom: 14 }}>{editing ? "Edit question" : "New question"}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-        <div>
-          <div className="tp-label" style={{ marginBottom: 6 }}>Question bank</div>
-          <select className="tp-input" value={draft.question_type} onChange={(e) => setDraft({ ...draft, question_type: e.target.value, material_id: e.target.value === "reading_test" ? draft.material_id || materials[0]?.id || null : null, page_number: e.target.value === "reading_test" ? draft.page_number : null, is_mandatory: e.target.value === "main_test" ? draft.is_mandatory : false })}>
-            <option value="main_test">Main test</option>
-            <option value="reading_test">Reading test</option>
-          </select>
+    <div className="tp-card question-item">
+      <div className="question-item__body">
+        <div className="question-item__badges">
+          <StatusBadge tone={reading ? "warn" : "accent"}>{reading ? readingLabel(question, materials) : "Main test"}</StatusBadge>
+          <StatusBadge>{question.options?.length || 0} options</StatusBadge>
+          {question.is_mandatory && <span className="tp-badge question-mandatory-badge">Mandatory</span>}
+          {question.image_url && <span className="tp-badge">Image</span>}
         </div>
+        <div className="question-item__text">{question.question_text}</div>
+        {question.image_url && <img className="question-media question-media--bank" src={question.image_url} alt="" />}
       </div>
-      {draft.question_type === "reading_test" && (
-        <div style={{ display: "grid", gridTemplateColumns: materials.length > 1 ? "2fr 1fr" : "1fr", gap: 12, marginBottom: 12 }}>
-          {materials.length > 1 && (
-            <div>
-              <div className="tp-label" style={{ marginBottom: 6 }}>Deck</div>
-              <select className="tp-input" value={draft.material_id || ""} onChange={(e) => setDraft({ ...draft, material_id: e.target.value })}>
-                {materials.map((material, index) => <option key={material.id} value={material.id}>{index + 1}. {material.title}</option>)}
-              </select>
-            </div>
-          )}
-          <div>
-            <div className="tp-label" style={{ marginBottom: 6 }}>{materials.length > 1 ? "Page in that deck" : "PDF page number"}</div>
-            <input className="tp-input" type="number" min="1" value={draft.page_number ?? ""} placeholder="e.g. 4" onChange={(e) => setDraft({ ...draft, page_number: e.target.value ? Number(e.target.value) : null })} />
-          </div>
+      {!readOnly && (
+        <div className="question-item__actions">
+          <button type="button" className="tp-btn tp-btn-ghost tp-btn--small" onClick={onEdit}>Edit</button>
+          <button type="button" className="tp-btn tp-btn-danger tp-btn--small" disabled={deleting} onClick={onDelete}>{deleting ? "Deleting…" : "Delete"}</button>
         </div>
       )}
-      <div style={{ marginBottom: 12 }}>
-        <div className="tp-label" style={{ marginBottom: 6 }}>Question text</div>
-        <textarea className="tp-input" rows={2} value={draft.question_text} onChange={(e) => setDraft({ ...draft, question_text: e.target.value })} />
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <div className="tp-label" style={{ marginBottom: 6 }}>Question image (optional)</div>
-        {imagePreview && <img className="question-media question-media--editor" src={imagePreview} alt="Question media preview" />}
-        <input className="tp-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setImageFile(event.target.files?.[0] || null)} />
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6, color: "var(--faint)", fontSize: 11.5 }}>
-          <span>JPEG, PNG, WebP, or GIF · 5 MB maximum</span>
-          {(imageFile || draft.image_url) && <button type="button" className="question-media-remove" onClick={() => { setImageFile(null); setDraft({ ...draft, image_url: null }); }}>Remove image</button>}
-        </div>
-      </div>
-      {draft.question_type === "main_test" && (
-        <label className="question-mandatory-toggle">
-          <input type="checkbox" checked={draft.is_mandatory} onChange={(event) => setDraft({ ...draft, is_mandatory: event.target.checked })} />
-          <span><b>Mandatory assessment question</b><small>Always include this question in every main assessment.</small></span>
-        </label>
-      )}
-      <div className="tp-label" style={{ marginBottom: 6 }}>Answer options — select the correct one</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-        {draft.options.map((opt, i) => (
-          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button type="button" aria-label={`Mark option ${i + 1} correct`} onClick={() => setDraft({ ...draft, correct_index: i })} style={{ width: 18, height: 18, padding: 0, borderRadius: "50%", border: `1.5px solid ${draft.correct_index === i ? "var(--accent)" : "var(--border)"}`, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              {draft.correct_index === i && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />}
-            </button>
-            <input className="tp-input" value={opt} placeholder={`Option ${i + 1}`} onChange={(e) => { const options = [...draft.options]; options[i] = e.target.value; setDraft({ ...draft, options }); }} />
-            <button type="button" className="tp-btn tp-btn-ghost" style={{ padding: "6px 10px" }} disabled={draft.options.length <= 2} aria-label={`Remove option ${i + 1}`} onClick={() => {
-              const options = draft.options.filter((_, index) => index !== i);
-              const correct_index = draft.correct_index === i ? 0 : draft.correct_index > i ? draft.correct_index - 1 : draft.correct_index;
-              setDraft({ ...draft, options, correct_index });
-            }}>×</button>
-          </div>
-        ))}
-      </div>
-      <button type="button" className="tp-btn tp-btn-ghost" style={{ marginBottom: 12 }} onClick={() => setDraft({ ...draft, options: [...draft.options, ""] })}>+ Add option</button>
-      <div style={{ marginBottom: 16 }}>
-        <div className="tp-label" style={{ marginBottom: 6 }}>Explanation (shown after submit)</div>
-        <textarea className="tp-input" rows={2} value={draft.explanation} onChange={(e) => setDraft({ ...draft, explanation: e.target.value })} />
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button className="tp-btn tp-btn-primary" disabled={saving} onClick={onSave}>{saving ? "Saving…" : "Save question"}</button>
-        <button className="tp-btn tp-btn-ghost" onClick={onCancel}>Cancel</button>
-      </div>
-      {formError && <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 10 }}>{formError}</div>}
     </div>
   );
 }
 
-function SuggestionPanel({ materials, deckId, questions, selected, loading, importing, error, counts, onToggle, onSelectAll, onClear, onGenerate, onImport }) {
-  if (loading) {
-    return (
-      <section className="tp-card suggestion-panel suggestion-panel--loading" aria-live="polite">
-        <div className="suggestion-spinner" />
-        <div><strong>Generating suggestions…</strong><span>Preparing {counts.reading} reading question{counts.reading === 1 ? "" : "s"} and {counts.main} main question{counts.main === 1 ? "" : "s"}. This may take a few minutes.</span></div>
-      </section>
-    );
-  }
-
-  if (!questions?.length) {
-    return error ? (
-      <section className="tp-card suggestion-panel">
-        <div className="suggestion-panel__header"><div><div className="tp-label">Question suggestions</div><h2>Suggestions need another try</h2><p>{error}</p></div><button className="tp-btn tp-btn-primary" onClick={onGenerate}>Try again</button></div>
-      </section>
-    ) : null;
-  }
-
-  return (
-    <section className="tp-card suggestion-panel" aria-label="Question suggestions">
-      <div className="suggestion-panel__header">
-        <div><div className="tp-label">Question suggestions</div><h2>Review suggested questions</h2><p>Select the accurate, relevant questions to add. Nothing is saved until you confirm.</p></div>
-        <button className="tp-btn tp-btn-ghost" onClick={onGenerate} disabled={importing}>Regenerate</button>
-      </div>
-      <div className="suggestion-toolbar">
-        <strong>{selected.size} of {questions.length} selected</strong>
-        <div><button type="button" onClick={onSelectAll}>Select all</button><button type="button" onClick={onClear}>Clear</button></div>
-      </div>
-      <div className="suggestion-list">
-        {questions.map((question, index) => {
-          const isSelected = selected.has(index);
-          const isTrueFalse = question.options.length === 2 && question.options[0] === "True" && question.options[1] === "False";
-          return (
-            <label key={`${question.question_type}-${index}`} className={`suggestion-item ${isSelected ? "is-selected" : ""}`}>
-              <input type="checkbox" checked={isSelected} onChange={() => onToggle(index)} />
-              <div className="suggestion-item__body">
-                <div className="suggestion-item__meta">
-                  <span className="tp-badge">{question.question_type === "reading_test" ? readingLabel({ ...question, material_id: deckId }, materials) : "Main test"}</span>
-                  {isTrueFalse && <span className="tp-badge">True / False</span>}
-                </div>
-                <strong>{question.question_text}</strong>
-                <div className="suggestion-options">
-                  {question.options.map((option, optionIndex) => <span key={optionIndex} className={optionIndex === question.correct_index ? "is-answer" : ""}>{option}{optionIndex === question.correct_index ? " ✓" : ""}</span>)}
-                </div>
-                <p><b>Why:</b> {question.explanation}</p>
-              </div>
-            </label>
-          );
-        })}
-      </div>
-      {error && <div className="suggestion-error">{error}</div>}
-      <div className="suggestion-panel__footer">
-        <span>Unselected questions will be discarded.</span>
-        <button className="tp-btn tp-btn-primary" onClick={onImport} disabled={importing || selected.size === 0}>{importing ? "Adding questions…" : `Add ${selected.size} selected question${selected.size === 1 ? "" : "s"}`}</button>
-      </div>
-    </section>
-  );
-}
-
 // One course's questions, shown on the course's Questions tab. Archived courses are read-only.
-export default function QuestionBankClient({ courses, materials = [], initialQuestions, initialCourseId, autoSuggest = false, initialGenerationCounts = {}, readOnly = false }) {
+export default function QuestionBankClient({ course, materials = [], initialQuestions, autoSuggest = false, initialGenerationCounts, readOnly = false }) {
   const supabase = createClient();
-  const [courseId, setCourseId] = useState(courses.some((course) => course.id === initialCourseId) ? initialCourseId : courses[0]?.id);
+  const saver = useMutation();
+  const importer = useMutation();
+  const deleter = useMutation();
   const [questions, setQuestions] = useState(initialQuestions);
   const [draft, setDraft] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState(null);
-  const [formError, setFormError] = useState("");
   const [suggestions, setSuggestions] = useState(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState(new Set());
   const [generating, setGenerating] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [suggestionError, setSuggestionError] = useState("");
-  const [mutationError, setMutationError] = useState("");
-  const [generationCounts, setGenerationCounts] = useState({
-    reading: generationCount(initialGenerationCounts.reading, 0, GENERATION_LIMITS.reading.max, 5),
-    main: generationCount(initialGenerationCounts.main, 0, GENERATION_LIMITS.main.max, 10),
-  });
+  const [generationError, setGenerationError] = useState("");
+  const [generationCounts, setGenerationCounts] = useState(initialGenerationCounts);
   const [generationDeckId, setGenerationDeckId] = useState(materials[0]?.id || null);
   // The deck the current suggestions were generated from; their reading questions belong to it.
   const [suggestionDeckId, setSuggestionDeckId] = useState(null);
   const autoSuggestStarted = useRef(false);
   const generationRequest = useRef(null);
 
-  const filtered = questions.filter((q) => q.course_id === courseId);
-  const mainQuestions = filtered.filter((question) => question.question_type === "main_test");
-  const mandatoryCount = mainQuestions.filter((question) => question.is_mandatory).length;
-  const targetAssessmentCount = Math.max(5, Math.round(mandatoryCount / 0.6));
-  const optionalCount = mainQuestions.length - mandatoryCount;
-  const requiredOptionalCount = Math.max(0, targetAssessmentCount - mandatoryCount);
+  const mainQuestions = questions.filter((question) => question.question_type === "main_test");
+  const mix = assessmentMix(mainQuestions);
+  const suggestionError = generationError || importer.error;
+
+  function openEditor(nextDraft, questionId = null) {
+    setDraft(nextDraft);
+    setImageFile(null);
+    setEditingId(questionId);
+    saver.setError("");
+  }
+
+  function closeEditor() {
+    setDraft(null);
+    setImageFile(null);
+    setEditingId(null);
+  }
 
   async function generateSuggestions() {
-    if (!courseId) return;
     generationRequest.current?.abort();
     const controller = new AbortController();
     generationRequest.current = controller;
     setGenerating(true);
-    setSuggestionError("");
+    setGenerationError("");
+    importer.setError("");
     setSuggestions(null);
     setSelectedSuggestions(new Set());
     setSuggestionDeckId(generationDeckId);
     try {
-      const response = await fetch("/api/admin/question-suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, materialId: generationDeckId, readingCount: Number(generationCounts.reading), mainCount: Number(generationCounts.main) }),
-        signal: controller.signal,
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not generate question suggestions.");
-      setSuggestions(payload.questions);
-      setSelectedSuggestions(new Set(payload.questions.map((_, index) => index)));
+      const generated = await requestSuggestions({ courseId: course.id, materialId: generationDeckId, counts: generationCounts, signal: controller.signal });
+      setSuggestions(generated);
+      setSelectedSuggestions(new Set(generated.map((_, index) => index)));
     } catch (error) {
       if (error.name === "AbortError") return;
-      setSuggestionError(error.message || "Could not generate question suggestions.");
+      setGenerationError(error.message || "Could not generate question suggestions.");
     } finally {
       if (generationRequest.current === controller) {
         generationRequest.current = null;
@@ -229,126 +116,111 @@ export default function QuestionBankClient({ courses, materials = [], initialQue
     }
   }
 
+  // Runs once, when the page opens straight from creating the course. Unmounting cancels
+  // the request and clears the flag, so React Strict Mode's dev-only remount starts it again.
+  const startAutoSuggest = useEffectEvent(() => generateSuggestions());
   useEffect(() => {
-    if (!autoSuggestStarted.current && autoSuggest && courseId) {
-      autoSuggestStarted.current = true;
-      generateSuggestions();
-    }
-  }, [autoSuggest, courseId]);
+    if (autoSuggestStarted.current || !autoSuggest) return;
+    autoSuggestStarted.current = true;
+    startAutoSuggest();
+    return () => {
+      autoSuggestStarted.current = false;
+    };
+  }, [autoSuggest]);
 
+  // Leaving the page cancels any generation still running.
   useEffect(() => () => generationRequest.current?.abort(), []);
+
+  function toggleSuggestion(index) {
+    setSelectedSuggestions((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
 
   async function importSuggestions() {
     const chosen = suggestions
       .filter((_, index) => selectedSuggestions.has(index))
-      .map((question) => ({ ...question, course_id: courseId, material_id: question.question_type === "reading_test" ? suggestionDeckId : null }));
+      .map((question) => ({ ...question, course_id: course.id, material_id: question.question_type === "reading_test" ? suggestionDeckId : null }));
     if (!chosen.length) return;
-
-    setImporting(true);
-    setSuggestionError("");
-    const { data, error } = await supabase.from("questions").insert(chosen).select();
-    if (error) {
-      console.error("Could not add selected question suggestions", error);
-      setSuggestionError("We couldn’t add the selected questions. Please try again.");
-    } else {
-      setQuestions((current) => [...current, ...(data || [])]);
-      setSuggestions(null);
-      setSelectedSuggestions(new Set());
-    }
-    setImporting(false);
+    const added = await importer.run("import", () => supabase.from("questions").insert(chosen).select(), IMPORT_FAILED);
+    if (!added) return;
+    setQuestions((current) => [...current, ...added]);
+    setSuggestions(null);
+    setSelectedSuggestions(new Set());
   }
 
+  // Uploads a new image first, then writes the question. A new image is removed again if
+  // the write fails; an image the question no longer uses is removed once it succeeds.
   async function saveDraft() {
-    if (!draft.question_text.trim() || draft.options.length < 2 || draft.options.some((o) => !o.trim())) {
-      setFormError("Enter the question text and at least two complete answer options.");
+    const validation = draftError(draft, imageFile);
+    if (validation) {
+      saver.setError(validation);
       return;
     }
-    if (draft.question_type === "reading_test" && !draft.page_number) {
-      setFormError("A reading-test question needs a PDF page number.");
-      return;
-    }
-    if (draft.question_type === "reading_test" && !draft.material_id) {
-      setFormError("Add a reading deck to this course before adding reading-test questions.");
-      return;
-    }
-    if (imageFile && (imageFile.size > 5 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(imageFile.type))) {
-      setFormError("Choose a JPEG, PNG, WebP, or GIF image no larger than 5 MB.");
-      return;
-    }
-    setFormError("");
-    setMutationError("");
-    setSaving(true);
-    let uploadedPath = null;
-    let payload = { ...draft, is_mandatory: draft.question_type === "main_test" && draft.is_mandatory };
-    if (imageFile) {
-      const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
-      uploadedPath = `${courseId}/${crypto.randomUUID()}.${extensions[imageFile.type]}`;
-      const { error: uploadError } = await supabase.storage.from("question-images").upload(uploadedPath, imageFile, { contentType: imageFile.type });
-      if (uploadError) {
-        setFormError(`Could not upload the question image: ${uploadError.message}`);
-        setSaving(false);
-        return;
-      }
-      payload.image_url = supabase.storage.from("question-images").getPublicUrl(uploadedPath).data.publicUrl;
-    }
-    let saved = false;
-    if (editingId) {
-      const { data, error } = await supabase.from("questions").update(payload).eq("id", editingId).select().single();
-      if (error) setFormError(error.message);
-      else {
-        setQuestions((prev) => prev.map((q) => (q.id === editingId ? data : q)));
-        saved = true;
-      }
-    } else {
-      const { data, error } = await supabase.from("questions").insert(payload).select().single();
-      if (error) setFormError(error.message);
-      else {
-        setQuestions((prev) => [...prev, data]);
-        saved = true;
-      }
-    }
-    setSaving(false);
-    if (!saved && uploadedPath) await supabase.storage.from("question-images").remove([uploadedPath]);
-    if (saved) {
-      setDraft(null);
-      setImageFile(null);
-      setEditingId(null);
-    }
+    deleter.setError("");
+    const previousImageUrl = editingId ? questions.find((question) => question.id === editingId)?.image_url : null;
+    const saved = await saver.run("save", async () => {
+      const payload = questionPayload(draft);
+      const upload = imageFile ? await uploadQuestionImage(supabase, course.id, imageFile) : null;
+      if (upload) payload.image_url = upload.imageUrl;
+      const query = editingId ? supabase.from("questions").update(payload).eq("id", editingId) : supabase.from("questions").insert(payload);
+      const result = await query.select().single();
+      if (result.error && upload) await removeStoredFiles(supabase, QUESTION_IMAGE_BUCKET, [upload.path]);
+      return result;
+    });
+    if (!saved) return;
+    setQuestions((current) => editingId ? current.map((question) => (question.id === editingId ? saved : question)) : [...current, saved]);
+    closeEditor();
+    if (previousImageUrl && previousImageUrl !== saved.image_url) await removeUnusedQuestionImage(supabase, previousImageUrl);
   }
 
-  async function deleteQuestion(id) {
-    setMutationError("");
-    const { error } = await supabase.from("questions").delete().eq("id", id);
-    if (error) {
-      setMutationError("We couldn’t delete that question. Please try again.");
-      return;
-    }
-    setQuestions((prev) => prev.filter((q) => q.id !== id));
+  async function deleteQuestion(question) {
+    if (deleter.busy) return;
+    if (!window.confirm("Delete this question? Past attempts keep their copy of it.")) return;
+    const deleted = await deleter.run(question.id, () => supabase.from("questions").delete().eq("id", question.id), DELETE_FAILED);
+    if (!deleted) return;
+    setQuestions((current) => current.filter((row) => row.id !== question.id));
+    if (question.image_url) await removeUnusedQuestionImage(supabase, question.image_url);
   }
+
+  const editorProps = {
+    materials,
+    draft,
+    setDraft,
+    imageFile,
+    setImageFile,
+    saving: Boolean(saver.busy),
+    error: saver.error,
+    onSave: saveDraft,
+    onCancel: closeEditor,
+  };
 
   return (
     <section className="bank-page is-embedded">
       <div className="bank-heading">
         <div>
           <div className="tp-label">Question bank</div>
-          <span className="bank-heading__counts">{mainQuestions.length} main test · {filtered.length - mainQuestions.length} reading{mandatoryCount ? ` · ${mandatoryCount} mandatory` : ""}</span>
+          <span className="bank-heading__counts">{mainQuestions.length} main test · {questions.length - mainQuestions.length} reading{mix.mandatoryCount ? ` · ${mix.mandatoryCount} mandatory` : ""}</span>
         </div>
-        {!readOnly && <button className="tp-btn tp-btn-primary" onClick={() => { setDraft(emptyDraft(courseId)); setImageFile(null); setEditingId(null); setFormError(""); }}>+ Add question</button>}
+        {!readOnly && <button type="button" className="tp-btn tp-btn-primary" onClick={() => openEditor(emptyDraft(course.id))}>+ Add question</button>}
       </div>
 
-      {readOnly && <div className="notice">This course is archived, so its questions are read-only. Restore the course to edit them.</div>}
+      {readOnly && <Notice>This course is archived, so its questions are read-only. Restore the course to edit them.</Notice>}
 
-      {mutationError && <div className="notice" role="alert">{mutationError}</div>}
+      <Notice tone="error">{deleter.error}</Notice>
 
       {!readOnly && !suggestions && !generating && !suggestionError && generationDeckId && (
-        <div className="suggestion-launch">
-          {materials.length > 1 ? (
-            <label><b>Generate from deck</b><select className="tp-input" value={generationDeckId} onChange={(event) => setGenerationDeckId(event.target.value)}>{materials.map((material, index) => <option key={material.id} value={material.id}>{index + 1}. {material.title}</option>)}</select></label>
-          ) : <span>Generate from this course’s PDF</span>}
-          <label><b>Reading</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.reading.max} value={generationCounts.reading} onChange={(event) => setGenerationCounts((current) => ({ ...current, reading: event.target.value }))} /></label>
-          <label><b>Main test</b><input className="tp-input" type="number" min="0" max={GENERATION_LIMITS.main.max} value={generationCounts.main} onChange={(event) => setGenerationCounts((current) => ({ ...current, main: event.target.value }))} /></label>
-          <button className="tp-btn tp-btn-ghost" onClick={generateSuggestions} disabled={!(Number(generationCounts.reading) + Number(generationCounts.main) > 0)}>Generate recommendations</button>
-        </div>
+        <SuggestionLauncher
+          materials={materials}
+          deckId={generationDeckId}
+          onDeckChange={setGenerationDeckId}
+          counts={generationCounts}
+          onCountChange={(kind, value) => setGenerationCounts((current) => ({ ...current, [kind]: value }))}
+          onGenerate={generateSuggestions}
+        />
       )}
 
       <SuggestionPanel
@@ -357,52 +229,39 @@ export default function QuestionBankClient({ courses, materials = [], initialQue
         questions={suggestions}
         selected={selectedSuggestions}
         loading={generating}
-        importing={importing}
+        importing={Boolean(importer.busy)}
         error={suggestionError}
         counts={{ reading: Number(generationCounts.reading), main: Number(generationCounts.main) }}
-        onToggle={(index) => setSelectedSuggestions((current) => { const next = new Set(current); if (next.has(index)) next.delete(index); else next.add(index); return next; })}
+        onToggle={toggleSuggestion}
         onSelectAll={() => setSelectedSuggestions(new Set(suggestions.map((_, index) => index)))}
         onClear={() => setSelectedSuggestions(new Set())}
         onGenerate={generateSuggestions}
         onImport={importSuggestions}
       />
 
-      {!readOnly && (mainQuestions.length < targetAssessmentCount || optionalCount < requiredOptionalCount) && (
-        <div className="notice">
-          This course needs {targetAssessmentCount} main-test questions ({mandatoryCount} mandatory and at least {requiredOptionalCount} non-mandatory) for the 60/40 assessment mix. Currently it has {mainQuestions.length} total and {optionalCount} non-mandatory.
-        </div>
+      {!readOnly && mix.isShort && (
+        <Notice>
+          This course needs {mix.targetCount} main-test questions ({mix.mandatoryCount} mandatory and at least {mix.requiredOptionalCount} non-mandatory) for the 60/40 assessment mix. Currently it has {mix.total} total and {mix.optionalCount} non-mandatory.
+        </Notice>
       )}
 
-      {draft && !editingId && <QuestionEditor materials={materials} draft={draft} setDraft={setDraft} imageFile={imageFile} setImageFile={setImageFile} editing={false} saving={saving} formError={formError} onSave={saveDraft} onCancel={() => { setDraft(null); setImageFile(null); setEditingId(null); }} />}
+      {draft && !editingId && <QuestionEditor {...editorProps} editing={false} />}
 
       <div className="question-list">
-        {filtered.map((q) => editingId === q.id && draft ? (
-          <QuestionEditor key={q.id} materials={materials} draft={draft} setDraft={setDraft} imageFile={imageFile} setImageFile={setImageFile} editing saving={saving} formError={formError} onSave={saveDraft} onCancel={() => { setDraft(null); setImageFile(null); setEditingId(null); }} />
+        {questions.map((question) => editingId === question.id && draft ? (
+          <QuestionEditor key={question.id} {...editorProps} editing />
         ) : (
-          <div key={q.id} className="tp-card question-item">
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                <span className="tp-badge" style={{ background: q.question_type === "reading_test" ? "var(--warn-dim)" : "var(--accent-dim)", color: q.question_type === "reading_test" ? "var(--warn)" : "var(--accent)" }}>{q.question_type === "reading_test" ? readingLabel(q, materials) : "Main test"}</span>
-                <span className="tp-badge" style={{ background: "var(--surface3)", color: "var(--dim)" }}>{q.options?.length || 0} options</span>
-                {q.is_mandatory && <span className="tp-badge question-mandatory-badge">Mandatory</span>}
-                {q.image_url && <span className="tp-badge">Image</span>}
-              </div>
-              <div style={{ fontSize: 13.5 }}>{q.question_text}</div>
-              {q.image_url && <img className="question-media question-media--bank" src={q.image_url} alt="" />}
-            </div>
-            {!readOnly && <div className="question-item__actions" style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              <button
-                className="tp-btn tp-btn-ghost"
-                style={{ padding: "6px 12px" }}
-                onClick={() => { setDraft({ course_id: q.course_id, question_type: q.question_type || "main_test", material_id: q.material_id || null, page_number: q.page_number, question_text: q.question_text, image_url: q.image_url || null, is_mandatory: Boolean(q.is_mandatory), options: [...q.options], correct_index: q.correct_index, explanation: q.explanation }); setImageFile(null); setEditingId(q.id); setFormError(""); }}
-              >
-                Edit
-              </button>
-              <button className="tp-btn tp-btn-danger" style={{ padding: "6px 12px" }} onClick={() => deleteQuestion(q.id)}>Delete</button>
-            </div>}
-          </div>
+          <QuestionItem
+            key={question.id}
+            question={question}
+            materials={materials}
+            readOnly={readOnly}
+            deleting={deleter.busy === question.id}
+            onEdit={() => openEditor(draftFromQuestion(question), question.id)}
+            onDelete={() => deleteQuestion(question)}
+          />
         ))}
-        {filtered.length === 0 && <div className="tp-card" style={{ padding: 20, color: "var(--faint)", fontSize: 13 }}>No questions yet for this course.</div>}
+        {questions.length === 0 && <div className="tp-card question-list__empty">No questions yet for this course.</div>}
       </div>
     </section>
   );

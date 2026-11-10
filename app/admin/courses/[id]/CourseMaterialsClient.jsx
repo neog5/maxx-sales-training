@@ -2,97 +2,94 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { COURSE_PDF_BUCKET, deckFileError, materialStoragePathFromUrl, reorderedPositions, titleFromFileName, uploadCourseDeck } from "@/lib/course-materials";
+import { FREE_PDF_PARSER_LIMIT_TEXT } from "@/lib/question-suggestions";
 import { createClient } from "@/lib/supabase/client";
-import { COURSE_PDF_BUCKET, materialStoragePath, materialStoragePathFromUrl, reorderedPositions, titleFromFileName } from "@/lib/course-materials.mjs";
+import useAdminMutation from "../../useAdminMutation";
+import { removeStoredFiles } from "@/lib/storage";
 
 // The course's reading decks: learners read them in this order before the assessment.
+// Decks come from the server, so each change re-renders the page from there.
 export default function CourseMaterialsClient({ course, materials, readingCounts, readOnly }) {
   const supabase = createClient();
   const router = useRouter();
-  const [titles, setTitles] = useState(() => Object.fromEntries(materials.map((material) => [material.id, material.title])));
-  const [busy, setBusy] = useState("");
-  const [message, setMessage] = useState({ type: "", text: "" });
+  const { run, busy, fail, notices } = useAdminMutation();
+  const [titles, setTitles] = useState({});
 
-  async function run(label, action, success) {
-    setBusy(label);
-    setMessage({ type: "", text: "" });
-    try {
-      await action();
-      if (success) setMessage({ type: "success", text: success });
-      router.refresh();
-    } catch (error) {
-      setMessage({ type: "error", text: error.message || "Something went wrong. Please try again." });
-    } finally {
-      setBusy("");
+  async function change(label, action, messages, { refreshOnFailure = false } = {}) {
+    const data = await run(label, action, messages);
+    if (data || refreshOnFailure) router.refresh();
+    return data;
+  }
+
+  // Uploads each PDF and adds it after the current last deck. Stops at the first failure;
+  // decks added before it stay, so the page refreshes either way.
+  async function uploadDecks(files) {
+    let position = Math.max(0, ...materials.map((material) => material.position));
+    for (const file of files) {
+      const { path, pdfUrl } = await uploadCourseDeck(supabase, course.code, file);
+      position += 1;
+      const result = await supabase.from("course_materials").insert({ course_id: course.id, position, title: titleFromFileName(file.name), pdf_url: pdfUrl });
+      if (result.error) {
+        await removeStoredFiles(supabase, COURSE_PDF_BUCKET, [path]);
+        return result;
+      }
     }
+    return { data: true };
   }
 
   function addDecks(event) {
     const files = Array.from(event.target.files || []);
     event.target.value = "";
     if (!files.length) return;
-    if (files.some((file) => file.type !== "application/pdf")) {
-      setMessage({ type: "error", text: "Decks must be PDF files." });
+    const fileError = files.map(deckFileError).find(Boolean);
+    if (fileError) {
+      fail(fileError);
       return;
     }
-    run("upload", async () => {
-      let position = Math.max(0, ...materials.map((material) => material.position));
-      for (const file of files) {
-        const path = materialStoragePath(course.code, file.name);
-        const { error: uploadError } = await supabase.storage.from(COURSE_PDF_BUCKET).upload(path, file, { contentType: "application/pdf" });
-        if (uploadError) throw uploadError;
-        const pdfUrl = supabase.storage.from(COURSE_PDF_BUCKET).getPublicUrl(path).data.publicUrl;
-        position += 1;
-        const { error } = await supabase.from("course_materials").insert({ course_id: course.id, position, title: titleFromFileName(file.name), pdf_url: pdfUrl });
-        if (error) {
-          await supabase.storage.from(COURSE_PDF_BUCKET).remove([path]);
-          throw error;
-        }
-      }
-    }, files.length === 1 ? "Deck added. Give it a clear title below." : `${files.length} decks added. Give them clear titles below.`);
+    change("upload", () => uploadDecks(files),
+      { success: files.length === 1 ? "Deck added. Give it a clear title below." : `${files.length} decks added. Give them clear titles below.` },
+      { refreshOnFailure: true });
   }
 
   function saveTitle(material) {
-    const title = (titles[material.id] || "").trim();
+    const title = (titles[material.id] ?? material.title).trim();
     if (title === material.title) return;
     if (!title) {
       setTitles((current) => ({ ...current, [material.id]: material.title }));
       return;
     }
-    run(`title-${material.id}`, async () => {
-      const { error } = await supabase.from("course_materials").update({ title }).eq("id", material.id);
-      if (error) throw error;
-    }, "Deck title saved.");
+    change(`title-${material.id}`, () => supabase.from("course_materials").update({ title }).eq("id", material.id), { success: "Deck title saved." });
   }
 
+  // Writes the new positions one deck at a time and stops at the first failure. The page
+  // refreshes either way so it shows the order actually saved.
   function move(index, toIndex) {
     const changes = reorderedPositions(materials, index, toIndex);
     if (!changes.length) return;
-    run("move", async () => {
+    change("move", async () => {
       for (const { id, position } of changes) {
-        const { error } = await supabase.from("course_materials").update({ position }).eq("id", id);
-        if (error) throw error;
+        const result = await supabase.from("course_materials").update({ position }).eq("id", id);
+        if (result.error) return result;
       }
-    });
+      return { data: true };
+    }, { fallback: "The new order couldn’t be fully saved. Check the order below and try again." }, { refreshOnFailure: true });
   }
 
-  function remove(material) {
+  async function remove(material) {
     const count = readingCounts[material.id] || 0;
     const warning = count ? ` Its ${count} reading question${count === 1 ? "" : "s"} will be deleted too.` : "";
     if (!window.confirm(`Remove “${material.title}” from ${course.code}?${warning} Past attempts are not affected.`)) return;
-    run(`remove-${material.id}`, async () => {
-      const { error } = await supabase.from("course_materials").delete().eq("id", material.id);
-      if (error) throw error;
-      const path = materialStoragePathFromUrl(material.pdf_url);
-      if (path) await supabase.storage.from(COURSE_PDF_BUCKET).remove([path]);
-    }, "Deck removed.");
+    const removed = await change(`remove-${material.id}`, () => supabase.from("course_materials").delete().eq("id", material.id), { success: "Deck removed." });
+    const path = removed && materialStoragePathFromUrl(material.pdf_url);
+    if (path) await removeStoredFiles(supabase, COURSE_PDF_BUCKET, [path]);
   }
 
   return (
     <section className="tp-card tp-form-card course-decks">
-      <div className="tp-label" style={{ marginBottom: 4 }}>Reading decks</div>
-      <p className="course-admin__hint">Learners read these PDFs in order and must open every deck before the assessment. Keep each deck under 5 MB to use AI question suggestions.</p>
-      {message.text && <div className={message.type === "error" ? "notice notice--error" : "notice notice--success"} role={message.type === "error" ? "alert" : "status"}>{message.text}</div>}
+      <div className="tp-label form-section-label--tight">Reading decks</div>
+      <p className="course-admin__hint">Learners read these PDFs in order and must open every deck before the assessment. Keep each deck under {FREE_PDF_PARSER_LIMIT_TEXT} to use AI question suggestions.</p>
+      {notices}
 
       <ol className="course-decks__list">
         {materials.map((material, index) => (
@@ -120,19 +117,6 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
           <input type="file" accept="application/pdf,.pdf" multiple disabled={Boolean(busy)} onChange={addDecks} hidden />
         </label>
       )}
-
-      <style jsx>{`
-        .course-decks { margin-top: 18px; }
-        .course-decks__list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-        .course-decks__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto auto auto auto; gap: 8px; align-items: center; }
-        .course-decks__number { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: var(--accent-dim); color: var(--accent); font: 600 11.5px/1 'JetBrains Mono', monospace; }
-        .course-decks__meta { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
-        .course-decks__upload { cursor: pointer; }
-        @media (max-width: 700px) {
-          .course-decks__row { grid-template-columns: 28px minmax(0, 1fr) auto auto auto; }
-          .course-decks__meta, .course-decks__row a { display: none; }
-        }
-      `}</style>
     </section>
   );
 }

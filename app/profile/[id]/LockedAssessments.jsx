@@ -1,31 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Notice from "@/components/Notice";
+import useMutation from "@/hooks/useMutation";
+import { MAX_ATTEMPTS } from "@/lib/attempts";
 import { createClient } from "@/lib/supabase/client";
-import { MAX_ATTEMPTS } from "@/lib/attempts.mjs";
 
 // Courses where this person has used all their attempts. Admins can approve a fresh set.
 export default function LockedAssessments({ personId, courses, canApprove, viewerId }) {
-  const router = useRouter();
-  const [busyId, setBusyId] = useState(null);
+  const { run, busy: busyId, error } = useMutation({ refresh: true });
   const [message, setMessage] = useState("");
 
   async function approve(course) {
-    setBusyId(course.id);
     setMessage("");
-    const supabase = createClient();
-    const { error } = await supabase.from("attempt_unlocks").insert({ user_id: personId, course_id: course.id, granted_by: viewerId });
-    if (error) {
-      setMessage(`Could not approve more attempts: ${error.message}`);
-    } else {
-      setMessage(`Approved ${MAX_ATTEMPTS} more attempts for ${course.code}.`);
-      router.refresh();
-    }
-    setBusyId(null);
+    const approved = await run(course.id, () => createClient().from("attempt_unlocks").insert({ user_id: personId, course_id: course.id, granted_by: viewerId }));
+    if (approved) setMessage(`Approved ${MAX_ATTEMPTS} more attempts for ${course.code}.`);
   }
 
-  if (!courses.length && !message) return null;
+  if (!courses.length && !message && !error) return null;
 
   return (
     <section className="profile-report-section">
@@ -51,6 +43,7 @@ export default function LockedAssessments({ personId, courses, canApprove, viewe
         ))}
         {!courses.length && <div className="admin-insight-empty">No locked assessments.</div>}
       </div>
+      <Notice tone="error" className="locked-assessments__notice">{error && `Could not approve more attempts: ${error}`}</Notice>
       {message && <div className="role-editor__status" role="status">{message}</div>}
     </section>
   );

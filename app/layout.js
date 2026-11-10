@@ -1,4 +1,6 @@
 import "./globals.css";
+import "./styles/learner.css";
+import "./styles/admin.css";
 import EnvironmentBanner, { appEnv, isProduction } from "@/components/EnvironmentBanner";
 
 export const metadata = {

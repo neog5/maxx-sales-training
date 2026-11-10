@@ -1,26 +1,27 @@
 "use client";
 import Link from "next/link";
-import { isAdmin } from "@/lib/roles.mjs";
+import { usePathname } from "next/navigation";
+import { isAdmin } from "@/lib/roles";
+import { routes } from "@/lib/routes";
 
 const TABS = [
-  { key: "dashboard", href: "/admin", label: "Dashboard" },
-  { key: "people", href: "/admin/people", label: "People" },
-  { key: "training-groups", href: "/admin/training-groups", label: "Training groups", adminOnly: true },
-  { key: "courses", href: "/admin/courses", label: "Courses", adminOnly: true },
-  { key: "insights", href: "/admin/insights", label: "Insights" },
+  { href: routes.admin, label: "Dashboard" },
+  { href: routes.people, label: "People" },
+  { href: routes.trainingGroups, label: "Training groups", adminOnly: true },
+  { href: routes.adminCourses, label: "Courses", adminOnly: true },
+  { href: routes.insights, label: "Insights" },
 ];
 
-export default function AdminTabs({ active, role }) {
+function isActive(tab, pathname) {
+  return tab.href === routes.admin ? pathname === routes.admin : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+}
+
+export default function AdminTabs({ role }) {
+  const pathname = usePathname();
   return (
     <nav className="admin-tabs" aria-label="Admin navigation">
       {TABS.filter((tab) => !tab.adminOnly || isAdmin(role)).map((tab) => (
-        <Link
-          key={tab.key}
-          href={tab.href}
-          className="tp-btn"
-          aria-current={active === tab.key ? "page" : undefined}
-          style={{ color: active === tab.key ? "var(--text)" : "var(--faint)", textDecoration: "none" }}
-        >
+        <Link key={tab.href} href={tab.href} className="tp-btn admin-tabs__tab" aria-current={isActive(tab, pathname) ? "page" : undefined}>
           {tab.label}
         </Link>
       ))}

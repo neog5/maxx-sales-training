@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { formatDate, formatDateTime } from "@/lib/format.mjs";
+import { useSyncExternalStore } from "react";
+import { formatDate, formatDateTime } from "@/lib/format";
 
-// Renders the UTC date on the server and first client render, then switches to the viewer's local time after mount.
+const subscribe = () => () => {};
+
+// Renders the UTC date on the server and during hydration, then the viewer's local time.
 export default function LocalDate({ value, withTime = false }) {
-  const [local, setLocal] = useState(false);
-  useEffect(() => setLocal(true), []);
+  const local = useSyncExternalStore(subscribe, () => true, () => false);
   const format = withTime ? formatDateTime : formatDate;
   return <time dateTime={new Date(value).toISOString()}>{format(value, { local })}</time>;
 }

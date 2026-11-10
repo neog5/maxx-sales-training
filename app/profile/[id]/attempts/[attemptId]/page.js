@@ -1,68 +1,55 @@
-import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import LocalDate from "@/components/LocalDate";
 import QuestionPerformance from "@/components/QuestionPerformance";
+import StatusBadge from "@/components/StatusBadge";
 import TopNav from "@/components/TopNav";
-import { calculateQuestionPerformance } from "@/lib/assessment.mjs";
-import { createClient } from "@/lib/supabase/server";
-import { canViewReports } from "@/lib/roles.mjs";
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
+import { calculateQuestionPerformance, summarizeAnswers } from "@/lib/assessment";
+import { requireSelfOrReports } from "@/lib/auth";
+import { must, mustFind } from "@/lib/db";
+import { displayName } from "@/lib/people";
+import { routes } from "@/lib/routes";
 
 export default async function AttemptPage({ params }) {
   const { id, attemptId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, profile: viewer } = await requireSelfOrReports(id);
 
-  const { data: viewer } = await supabase.from("profiles").select("id, full_name, role").eq("id", user.id).single();
-  if (!viewer) redirect("/login");
-  if (!canViewReports(viewer?.role) && user.id !== id) redirect(`/profile/${user.id}`);
-
-  const [{ data: person }, { data: attempt }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, role").eq("id", id).single(),
+  const [person, attempt] = await Promise.all([
+    supabase.from("profiles").select("id, full_name").eq("id", id).maybeSingle().then((result) => mustFind(result, "this person")),
     supabase
       .from("quiz_attempts")
-      .select("id, user_id, score, passed, submitted_at, status, courses(title, code, pass_threshold)")
+      .select("id, score, passed, submitted_at, courses(title, code, pass_threshold)")
       .eq("id", attemptId)
       .eq("user_id", id)
       .eq("status", "completed")
-      .maybeSingle(),
+      .maybeSingle()
+      .then((result) => mustFind(result, "the attempt")),
   ]);
-  if (!person || !attempt) notFound();
 
-  const { data: attemptQuestions } = await supabase
-    .from("attempt_questions")
-    .select("id, position, question_text, image_url, is_mandatory, options, correct_index, explanation, selected_index, is_correct")
-    .eq("attempt_id", attempt.id)
-    .order("position", { ascending: true })
-    .order("id", { ascending: true });
-  const questions = attemptQuestions || [];
-  const correctCount = questions.filter((question) => question.is_correct).length;
-  const mandatoryQuestions = questions.filter((question) => question.is_mandatory);
-  const mandatoryCorrect = mandatoryQuestions.filter((question) => question.is_correct).length;
-  const mandatoryMet = mandatoryCorrect === mandatoryQuestions.length;
-  const questionPerformance = calculateQuestionPerformance(questions);
+  const questions = must(
+    await supabase
+      .from("attempt_questions")
+      .select("id, position, question_text, image_url, is_mandatory, options, correct_index, explanation, selected_index, is_correct")
+      .eq("attempt_id", attempt.id)
+      .order("position", { ascending: true })
+      .order("id", { ascending: true }),
+    "the attempt's questions"
+  ) || [];
+  const { total, correctCount, mandatoryCount, mandatoryCorrectCount, mandatoryPassed } = summarizeAnswers(questions);
+  const name = displayName(person);
 
   return (
     <div>
       <TopNav profile={viewer} />
       <main className="tp-page attempt-detail-page tp-fade-in">
-        <Link href={`/profile/${person.id}`} className="tp-btn tp-btn-ghost back-link">← Back to {person.full_name}</Link>
+        <Link href={routes.profile(person.id)} className="tp-btn tp-btn-ghost back-link">← Back to {name}</Link>
 
         <div className="page-heading attempt-detail-heading">
           <div>
             <div className="tp-label">Attempt review · {attempt.courses?.code || "Assessment"}</div>
             <h1 className="tp-display">{attempt.courses?.title || "Assessment attempt"}</h1>
-            <p>{person.full_name} · submitted {formatDate(attempt.submitted_at)}</p>
+            <p>{name} · submitted <LocalDate value={attempt.submitted_at} withTime /></p>
           </div>
-          <span className="tp-badge attempt-detail-result" style={{ background: attempt.passed ? "var(--success-dim)" : "var(--danger-dim)", color: attempt.passed ? "var(--success)" : "var(--danger)" }}>
-            {attempt.passed ? "Passed" : "Failed"}
-          </span>
+          <StatusBadge tone={attempt.passed ? "success" : "danger"} className="attempt-detail-result">{attempt.passed ? "Passed" : "Failed"}</StatusBadge>
         </div>
 
         <div className="metric-grid metric-grid--attempt">
@@ -73,13 +60,13 @@ export default async function AttemptPage({ params }) {
           </div>
           <div className="tp-card metric-card">
             <div className="tp-label">Questions correct</div>
-            <div className="tp-mono metric-value">{correctCount}/{questions.length}</div>
-            <small>{questions.length ? Math.round((correctCount / questions.length) * 100) : 0}% accuracy</small>
+            <div className="tp-mono metric-value">{correctCount}/{total}</div>
+            <small>{total ? Math.round((correctCount / total) * 100) : 0}% accuracy</small>
           </div>
-          <div className={`tp-card metric-card mandatory-metric ${mandatoryMet ? "is-met" : "is-unmet"}`}>
+          <div className={`tp-card metric-card mandatory-metric ${mandatoryPassed ? "is-met" : "is-unmet"}`}>
             <div className="tp-label">Mandatory requirement</div>
-            <div className="tp-mono metric-value">{mandatoryQuestions.length ? `${mandatoryCorrect}/${mandatoryQuestions.length}` : "—"}</div>
-            <small>{mandatoryQuestions.length ? (mandatoryMet ? "All mandatory questions correct" : "Requirement not met") : "No mandatory questions asked"}</small>
+            <div className="tp-mono metric-value">{mandatoryCount ? `${mandatoryCorrectCount}/${mandatoryCount}` : "—"}</div>
+            <small>{mandatoryCount ? (mandatoryPassed ? "All mandatory questions correct" : "Requirement not met") : "No mandatory questions asked"}</small>
           </div>
         </div>
 
@@ -92,7 +79,7 @@ export default async function AttemptPage({ params }) {
             <span>Groups can overlap</span>
           </div>
           <div className="tp-card question-performance-card">
-            <QuestionPerformance groups={questionPerformance} />
+            <QuestionPerformance groups={calculateQuestionPerformance(questions)} />
           </div>
         </section>
 
@@ -100,7 +87,7 @@ export default async function AttemptPage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Questions asked</div>
-              <span>{questions.length} {questions.length === 1 ? "question" : "questions"} in this attempt</span>
+              <span>{total} {total === 1 ? "question" : "questions"} in this attempt</span>
             </div>
           </div>
           <div className="attempt-question-list">
@@ -112,9 +99,7 @@ export default async function AttemptPage({ params }) {
                     <div className="attempt-question__badges">
                       {question.is_mandatory && <span className="tp-badge question-mandatory-badge">Mandatory</span>}
                       {question.image_url && <span className="tp-badge">Image-based</span>}
-                      <span className="tp-badge" style={{ background: question.is_correct ? "var(--success-dim)" : "var(--danger-dim)", color: question.is_correct ? "var(--success)" : "var(--danger)" }}>
-                        {question.is_correct ? "Correct" : "Incorrect"}
-                      </span>
+                      <StatusBadge tone={question.is_correct ? "success" : "danger"}>{question.is_correct ? "Correct" : "Incorrect"}</StatusBadge>
                     </div>
                     <h2>{question.question_text}</h2>
                   </div>

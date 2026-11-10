@@ -2,29 +2,20 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ROLES, ROLE_LABELS } from "@/lib/roles.mjs";
+import LocalDate from "@/components/LocalDate";
+import PersonIdentity from "@/components/PersonIdentity";
+import SearchField from "@/components/SearchField";
+import { ATTENTION_LABELS, ATTENTION_STATUSES } from "@/lib/attempt-stats";
+import { byName } from "@/lib/people";
+import { ROLES, ROLE_LABELS } from "@/lib/roles";
+import { routes } from "@/lib/routes";
 
-const STATUS_LABELS = {
-  "on-track": "On track",
-  "needs-attention": "Needs attention",
-  "not-started": "Not started",
+const SORTS = {
+  attention: (a, b) => ATTENTION_STATUSES.indexOf(a.attentionStatus) - ATTENTION_STATUSES.indexOf(b.attentionStatus) || byName(a, b),
+  name: byName,
+  recent: (a, b) => (Date.parse(b.lastActiveAt || 0) || 0) - (Date.parse(a.lastActiveAt || 0) || 0),
+  score: (a, b) => (b.averageScore ?? -1) - (a.averageScore ?? -1),
 };
-
-const STATUS_ORDER = {
-  "needs-attention": 0,
-  "not-started": 1,
-  "on-track": 2,
-};
-
-function formatDate(value) {
-  if (!value) return "No activity";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
-}
 
 export default function PeopleDirectoryClient({ people, initialStatus = "all" }) {
   const [query, setQuery] = useState("");
@@ -43,15 +34,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
           && (role === "all" || person.role === role)
           && (status === "all" || person.attentionStatus === status);
       })
-      .sort((a, b) => {
-        if (sort === "name") return a.full_name.localeCompare(b.full_name);
-        if (sort === "recent") {
-          return (Date.parse(b.lastActiveAt || 0) || 0) - (Date.parse(a.lastActiveAt || 0) || 0);
-        }
-        if (sort === "score") return (b.averageScore ?? -1) - (a.averageScore ?? -1);
-        return STATUS_ORDER[a.attentionStatus] - STATUS_ORDER[b.attentionStatus]
-          || a.full_name.localeCompare(b.full_name);
-      });
+      .sort(SORTS[sort]);
   }, [people, query, role, status, sort]);
 
   const attentionCount = people.filter((person) => person.attentionStatus === "needs-attention").length;
@@ -80,17 +63,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
       </div>
 
       <section className="tp-card directory-toolbar" aria-label="Directory filters">
-        <label className="directory-search">
-          <span className="tp-sr-only">Search people</span>
-          <span className="directory-search__icon" aria-hidden="true">⌕</span>
-          <input
-            className="tp-input"
-            type="search"
-            placeholder="Search by name or email…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+        <SearchField value={query} onChange={setQuery} />
         <label>
           <span className="tp-sr-only">Filter by role</span>
           <select className="tp-input" value={role} onChange={(event) => setRole(event.target.value)}>
@@ -102,9 +75,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
           <span className="tp-sr-only">Filter by training status</span>
           <select className="tp-input" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="all">All statuses</option>
-            <option value="needs-attention">Needs attention</option>
-            <option value="not-started">Not started</option>
-            <option value="on-track">On track</option>
+            {ATTENTION_STATUSES.map((value) => <option key={value} value={value}>{ATTENTION_LABELS[value]}</option>)}
           </select>
         </label>
         <label>
@@ -129,20 +100,16 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
         <div className="tp-scroll people-table__body">
           {filteredPeople.map((person) => (
             <article className="people-table__row" key={person.id}>
-              <div className="people-identity">
-                <span className="people-avatar" aria-hidden="true">{person.full_name?.trim()?.charAt(0)?.toUpperCase() || "U"}</span>
-                <span>
-                  <Link className="profile-link" href={`/profile/${person.id}`}>{person.full_name}</Link>
-                  <small>{person.attemptCount === 0 ? "No completed training" : `${person.attemptCount} completed ${person.attemptCount === 1 ? "attempt" : "attempts"}`}</small>
-                </span>
-              </div>
+              <PersonIdentity person={person}>
+                {person.attemptCount === 0 ? "No completed training" : `${person.attemptCount} completed ${person.attemptCount === 1 ? "attempt" : "attempts"}`}
+              </PersonIdentity>
               <div><span className={`tp-badge role-badge role-badge--${person.role}`}>{ROLE_LABELS[person.role] || person.role}</span></div>
               <div>
                 <span
                   className={`training-status training-status--${person.attentionStatus}`}
                   title={person.attentionStatus === "not-started" ? "No completed attempts" : "Based on the latest completed attempt"}
                 >
-                  <span aria-hidden="true"></span>{STATUS_LABELS[person.attentionStatus]}
+                  <span aria-hidden="true"></span>{ATTENTION_LABELS[person.attentionStatus]}
                 </span>
               </div>
               <div className="tp-mono">{person.attemptCount}</div>
@@ -150,8 +117,8 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
                 <span className="tp-mono">{person.averageScore === null ? "—" : `${person.averageScore}%`}</span>
                 {person.passRate !== null && <small>{person.passRate}% pass</small>}
               </div>
-              <div className="people-last-active">{formatDate(person.lastActiveAt)}</div>
-              <div><Link href={`/profile/${person.id}`} className="tp-btn tp-btn-ghost people-view-link">View</Link></div>
+              <div className="people-last-active">{person.lastActiveAt ? <LocalDate value={person.lastActiveAt} /> : "No activity"}</div>
+              <div><Link href={routes.profile(person.id)} className="tp-btn tp-btn-ghost people-view-link">View</Link></div>
             </article>
           ))}
           {filteredPeople.length === 0 && (

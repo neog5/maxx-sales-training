@@ -1,0 +1,71 @@
+/* Admin pages. */
+
+/* Admin tabs */
+.admin-tabs__tab { color: var(--faint); text-decoration: none; }
+
+/* Form labels and checkbox rows */
+.form-label { margin-bottom: 6px; }
+.form-section-label { margin-bottom: 14px; }
+.form-section-label--tight { margin-bottom: 4px; }
+.form-hint { margin-top: 6px; color: var(--faint); font-size: 11.5px; }
+.form-error { margin-top: 6px; color: var(--danger); font-size: 12px; }
+.form-file-list { margin: 8px 0 0; padding-left: 18px; color: var(--dim); font-size: 12px; }
+.check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
+.check-row--last { margin-bottom: 18px; }
+.form-notice { margin: 12px 0 0; }
+
+/* Insights */
+.metric-value--accent { color: var(--accent); }
+.attempt-table { overflow: hidden; }
+.attempt-table__body { max-height: 440px; overflow-y: auto; }
+.attempt-table__course { color: var(--dim); }
+.attempt-table__date { color: var(--faint); font-size: 12px; }
+
+/* Training groups */
+.groups-list__empty { padding: 14px; }
+
+/* Course reading decks */
+.course-decks { margin-top: 18px; }
+.course-decks__list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.course-decks__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto auto auto auto; gap: 8px; align-items: center; }
+.course-decks__number { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: var(--accent-dim); color: var(--accent); font: 600 11.5px/1 'JetBrains Mono', monospace; }
+.course-decks__meta { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.course-decks__upload { cursor: pointer; }
+@media (max-width: 700px) {
+  .course-decks__row { grid-template-columns: 28px minmax(0, 1fr) auto auto auto; }
+  .course-decks__meta, .course-decks__row a { display: none; }
+}
+
+/* Question bank */
+.question-editor__row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.question-editor__row--single { grid-template-columns: 1fr; }
+.question-editor__row--deck { grid-template-columns: 2fr 1fr; }
+.question-editor__field { margin-bottom: 12px; }
+.question-editor__field--last { margin-bottom: 16px; }
+.question-editor__image-hint { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; color: var(--faint); font-size: 11.5px; }
+.question-editor__options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.question-editor__option { display: flex; align-items: center; gap: 8px; }
+.question-editor__add-option { margin-bottom: 12px; }
+.question-editor__actions { display: flex; gap: 8px; }
+.correct-toggle { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--border); border-radius: 50%; background: transparent; cursor: pointer; }
+.correct-toggle.is-correct { border-color: var(--accent); }
+.correct-toggle.is-correct::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.tp-btn.tp-btn--compact { padding: 6px 10px; }
+.tp-btn.tp-btn--small { padding: 6px 12px; }
+.question-item__body { flex: 1; }
+.question-item__badges { display: flex; gap: 8px; margin-bottom: 6px; }
+.question-item__text { font-size: 13.5px; }
+.question-item__actions { display: flex; flex-shrink: 0; gap: 6px; }
+.question-list__empty { padding: 20px; color: var(--faint); font-size: 13px; }
+@media (max-width: 760px) {
+  .question-item__actions { width: 100%; }
+  .question-item__actions .tp-btn { flex: 1; }
+}
+
+/* Dial (components/Dial.jsx; size-dependent values stay inline) */
+.dial { position: relative; }
+.dial__svg { position: absolute; inset: 0; }
+.dial__progress { transition: stroke-dashoffset .4s ease; }
+.dial__label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.dial__value { font-weight: 600; color: var(--text); }
+.dial__sub { margin-top: 2px; color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }

@@ -1,0 +1,132 @@
+/* Learner pages: courses, reading, assessment, certificates, profile. */
+
+/* Sign in */
+.login-fields { display: flex; flex-direction: column; gap: 12px; }
+.login-field .tp-label { display: block; margin-bottom: 6px; }
+.login-notice { margin-bottom: 0; }
+.login-switch { margin-top: 16px; color: var(--faint); font-size: 12.5px; text-align: center; }
+
+/* Course list */
+.section-heading--spaced { margin-top: 40px; }
+.courses-empty { padding: 24px; color: var(--faint); font-size: 13.5px; }
+.courses-empty--spaced { margin-top: 16px; }
+.course-card__error { margin: 10px 0 0; }
+
+/* Assessment */
+.assessment-locked { padding-top: 60px; text-align: center; }
+.assessment-locked__title { margin: 20px 0 6px; font-size: 18px; font-weight: 700; }
+.assessment-locked__copy { max-width: 420px; margin: 0 auto 20px; color: var(--faint); font-size: 13px; }
+.assessment-submit__error { margin: 20px 0 0; }
+.assessment-submit__button { padding: 12px 26px; }
+.assessment-results-title { margin: 6px 0 24px; font-size: 24px; font-weight: 700; }
+.assessment-result-card__actions { margin-top: 14px; }
+.assessment-result-card__actions .tp-btn { text-decoration: none; }
+.assessment-result-card__attempts { margin-bottom: 8px; }
+.assessment-review-label { margin-bottom: 10px; }
+.assessment-review-list { display: flex; flex-direction: column; gap: 12px; }
+.assessment-review-card__row { display: flex; gap: 10px; }
+.assessment-review-card__number { color: var(--faint); font-size: 12px; }
+.assessment-review-card__body { flex: 1; }
+.assessment-review-card__question { margin-bottom: 8px; font-size: 13.5px; }
+.assessment-review-card__explanation { padding: 8px 10px; border-radius: 7px; background: var(--surface2); color: var(--faint); font-size: 12.5px; line-height: 1.5; }
+.assessment-back { margin-top: 24px; }
+
+/* Reading: layout, deck tabs and checkpoint panel */
+.reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.reading-question-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 12px; }
+.reading-question-card { padding: 20px; min-height: 190px; border-radius: 15px; }
+.reader-heading__hint { color: var(--faint); font-size: 12px; text-align: right; }
+.reader-frame { padding: 0; overflow: hidden; }
+.deck-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; }
+.deck-tab { min-width: 0; max-width: 240px; display: flex; align-items: center; gap: 8px; padding: 7px 12px 7px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--dim); font-size: 12.5px; cursor: pointer; flex: 0 0 auto; }
+.deck-tab:disabled { cursor: not-allowed; opacity: .55; }
+.deck-tab.is-active { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent) inset; }
+.deck-tab__number { width: 22px; height: 22px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 6px; background: var(--accent-dim); color: var(--accent); font: 600 11px/1 'JetBrains Mono', monospace; }
+.deck-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-next { display: flex; justify-content: flex-end; margin-top: 10px; }
+.checkpoint-count { margin-bottom: 12px; color: var(--faint); font-size: 12px; }
+.checkpoint-badge { margin-bottom: 12px; }
+.checkpoint-question { margin-bottom: 16px; font-size: 14.5px; line-height: 1.5; }
+.checkpoint-options { display: flex; flex-direction: column; gap: 8px; }
+.checkpoint-option { text-align: left; }
+.checkpoint-option__text { font-size: 13.5px; }
+.checkpoint-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.checkpoint-idle__label { margin-bottom: 8px; }
+.checkpoint-idle__copy { color: var(--dim); font-size: 13px; line-height: 1.55; }
+.checkpoint-skeleton__count { width: 72%; height: 12px; margin-bottom: 24px; }
+.checkpoint-skeleton__badge { width: 106px; height: 21px; margin-bottom: 14px; border-radius: 999px; }
+.checkpoint-skeleton__question { width: 95%; height: 42px; margin-bottom: 16px; }
+.checkpoint-skeleton__option { width: 100%; height: 43px; margin-bottom: 8px; }
+@media (max-width: 1100px) {
+  .reading-workspace { grid-template-columns: 1fr; }
+  .reading-question-panel { position: static; }
+}
+
+/* PDF reader */
+.pdf-viewer-shell { overflow: hidden; background: #dfe5ec; color: #fff; }
+.pdf-toolbar { min-height: 62px; padding: 10px 12px 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid rgba(255,255,255,.08); background: var(--surface-dark); }
+.pdf-document-meta { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.pdf-document-icon { width: 34px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.2); border-radius: 7px; background: rgba(255,255,255,.09); color: #f4b46f; font: 700 9px/1 'JetBrains Mono', monospace; letter-spacing: .08em; }
+.pdf-document-copy { min-width: 0; display: flex; flex-direction: column; }
+.pdf-document-copy strong { max-width: 260px; overflow: hidden; color: #fff; font-size: 12.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-document-copy span { margin-top: 2px; color: #aebed0; font-size: 10.5px; }
+.pdf-toolbar-actions, .pdf-control-group { display: flex; align-items: center; }
+.pdf-toolbar-actions { gap: 8px; }
+.pdf-control-group { overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.06); }
+.pdf-toolbar-button { width: 31px; height: 30px; padding: 0; display: grid; place-items: center; border: 0; border-right: 1px solid rgba(255,255,255,.12); background: transparent; color: #edf3f8; cursor: pointer; font-size: 18px; line-height: 1; transition: background .15s, color .15s; }
+.pdf-toolbar-button:last-child { border-right: 0; }
+.pdf-toolbar-button:hover:not(:disabled) { background: rgba(255,255,255,.12); color: #fff; }
+.pdf-toolbar-button:disabled { color: rgba(255,255,255,.28); cursor: not-allowed; }
+.pdf-zoom-value { width: 52px; font: 600 10.5px/1 'JetBrains Mono', monospace; }
+.pdf-page-counter { min-width: 54px; height: 30px; padding: 0 7px; display: flex; align-items: center; justify-content: center; gap: 5px; border-right: 1px solid rgba(255,255,255,.12); color: #aebed0; font: 500 10.5px/1 'JetBrains Mono', monospace; }
+.pdf-page-counter b { color: #fff; font-weight: 600; }
+.pdf-toolbar-divider { width: 1px; height: 22px; margin: 0 1px; background: rgba(255,255,255,.13); }
+.pdf-open-link { height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; color: #dce7f1; font-size: 10.5px; font-weight: 650; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s; }
+.pdf-open-link:hover { border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; }
+.pdf-progress-track { height: 3px; background: #1B3A62; }
+.pdf-progress-track span { height: 100%; display: block; background: var(--accent); transition: width .2s ease; }
+.pdf-scroll-region { height: min(82vh, 960px); min-height: 640px; overflow: auto; overscroll-behavior: contain; scrollbar-color: #8e9bab transparent; scrollbar-width: thin; background-color: #dfe5ec; background-image: radial-gradient(rgba(17,35,69,.11) .7px, transparent .7px), linear-gradient(180deg, rgba(255,255,255,.42), transparent 150px); background-size: 16px 16px, 100% 100%; }
+.pdf-scroll-region::-webkit-scrollbar { width: 10px; height: 10px; }
+.pdf-scroll-region::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; background: #8e9bab; background-clip: padding-box; }
+.pdf-scroll-region.is-pannable { cursor: grab; }
+.pdf-scroll-region.is-panning { cursor: grabbing; user-select: none; }
+.pdf-pages { width: max-content; min-width: 100%; padding: 24px 28px 34px; box-sizing: border-box; display: none; flex-direction: column; align-items: center; gap: 24px; }
+.pdf-pages.is-ready { display: flex; }
+.pdf-page { position: relative; overflow: hidden; flex: 0 0 auto; border-radius: 3px; background: var(--card); box-shadow: 0 2px 3px rgba(26,39,55,.12), 0 16px 34px rgba(26,39,55,.2); line-height: 0; }
+.pdf-page canvas { display: block; }
+.pdf-page-label { position: absolute; right: 10px; bottom: 10px; min-width: 24px; height: 24px; padding: 0 7px; display: grid; place-items: center; border-radius: 999px; background: rgba(17,35,69,.78); color: #fff; font: 600 9.5px/1 'JetBrains Mono', monospace; box-shadow: 0 2px 7px rgba(0,0,0,.16); opacity: 0; transition: opacity .15s; }
+.pdf-page:hover .pdf-page-label { opacity: 1; }
+.pdf-loading-skeleton { min-height: 100%; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+.pdf-loading-copy { height: 34px; margin-bottom: 12px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: rgba(255,255,255,.82); color: #48617e; box-shadow: 0 5px 16px rgba(17,35,69,.1); font-size: 11px; font-weight: 600; }
+.pdf-loading-spinner { width: 13px; height: 13px; border: 2px solid #cbd5e1; border-top-color: var(--accent); border-radius: 50%; animation: pdfSpin .75s linear infinite; }
+.pdf-loading-page { width: min(82%, 650px); height: min(70vh, 820px); min-height: 540px; border-radius: 3px; background: #f7f8fa; box-shadow: 0 16px 34px rgba(26,39,55,.14); }
+.pdf-empty-state, .pdf-error-state { min-height: 500px; padding: 42px; display: flex; align-items: center; justify-content: center; flex-direction: column; background: linear-gradient(180deg, #edf2f6, #e4eaf0); color: var(--text); text-align: center; }
+.pdf-empty-state span, .pdf-error-state span { max-width: 440px; margin-top: 5px; color: #687a90; font-size: 12px; line-height: 1.5; }
+.pdf-state-icon { width: 46px; height: 46px; margin-bottom: 13px; display: grid; place-items: center; border: 1px solid #cbd5e1; border-radius: 13px; background: var(--card); color: var(--accent); box-shadow: 0 7px 18px rgba(17,35,69,.09); font: 700 18px/1 'JetBrains Mono', monospace; }
+.pdf-retry-button { margin-top: 16px; padding: 8px 14px; border: 0; border-radius: 7px; background: var(--surface-dark); color: #fff; cursor: pointer; font-size: 11.5px; font-weight: 650; }
+@keyframes pdfSpin { to { transform: rotate(360deg); } }
+@media (max-width: 1100px) {
+  .pdf-toolbar { align-items: stretch; flex-direction: column; }
+  .pdf-document-meta { padding: 0 2px; }
+  .pdf-document-copy strong { max-width: calc(100vw - 130px); }
+  .pdf-toolbar-actions { justify-content: space-between; }
+  .pdf-toolbar-divider { display: none; }
+  .pdf-open-link { margin-left: auto; }
+}
+@media (max-width: 680px) {
+  .pdf-scroll-region { min-height: 520px; height: 72vh; }
+  .pdf-pages { padding: 14px 12px 28px; gap: 14px; }
+}
+@media (max-width: 430px) {
+  .pdf-open-link { width: 32px; padding: 0; justify-content: center; font-size: 0; }
+  .pdf-open-link span { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pdf-progress-track span, .pdf-page-label { transition: none; }
+  .pdf-loading-spinner { animation-duration: 1.5s; }
+}
+
+/* Profile */
+.profile-history__scroll { max-height: 520px; overflow-y: auto; }
+.course-admin__subhead--first { margin-top: 0; }
+.required-training__error, .locked-assessments__notice { margin: 12px 0 0; }
