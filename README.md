@@ -1,241 +1,52 @@
 # Maxx Orthopedics Rep Training Portal
 
-A Next.js 16 App Router application backed by Supabase. Learners read course PDFs, complete page-based reading checkpoints, take randomized quizzes, and review their results. Admins create courses, upload PDFs, manage question banks, group people, assign courses, and track compliance.
+Online training for Maxx Orthopedics sales reps and distributors. Learners read course PDFs with reading questions along the way, take randomized assessments, and earn certificates. Admins build courses (with AI-suggested questions), assign them to training groups or people, and track who is compliant.
 
-## Prerequisites
+Built with Next.js 16 (App Router) and Supabase, hosted on Cloudflare Workers.
 
-- Node.js 20.9 or newer
-- npm
-- A Supabase project
-- An OpenRouter API key (for AI-generated question recommendations)
+| Environment | URL | Branch |
+|---|---|---|
+| dev | https://training-dev.maxxorthoportal.com | `dev` |
+| production | https://training.maxxorthoportal.com (not launched yet) | `main` |
 
-## Local setup
-
-1. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-2. In a new Supabase project's SQL editor, run these files in order:
-
-   - `supabase/setup.sql` - tables, constraints, indexes, row-level security, database functions, signup trigger, and storage buckets
-   - `supabase/requested-changes.sql` - question images, mandatory questions and attempt reporting
-   - `supabase/migrations/001_compliance_safety.sql` - roles, course archiving, the audit log and record protection
-   - `supabase/migrations/002_groups_and_assignments.sql` - groups and course assignments
-   - `supabase/migrations/003_view_groups.sql` - private watchlists (`view_groups`), profile emails and manager scoping
-   - `supabase/migrations/004_certificates.sql` - course completion certificates
-   - `supabase/migrations/005_certificate_expiry.sql` - certificates valid for 2 years
-   - `supabase/migrations/006_course_materials.sql` - multi-deck courses (several PDFs per course, read in order)
-   - `supabase/migrations/007_attempt_limit.sql` - three failed attempts per course, then an admin approves more
-   - `supabase/migrations/008_view_only_courses.sql` - reading-only courses (no test; finishing the reading issues the certificate)
-   - `supabase/migrations/009_admin_email_alerts.sql` - emails admins about new sign-ups and people who run out of test attempts (see [Admin email alerts](#admin-email-alerts))
-   - `supabase/seed.sql` - one fictional sample course with reading and quiz questions
-
-3. Copy the environment template and add the public credentials from the Supabase project's API settings:
-
-   ```bash
-   cp .env.local.example .env.local
-   ```
-
-   ```dotenv
-   NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   OPENROUTER_API_KEY=your-openrouter-api-key
-   ```
-
-   The two `NEXT_PUBLIC_*` values are intentionally exposed to the browser. `OPENROUTER_API_KEY` is server-only and must never use the `NEXT_PUBLIC_` prefix. Security depends on Supabase Row Level Security; never put a service-role key or another private credential in a `NEXT_PUBLIC_*` variable.
-
-   Question generation passes the course PDF to OpenRouter by its public Supabase URL (OpenRouter fetches the file itself), so models can consider diagrams and other page imagery as well as text without the server buffering the PDF. It defaults to the zero-usage-cost `nvidia/nemotron-3-ultra-550b-a55b:free` model and OpenRouter’s free `cloudflare-ai` PDF parser. Pinning this model provides enough output capacity for complete question sets and avoids random free-router choices with small output limits. Free models still have lower rate limits and variable availability. Override `OPENROUTER_MODEL` for a more consistent paid model, or set `OPENROUTER_PDF_ENGINE=mistral-ocr` for stronger paid OCR of scanned documents.
-
-4. Start the app:
-
-   ```bash
-   npm run dev
-   ```
-
-   Open [http://localhost:3000](http://localhost:3000). The included `public/sample-course.pdf` is referenced by the sample course and requires no storage upload.
-
-## Roles and the first super admin
-
-Roles control what someone can do; every role can also be assigned courses.
-
-| Role | Can |
-|---|---|
-| `learner` | Take their courses and see their own results (default for new sign-ups) |
-| `manager` | Everything a learner can, plus read-only Dashboard, People, Insights and profiles, and their own private watchlists |
-| `admin` | Everything a manager can, plus courses, question banks, groups, assignments, roles and archiving |
-| `super_admin` | Everything an admin can, plus deleting courses that have no training records and granting super admin |
-
-Sign up through the app, then make the first super admin in the Supabase SQL Editor (direct database sessions are allowed to change roles):
-
-```sql
-update public.profiles set role = 'super_admin'
-where id = (select id from auth.users where email = 'you@maxxortho.com');
-```
-
-After that, manage roles from each person's profile page.
-
-## Groups, assignments and compliance
-
-- **Training groups** (Admin → Training groups) hold people, such as Titan Distributors, Normal Distributors or a manager's team. A person can be in several groups.
-- **Assignments** make a course required: assign it to a training group (everyone in it) on the training group or course page, or to one person from the course page or their profile.
-- **Compliance**: a person is compliant when they have passed every course assigned to them or their groups. Archived and hidden courses no longer count. The Dashboard filters by group and status and exports CSV.
-- Courses that aren't assigned to someone still appear under "Other available courses" for them.
-- **Watchlists** (the ☆ row on the Dashboard) are private lists that managers, admins and super admins make to watch a team's compliance, such as "My team". Only the creator can see a watchlist, and watchlists never change what anyone has to complete. Managers can't see training groups; they get accurate compliance through the `required_courses()` database function, which expands group assignments without revealing them.
-- People pickers search by name or email, can select every match at once, and accept a pasted list of email addresses.
-
-## Course completion certificates
-
-- The first time someone passes a course, the database issues a certificate with a number such as `MXO-2026-000001` and keeps a copy of their name, the course title and the completion date. Certificates are valid for 2 years; the expiry date is shown but doesn't affect compliance yet. Retakes don't issue another one, and renaming or archiving the course later doesn't change it. Nobody can edit or delete certificates from the app.
-- People open their certificates from the quiz results, their course cards and their profile; managers and admins also see them on each person's profile. The certificate page previews it and offers **Download PDF**; the PDF is made in the browser from the template.
-- **Changing the template:** design it in Canva (one template for every course) with the name, course and date areas left blank, then Download → **PDF Print** and save it as `public/certificates/template.pdf`. Then adjust the text positions, sizes, fonts and colours in `CERTIFICATE_TEMPLATE` in `lib/certificates.mjs` until the text sits in the right place. Fonts can be any `.ttf` file in `public/certificates/fonts/` (currently Archivo Black for the name, Alice for the course and Montserrat for the date, all free Google Fonts with their licences beside them) or a built-in PDF font.
-
-## Archiving, deleting and the audit log
-
-Courses are compliance records, so the database protects them:
-
-- **Archive** (admins): hides the course from learners and stops new attempts, but keeps every reading session, attempt and answer. The server stamps who archived it and when. Restoring undoes it.
-- **Delete** (super admins only): allowed only for courses with no reading sessions or attempts. Foreign keys use `ON DELETE RESTRICT`, so the database refuses to delete courses or people that have training records.
-- **Audit log**: triggers record course, group, membership, assignment and role changes in `audit_log` with who and when. The table is append-only, and only admins can read it. Each course page shows its history.
-
-If the database already exists, run `supabase/requested-changes.sql` and then the files in `supabase/migrations/` (in number order) in the Supabase SQL Editor. Each migration has a matching `.undo.sql` file. `requested-changes.sql` is safe to rerun even if you ran an earlier version of that script. It safely adds question images, mandatory assessment questions, and the attempt-question metadata used by performance reporting. Do not rerun `setup.sql` against an existing database.
-
-If email confirmation is enabled in Supabase Auth, confirm the new account before signing in. For a frictionless local demo, adjust that setting in the Supabase dashboard.
-
-## Admin email alerts
-
-Every admin and super admin gets an email when someone signs up, and when someone fails a course test for the third time (they then need an admin to approve more attempts on their profile). The database sends these itself through [Resend](https://resend.com), using triggers and the `pg_net` extension (migration 009), so they go out whatever happens in the browser. If sending fails, the sign-up or attempt still saves.
-
-Setup, once per Supabase project:
-
-1. In Resend, verify the sending domain (e.g. `maxxorthoportal.com`) and create an API key with sending access.
-2. In the Supabase SQL Editor, store the settings in Vault:
-
-   ```sql
-   select vault.create_secret('re_your_api_key', 'resend_api_key');
-   select vault.create_secret('Maxx Training <alerts@maxxorthoportal.com>', 'alert_from_email');
-   select vault.create_secret('https://training.maxxorthoportal.com', 'portal_url');  -- for the profile link
-   select vault.create_secret('[DEV] ', 'alert_subject_prefix');                      -- dev project only
-   ```
-
-   To change one later, use `vault.update_secret` or Project Settings → Vault.
-
-No emails are sent until `resend_api_key` is set. To check whether Resend accepted recent emails: `select status_code, content from net._http_response order by created desc limit 10;` (kept for about 6 hours).
-
-## Deploying to Cloudflare Workers
-
-The app deploys to Cloudflare Workers with the [OpenNext Cloudflare adapter](https://opennext.js.org/cloudflare). Config lives in `wrangler.jsonc` and `open-next.config.ts`.
-
-There are two Workers, defined as environments in `wrangler.jsonc`, each with its own Supabase project:
-
-| Environment | Worker | Domain | Git branch | Supabase |
-|---|---|---|---|---|
-| dev | `maxx-sales-training-dev` | training-dev.maxxorthoportal.com | `dev` | current project |
-| production | `maxx-sales-training` | training.maxxorthoportal.com | `main` | business-account project (not created yet) |
+## Quick start
 
 ```bash
-npm run preview     # build and run in the local Workers runtime (needs .env.local)
-npm run deploy:dev  # build and deploy the dev Worker (needs `npx wrangler login`)
-npm run deploy      # build and deploy the production Worker
+npm install
+cp .env.local.example .env.local   # add your Supabase URL and anon key
+npm run dev
 ```
 
-Build variables per Worker (Settings → Build → Variables and secrets): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and on every non-production Worker `NEXT_PUBLIC_APP_ENV=dev`. Runtime secret (Settings → Variables and Secrets, outside Build): `OPENROUTER_API_KEY`.
+You'll need a Supabase project with the schema built first. See [Local setup](docs/developer/setup.md).
 
-**Environment banner:** when `NEXT_PUBLIC_APP_ENV` is set to anything other than `production`, every page shows a red "DEV environment" strip, the browser tab title is prefixed with `[DEV]`, and search engines are told not to index the site (`components/EnvironmentBanner.jsx`). The production Worker must leave `NEXT_PUBLIC_APP_ENV` unset (or set it to `production`). It is a build variable, so changing it requires a rebuild.
+## Documentation
 
-In Cloudflare Workers Builds, use build command `npx opennextjs-cloudflare build` and deploy command `npx opennextjs-cloudflare deploy --env dev` for the dev Worker, or `npx opennextjs-cloudflare deploy` for production. The custom domains in `wrangler.jsonc` are created on deploy, so the `maxxorthoportal.com` zone must be in the same Cloudflare account as the Workers.
+All docs are in [docs/](docs/README.md):
 
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are inlined at build time, so in Cloudflare Workers Builds set them as **build variables** as well as runtime variables.
-- `OPENROUTER_API_KEY` (and optional `OPENROUTER_MODEL` / `OPENROUTER_PDF_ENGINE`) are runtime-only: add them as Worker secrets/variables.
-- Keep `next` within the range supported by `@opennextjs/cloudflare`; Next 16.4 is not yet supported by adapter 1.20.10.
-- OpenNext is not fully supported on Windows; prefer WSL, or let Cloudflare build from GitHub.
-- **Worker size:** the Workers Free plan limits the compressed Worker to 3 MB (Paid: 10 MB). The build is currently about 1.75 MB. Check it with `npx wrangler deploy --dry-run` ("gzip" figure) after adding dependencies.
-- **Route protection uses `middleware.js`, not `proxy.js`.** Next 16 renamed middleware to `proxy`, but `proxy.js` always runs on the Node.js runtime, which OpenNext supports only experimentally and which bundles a second copy of the Next.js server (about +1.2 MB compressed, over the Free plan limit). The Edge `middleware.js` is officially supported and much smaller. Next prints a deprecation warning for it during builds; do not run the `middleware-to-proxy` codemod while deploying to Cloudflare.
-- **Workers Free plan CPU limit:** 10 ms of CPU time per request (time spent waiting on Supabase/OpenRouter does not count). Requests that exceed it fail with error 1102; if that appears in logs, move to the Workers Paid plan.
-- **Course PDF size:** with the default free `cloudflare-ai` PDF engine, AI question suggestions only work for PDFs of **5 MiB (5,242,880 bytes) or less**. OpenRouter rejects larger files with "The file exceeds the maximum size supported by the file parser" (or "Download exceeded 5242880 byte limit" when sent by URL). Compress larger PDFs before uploading (a lossless re-save often saves 10%; image downsampling saves far more), or set `OPENROUTER_PDF_ENGINE=mistral-ocr` (paid). Uploads themselves are capped at 50 MB by the storage bucket, and the course reader works at any size. The Worker no longer downloads PDFs (OpenRouter fetches the public URL), so the 128 MB Worker memory limit no longer applies. If the route is ever changed back to downloading or base64-encoding PDFs, PDFs over about 20 MB can exhaust Worker memory.
-- **Private PDFs:** the URL approach requires the `course-pdfs` bucket to stay public. If it becomes private, pass a short-lived signed URL to OpenRouter instead.
+- **Using the portal:** [learners](docs/user-guide/learners.md), [managers](docs/user-guide/managers.md), [admins](docs/user-guide/admins.md)
+- **Developing it:**
+  - [setup](docs/developer/setup.md)
+  - [architecture](docs/developer/architecture.md)
+  - [data model](docs/developer/data-model.md)
+  - [features](docs/developer/features.md)
+  - [security](docs/developer/security.md)
+  - [deployment](docs/developer/deployment.md)
+  - [operations](docs/developer/operations.md)
+  - [testing](docs/TESTING.md)
 
-## Production launch checklist
-
-Not done yet. When moving to training.maxxorthoportal.com:
-
-1. Create the production Supabase project on the business account, run `supabase/setup.sql` (and any later migration files), and set its Authentication → URL Configuration Site URL to `https://training.maxxorthoportal.com`.
-2. Create a second Worker named exactly `maxx-sales-training` from this repo: Git branch `main`, build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`.
-3. Build variables: the production `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Do **not** set `NEXT_PUBLIC_APP_ENV` (no dev banner).
-4. Runtime secret (Settings → Variables and Secrets, not Build): `OPENROUTER_API_KEY`.
-   Also set up [admin email alerts](#admin-email-alerts) in the production Supabase project (Resend key and Vault settings, without the `[DEV]` prefix).
-5. Merge `dev` into `main`; the push builds and deploys production.
-6. **Restrict the dev site with Cloudflare Access** so employees cannot land on it by mistake (production users are also `@maxxortho.com`, so allow a named list of testers, not the whole domain):
-   - Zero Trust → Settings → Authentication: confirm the One-time PIN login method.
-   - Access → Access Groups → add `Training portal – dev testers`, Include → Emails → each tester.
-   - Access → Applications → Add → Self-hosted: domain `training-dev.maxxorthoportal.com` (empty path), session 24 hours, policy Allow → Include → Access Group `Training portal – dev testers`.
-   - Test in a private window with an allowed and a non-allowed email. Make sure the application does not cover `training.maxxorthoportal.com`.
-   - `workers_dev` and `preview_urls` are already disabled in `wrangler.jsonc`, so Access cannot be bypassed via other URLs.
-
-## Useful commands
+## Commands
 
 ```bash
-npm run dev      # development server
-npm run test     # unit tests (question suggestions, grading, compliance, roles)
-npm run build    # production build
-npm run start    # serve a completed production build
-npm run check    # repository verification (tests and production build)
-npm run preview  # production build in the local Cloudflare Workers runtime
-npm run deploy   # deploy to Cloudflare Workers
+npm run dev         # development server
+npm run check       # lint, unit tests and production build
+npm run test:db     # database permission tests (needs SUPABASE_DB_URL)
+npm run deploy:dev  # deploy the dev Worker
 ```
 
-## Database files
+The full list is in [setup](docs/developer/setup.md#commands).
 
-- `supabase/setup.sql` initializes a fresh Supabase project.
-- `supabase/seed.sql` replaces only the `DEMO-101` sample course, so it can be rerun without deleting real courses or users.
-- `supabase/requested-changes.sql` upgrades an existing database with question media, mandatory-question assessment selection, and question-level attempt reporting.
-- `supabase/profile-role-policy.sql` upgrades older databases with administrator profile-editing access.
-- `supabase/migrations/NNN_*.sql` are numbered migrations for existing databases; run them in order. Each `NNN_*.undo.sql` reverses its migration.
+## Status
 
-The setup script is intended for a fresh project and is not a migration for an existing database. Future schema changes should use a migration workflow rather than rerunning it against production.
+Not launched yet. The database checks reading and grades assessments (migration 011), so learners can't change their own results. The remaining open points are in [Security](docs/developer/security.md); the steps to go live are in the [launch checklist](docs/developer/deployment.md#production-launch-checklist).
 
-## Application structure
-
-```text
-app/
-  login/                  authentication
-  courses/                learner course list (required and optional)
-  courses/[id]/read/      PDF reader and page checkpoints
-  courses/[id]/quiz/      randomized quiz and results
-  certificates/[id]/      certificate preview and PDF download
-  admin/                  compliance dashboard
-  admin/people/           searchable team directory and performance overview
-  admin/training-groups/  training groups, members and group course assignments
-  admin/courses/          course list; [id]/ manages details, assignments, archive and delete; [id]/questions/ is the course's question bank; new/ creates a course
-  admin/insights/         assessment analytics and attempt log
-components/               shared UI components
-lib/supabase/             browser and server Supabase clients
-public/sample-course.pdf  fictional sample training document
-supabase/setup.sql        complete fresh-project database setup
-supabase/seed.sql         sample course and question bank
-supabase/requested-changes.sql  existing-project question upgrade
-supabase/migrations/      numbered migrations with undo scripts
-middleware.js             session refresh and route protection (Edge middleware; see Cloudflare notes)
-wrangler.jsonc            Cloudflare Worker configuration
-open-next.config.ts       OpenNext Cloudflare adapter configuration
-```
-
-## Prototype security and integrity limitations
-
-This code is suitable for demonstration and further development, but quiz outcomes should not yet be treated as trusted training or compliance records:
-
-- Grading and attempt creation happen in the browser, so an authenticated user can alter submitted results, and with them earn a certificate.
-- Quiz RPC responses include correct answers and explanations before submission.
-- Reading completion enforcement is client-side and can be bypassed. The three-attempt limit is enforced by the database (`attempts_remaining()` in migration 007).
-- The results screen may appear even if attempt persistence fails.
-- Public course PDFs and question images are readable by anyone with their URL. Use private buckets and signed URLs if course material is confidential.
-
-Move grading, attempt persistence, and reading-gate enforcement to trusted server-side code before production use.
-
-## Publishing checklist
-
-- Keep `.env.local` untracked and configure environment variables in the deployment platform.
-- Run `npm run check` before each release.
-- Review uploaded course materials for redistribution rights and confidential information.
-- Choose and add a `LICENSE` file if you intend to grant reuse rights. A public repository without a license does not grant general permission to copy or modify the code.
+No licence has been chosen. A public repository without a `LICENSE` file doesn't give anyone permission to copy or modify the code.

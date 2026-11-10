@@ -6,10 +6,10 @@ How the training portal is tested: what runs automatically, and the manual test 
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm test` | Logic tests: grading, compliance status, role permissions, question-suggestion validation, CSV export | Nothing |
-| `npm run test:db` | Database access rules, run as real signed-in learner / manager / admin / super admin users | `SUPABASE_DB_URL` in `.env.local` |
+| `npm test` | Logic tests: compliance status, attempt limit, role permissions, certificates, question-suggestion validation, CSV export | Nothing |
+| `npm run test:db` | Database access rules, reading checks and grading, run as real signed-in learner / manager / admin / super admin users | `SUPABASE_DB_URL` in `.env.local` |
 | `npm run build` | The app compiles | `.env.local` |
-| `npm run check` | `npm test` + `npm run build` | `.env.local` |
+| `npm run check` | `npm run lint` + `npm test` + `npm run build` | `.env.local` |
 
 `npm run test:db` creates its own test users and courses inside one database transaction and always rolls it back, so it leaves nothing behind. It covers:
 
@@ -22,6 +22,18 @@ How the training portal is tested: what runs automatically, and the manual test 
 - Training groups and assignments are admin-only; each assignment targets exactly one group or person; the actor is stamped.
 - Managers can't see training groups or how courses are assigned, but get accurate required courses through `required_courses()`.
 - Watchlists are private to their creator; nobody else, not even a super admin, can see or change them.
+- Reading checkpoints come without answers, are checked by the database, and keep the same set when the reading is reopened. The reading can't finish until every checkpoint is right and the minimum time has passed. Learners can't create, backdate or finish reading sessions themselves.
+- Assessments need a finished reading and come without answers. The database grades them: a wrong mandatory question fails, and every question needs a valid answer. Nobody can read an unsubmitted attempt's questions, edit an attempt, or submit someone else's. Passing issues the certificate, dated by the server.
+- The attempt limit: three failed attempts, then an admin approves more; passing resets it.
+- Reading-only courses issue one certificate, only after the reading time.
+
+To test a migration **before** it's on the database, apply it inside the test transaction; it's rolled back with everything else:
+
+```bash
+TEST_MIGRATIONS=supabase/migrations/011_server_side_grading.sql npm run test:db
+```
+
+This briefly locks the tables the migration changes, so the dev site may pause for the minute the tests take.
 
 ## Manual test cases
 
