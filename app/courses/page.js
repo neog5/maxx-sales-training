@@ -1,57 +1,59 @@
-import { createClient } from "@/lib/supabase/server";
 import TopNav from "@/components/TopNav";
+import { requireViewer } from "@/lib/auth";
+import { passedCoursesByUser } from "@/lib/compliance";
+import { must } from "@/lib/db";
+import { firstName } from "@/lib/people";
 import CourseCardClient from "./CourseCardClient";
 
+// Map<courseId, rows> for rows that carry a course_id.
+function groupByCourse(rows) {
+  const grouped = new Map();
+  for (const row of rows) grouped.set(row.course_id, [...(grouped.get(row.course_id) || []), row]);
+  return grouped;
+}
+
 export default async function CoursesPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: profile }, { data: courses }, { data: attempts }, { data: readingSessions }, { data: requiredRows }, { data: certificates }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).single(),
-    supabase.from("courses").select("*").eq("is_active", true).is("archived_at", null).order("code"),
-    supabase
-      .from("quiz_attempts")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("status", "completed")
-      .order("submitted_at", { ascending: false }),
-    supabase
-      .from("reading_sessions")
-      .select("course_id, checkpoint_passed")
-      .eq("user_id", user.id),
+  const { supabase, user, profile } = await requireViewer();
+  const rows = async (query, what) => must(await query, what) || [];
+  const [courses, attempts, readingSessions, requiredRows, certificates] = await Promise.all([
+    rows(supabase.from("courses").select("id, code, title, description, view_only").eq("is_active", true).is("archived_at", null).order("code"), "courses"),
+    // Newest first, so the first passed attempt in a course's history is the latest pass.
+    rows(
+      supabase
+        .from("quiz_attempts")
+        .select("id, user_id, course_id, score, passed")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .order("submitted_at", { ascending: false }),
+      "your attempts"
+    ),
+    rows(supabase.from("reading_sessions").select("course_id, checkpoint_passed").eq("user_id", user.id), "your reading progress"),
     // Managers and admins can read everyone's rows, so filter to this person.
-    supabase.rpc("required_courses").eq("user_id", user.id),
-    supabase.from("certificates").select("id, course_id").eq("user_id", user.id),
+    rows(supabase.rpc("required_courses").eq("user_id", user.id), "your required courses"),
+    rows(supabase.from("certificates").select("id, user_id, course_id").eq("user_id", user.id), "your certificates"),
   ]);
 
-  const certificateIdByCourse = new Map((certificates || []).map((certificate) => [certificate.course_id, certificate.id]));
-  const requiredIds = new Set((requiredRows || []).map((row) => row.course_id));
-
-  const byCourse = {};
-  (attempts || []).forEach((a) => { (byCourse[a.course_id] = byCourse[a.course_id] || []).push(a); });
-  const activeCourses = courses || [];
-  const requiredCourses = activeCourses.filter((course) => requiredIds.has(course.id));
-  const otherCourses = activeCourses.filter((course) => !requiredIds.has(course.id));
-  // Reading-only courses have no test; their certificate is the completion.
-  const passedCourseIds = new Set([
-    ...(attempts || []).filter((attempt) => attempt.passed).map((attempt) => attempt.course_id),
-    ...(certificates || []).map((certificate) => certificate.course_id),
-  ]);
+  const certificateIdByCourse = new Map(certificates.map((certificate) => [certificate.course_id, certificate.id]));
+  const attemptsByCourse = groupByCourse(attempts);
+  const sessionsByCourse = groupByCourse(readingSessions);
+  const requiredIds = new Set(requiredRows.map((row) => row.course_id));
+  const requiredCourses = courses.filter((course) => requiredIds.has(course.id));
+  const otherCourses = courses.filter((course) => !requiredIds.has(course.id));
+  const passedCourseIds = passedCoursesByUser(attempts, certificates).get(user.id) || new Set();
   const requiredPassed = requiredCourses.filter((course) => passedCourseIds.has(course.id)).length;
-  const readingCompleteIds = new Set((readingSessions || []).filter((session) => session.checkpoint_passed).map((session) => session.course_id));
-  const firstName = profile?.full_name?.trim()?.split(/\s+/)[0] || "there";
+  const readingsDone = new Set(readingSessions.filter((session) => session.checkpoint_passed).map((session) => session.course_id)).size;
 
   function renderCourses(list, offset = 0) {
-    return list.map((c, index) => {
-      const courseSessions = (readingSessions || []).filter((session) => session.course_id === c.id);
+    return list.map((course, index) => {
+      const sessions = sessionsByCourse.get(course.id) || [];
       return (
         <CourseCardClient
-          key={c.id}
-          course={c}
-          userId={user.id}
-          initiallyEnrolled={courseSessions.length > 0}
-          readingComplete={courseSessions.some((session) => session.checkpoint_passed)}
-          history={byCourse[c.id] || []}
-          certificateId={certificateIdByCourse.get(c.id)}
+          key={course.id}
+          course={course}
+          initiallyEnrolled={sessions.length > 0}
+          readingComplete={sessions.some((session) => session.checkpoint_passed)}
+          history={attemptsByCourse.get(course.id) || []}
+          certificateId={certificateIdByCourse.get(course.id)}
           index={index + offset}
         />
       );
@@ -65,12 +67,12 @@ export default async function CoursesPage() {
         <section className="courses-hero">
           <div className="courses-hero__copy">
             <div className="tp-label">Learning hub</div>
-            <h1 className="tp-display">Welcome back, {firstName}.</h1>
+            <h1 className="tp-display">Welcome back, {firstName(profile.full_name)}.</h1>
             <p>Build product confidence at your pace. Read the material, complete the checkpoints, and pass each assessment.</p>
           </div>
           <div className="courses-hero__summary" aria-label="Training summary">
             <div><strong className="tp-display">{requiredCourses.length}</strong><span>Required</span></div>
-            <div><strong className="tp-display">{readingCompleteIds.size}</strong><span>Readings done</span></div>
+            <div><strong className="tp-display">{readingsDone}</strong><span>Readings done</span></div>
             <div><strong className="tp-display">{passedCourseIds.size}</strong><span>Completed</span></div>
           </div>
         </section>
@@ -85,16 +87,12 @@ export default async function CoursesPage() {
 
         <div className="course-list">
           {renderCourses(requiredCourses)}
-          {requiredCourses.length === 0 && (
-            <div className="tp-card" style={{ padding: 24, color: "var(--faint)", fontSize: 13.5 }}>
-              No courses have been assigned to you yet.
-            </div>
-          )}
+          {requiredCourses.length === 0 && <div className="tp-card courses-empty">No courses have been assigned to you yet.</div>}
         </div>
 
         {otherCourses.length > 0 && (
           <>
-            <div className="section-heading" style={{ marginTop: 40 }}>
+            <div className="section-heading section-heading--spaced">
               <div>
                 <div className="tp-label">Optional</div>
                 <h2 className="tp-display">Other available courses</h2>
@@ -105,11 +103,7 @@ export default async function CoursesPage() {
           </>
         )}
 
-        {activeCourses.length === 0 && (
-          <div className="tp-card" style={{ padding: 24, marginTop: 16, color: "var(--faint)", fontSize: 13.5 }}>
-            No courses yet — an admin needs to add one, or run <span className="tp-mono">supabase/seed.sql</span>.
-          </div>
-        )}
+        {courses.length === 0 && <div className="tp-card courses-empty courses-empty--spaced">No courses are available yet.</div>}
       </main>
     </div>
   );

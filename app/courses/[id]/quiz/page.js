@@ -1,41 +1,50 @@
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import TopNav from "@/components/TopNav";
-import CourseUnavailable from "@/components/CourseUnavailable";
+import { attemptAllowance } from "@/lib/attempts";
+import { must } from "@/lib/db";
+import { routes } from "@/lib/routes";
+import { loadCourse } from "../load-course";
 import QuizClient from "./QuizClient";
-import { attemptAllowance } from "@/lib/attempts.mjs";
-import { notFound, redirect } from "next/navigation";
 
 export default async function QuizPage({ params }) {
-  const supabase = await createClient();
-  const { id } = await params;
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  const { data: course } = await supabase.from("courses").select("*").eq("id", id).single();
-  if (!course) notFound();
-  if (course.archived_at) return <CourseUnavailable profile={profile} course={course} />;
+  const { supabase, user, profile, course, unavailable } = await loadCourse(params);
+  if (unavailable) return unavailable;
   // Reading-only courses have no test; finishing the reading completes them.
-  if (course.view_only) redirect(`/courses/${course.id}/read`);
-  const { data: completedReading } = await supabase
-    .from("reading_sessions")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("course_id", course.id)
-    .eq("checkpoint_passed", true)
-    .limit(1)
-    .maybeSingle();
-  if (!completedReading) redirect(`/courses/${course.id}/read`);
+  if (course.view_only) redirect(routes.read(course.id));
 
-  // Three failed attempts, then an admin must approve more (the database enforces this too).
-  const [{ data: attempts }, { data: unlocks }] = await Promise.all([
-    supabase.from("quiz_attempts").select("passed, submitted_at").eq("user_id", user.id).eq("course_id", course.id).eq("status", "completed"),
-    supabase.from("attempt_unlocks").select("granted_at").eq("user_id", user.id).eq("course_id", course.id),
+  const [completedReading, attempts, unlocks] = await Promise.all([
+    supabase
+      .from("reading_sessions")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("course_id", course.id)
+      .eq("checkpoint_passed", true)
+      .limit(1)
+      .maybeSingle()
+      .then((result) => must(result, "your reading progress")),
+    supabase
+      .from("quiz_attempts")
+      .select("passed, submitted_at")
+      .eq("user_id", user.id)
+      .eq("course_id", course.id)
+      .eq("status", "completed")
+      .then((result) => must(result, "your attempts")),
+    supabase
+      .from("attempt_unlocks")
+      .select("granted_at")
+      .eq("user_id", user.id)
+      .eq("course_id", course.id)
+      .then((result) => must(result, "attempt approvals")),
   ]);
+  if (!completedReading) redirect(routes.read(course.id));
+
+  // After MAX_ATTEMPTS failed attempts an admin must approve more (the database enforces this too).
   const { remaining } = attemptAllowance(attempts || [], unlocks || []);
 
   return (
     <div>
       <TopNav profile={profile} />
-      <QuizClient course={course} userId={user.id} attemptsLeft={remaining} />
+      <QuizClient course={course} attemptsLeft={remaining} />
     </div>
   );
 }

@@ -1,35 +1,36 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import BackToCourses from "@/components/BackToCourses";
+import { shuffleOptions } from "@/lib/assessment";
+import { startReading } from "@/lib/queries";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
-import Skeleton from "@/components/Skeleton";
+import CheckpointCard from "./CheckpointCard";
 import PdfReader from "./PdfReader";
+import ReadingProgressCard from "./ReadingProgressCard";
 
-function shuffleOptions(question) {
-  const shuffled = question.options.map((text, originalIndex) => ({ text, originalIndex }));
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
-  }
-  return { ...question, shuffled };
-}
+const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
-export default function ReadingGateClient({ course, materials, userId }) {
-  const supabase = createClient();
+// The database picks the checkpoint questions, checks each answer and decides when the reading
+// is finished (migration 011), so the browser never sees the correct answers.
+export default function ReadingGateClient({ course, materials }) {
+  const [supabase] = useState(createClient);
   const router = useRouter();
+  const startedRef = useRef(false);
   const [elapsed, setElapsed] = useState(0);
-  const [paused, setPaused] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [readingQuestions, setReadingQuestions] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(true);
   const [answeredIds, setAnsweredIds] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  // Furthest page reached in the open deck; checkpoints open when the reader gets to them.
+  const [furthestPage, setFurthestPage] = useState(1);
   const [deckIndex, setDeckIndex] = useState(0);
   const [openedDecks, setOpenedDecks] = useState([0]);
-  const [activeQuestion, setActiveQuestion] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(undefined);
-  const [answerChecked, setAnswerChecked] = useState(false);
+  // The database's verdict on the selected answer: { correct, explanation }, or null.
+  const [feedback, setFeedback] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [progressError, setProgressError] = useState("");
   // Saving can be retried, unlike failing to load the session or checkpoints.
@@ -39,58 +40,43 @@ export default function ReadingGateClient({ course, materials, userId }) {
   const viewOnly = course.view_only;
   const deck = materials[deckIndex];
   const multiDeck = materials.length > 1;
-  const deckNumber = (materialId) => materials.findIndex((material) => material.id === materialId) + 1;
   const unopenedDecks = materials.length - openedDecks.length;
+  const timeUp = elapsed >= total;
+  const remainingQuestions = readingQuestions.length - answeredIds.length;
   const orderedQuestions = useMemo(() => [...readingQuestions].sort((a, b) => a.page_number - b.page_number), [readingQuestions]);
   // The next checkpoint is the earliest unanswered one in the deck being read.
-  const unanswered = orderedQuestions.find((q) => q.material_id === deck?.id && !answeredIds.includes(q.id));
-  const done = elapsed >= total && answeredIds.length === readingQuestions.length && unopenedDecks === 0;
+  const unanswered = orderedQuestions.find((question) => question.material_id === deck?.id && !answeredIds.includes(question.id));
+  // The checkpoint stays open until answered, even if the reader scrolls back.
+  const activeQuestion = unanswered && furthestPage >= unanswered.page_number ? unanswered : null;
+  const paused = Boolean(activeQuestion);
+  const done = timeUp && remainingQuestions === 0 && unopenedDecks === 0;
   const timeProgress = total ? Math.min(100, Math.round((elapsed / total) * 100)) : 100;
   const questionProgress = questionsLoading ? 0 : readingQuestions.length ? Math.round((answeredIds.length / readingQuestions.length) * 100) : 100;
-  const answerIsCorrect = selectedAnswer === activeQuestion?.correct_index;
+
+  // Once per mount: a ref, unlike state, survives React Strict Mode's second effect run.
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    startReading(supabase, course.id)
+      .then((data) => {
+        setSessionId(data.session_id);
+        setReadingQuestions(data.questions.map((question) => shuffleOptions(question)));
+        setAnsweredIds(data.questions.filter((question) => question.answered).map((question) => question.id));
+      })
+      .catch(() => setProgressError("We couldn’t start your reading session. Refresh the page to try again."))
+      .finally(() => setQuestionsLoading(false));
+  }, [supabase, course.id]);
 
   useEffect(() => {
-    supabase.from("reading_sessions").select("id").eq("user_id", userId).eq("course_id", course.id).eq("checkpoint_passed", false).order("started_at", { ascending: false }).limit(1).maybeSingle().then(async ({ data, error }) => {
-      if (error) {
-        setProgressError("We couldn’t start your reading session. Refresh the page to try again.");
-        return;
-      }
-      if (data?.id) setSessionId(data.id);
-      else {
-        const { data: session, error: insertError } = await supabase.from("reading_sessions").insert({ user_id: userId, course_id: course.id }).select().single();
-        if (insertError) {
-          setProgressError("We couldn’t start your reading session. Refresh the page to try again.");
-          return;
-        }
-        setSessionId(session?.id);
-      }
-    });
-    supabase.rpc("get_reading_questions", { p_course_id: course.id, p_count: 3 }).then(({ data, error }) => {
-      if (error) setProgressError("We couldn’t load the reading checkpoints. Refresh the page to try again.");
-      setReadingQuestions((data || []).map(shuffleOptions));
-      setQuestionsLoading(false);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (paused || elapsed >= total) return;
+    if (paused || timeUp) return;
     const timer = setInterval(() => setElapsed((value) => Math.min(value + 1, total)), 1000);
     return () => clearInterval(timer);
-  }, [paused, elapsed, total]);
-
-  useEffect(() => {
-    if (!activeQuestion && unanswered && currentPage >= unanswered.page_number) {
-      setActiveQuestion(unanswered);
-      setSelectedAnswer(undefined);
-      setAnswerChecked(false);
-      setPaused(true);
-    }
-  }, [activeQuestion, unanswered, currentPage]);
+  }, [paused, timeUp, total]);
 
   function openDeck(index) {
     if (index === deckIndex || activeQuestion) return;
     setDeckIndex(index);
-    setCurrentPage(1);
+    setFurthestPage(1);
     setOpenedDecks((opened) => (opened.includes(index) ? opened : [...opened, index]));
   }
 
@@ -98,43 +84,59 @@ export default function ReadingGateClient({ course, materials, userId }) {
     if (!sessionId || completing) return;
     setCompleting(true);
     setSaveError("");
-    const { error } = await supabase.from("reading_sessions").update({ checkpoint_passed: true, completed_at: new Date().toISOString() }).eq("id", sessionId);
+    const { data, error } = await supabase.rpc("finish_reading", { p_session_id: sessionId });
     if (error) {
       setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time isn’t complete yet. Keep reading, then try again." : "We couldn’t save your reading progress. Please try again.");
       setCompleting(false);
       return;
     }
     if (!viewOnly) {
-      router.push(`/courses/${course.id}/quiz`);
+      router.push(routes.quiz(course.id));
       return;
     }
     // The database issues the certificate when the reading of a reading-only course is finished.
-    const { data: certificate } = await supabase.from("certificates").select("id").eq("user_id", userId).eq("course_id", course.id).maybeSingle();
-    router.push(certificate ? `/certificates/${certificate.id}` : "/courses");
+    router.push(data?.certificate_id ? routes.certificate(data.certificate_id) : routes.courses);
     router.refresh();
   }
 
-  function continueReading() {
-    if (!answerChecked || selectedAnswer !== activeQuestion.correct_index) return;
-    setAnsweredIds((ids) => [...ids, activeQuestion.id]);
-    setActiveQuestion(null);
-    setPaused(false);
-  }
-
-  function retryQuestion() {
+  async function handleAnswerAction() {
+    if (!feedback) {
+      setChecking(true);
+      const { data, error } = await supabase.rpc("answer_reading_question", { p_session_id: sessionId, p_question_id: activeQuestion.id, p_selected_index: selectedAnswer });
+      setChecking(false);
+      if (error) {
+        setSaveError("We couldn’t check your answer. Please try again.");
+        return;
+      }
+      setSaveError("");
+      setFeedback(data);
+      return;
+    }
+    if (feedback.correct) setAnsweredIds((ids) => [...ids, activeQuestion.id]);
     setSelectedAnswer(undefined);
-    setAnswerChecked(false);
+    setFeedback(null);
   }
 
-  function handleAnswerAction() {
-    if (!answerChecked) setAnswerChecked(true);
-    else if (answerIsCorrect) continueReading();
-    else retryQuestion();
+  function questionLocation(question) {
+    const deckNumber = materials.findIndex((material) => material.id === question.material_id) + 1;
+    return `${multiDeck ? `deck ${deckNumber}, ` : ""}page ${question.page_number}`;
   }
+
+  function footerLabel() {
+    if (completing) return "Saving progress…";
+    if (done) return viewOnly ? "Finish and get certificate →" : "Start assessment →";
+    if (!timeUp) return `Continue reading · ${total - elapsed}s left`;
+    if (remainingQuestions > 0) return `Complete ${plural(remainingQuestions, "checkpoint")}`;
+    return `Open ${plural(unopenedDecks, "more deck")}`;
+  }
+
+  const footerMessage = progressError || saveError || (done
+    ? "All requirements complete"
+    : `Complete the reading requirements to ${viewOnly ? "get your certificate" : "unlock your assessment"}.`);
 
   return (
     <main className="reading-shell tp-fade-in">
-      <Link href="/courses" className="tp-btn tp-btn-ghost back-link">← Back to courses</Link>
+      <BackToCourses />
       <header className="reading-header">
         <div>
           <div className="tp-label">{course.code} · Step 01</div>
@@ -147,108 +149,69 @@ export default function ReadingGateClient({ course, materials, userId }) {
         <section>
           <div className="reader-heading">
             <span className="tp-label">{multiDeck ? `Course documents · ${materials.length} decks` : "Course document"}</span>
-            <span style={{ fontSize: 12, color: "var(--faint)", textAlign: "right" }}>{multiDeck ? "Read every deck and reach each reading checkpoint" : "Scroll to reach each reading checkpoint"}</span>
+            <span className="reader-heading__hint">{multiDeck ? "Read every deck and reach each reading checkpoint" : "Scroll to reach each reading checkpoint"}</span>
           </div>
           {multiDeck && (
-            <div className="deck-tabs" role="tablist" aria-label="Course decks">
+            <div className="deck-tabs" role="group" aria-label="Course decks">
               {materials.map((material, index) => (
-                <button key={material.id} type="button" role="tab" aria-selected={index === deckIndex} className={`deck-tab ${index === deckIndex ? "is-active" : ""}`} disabled={Boolean(activeQuestion) && index !== deckIndex} title={activeQuestion ? "Answer the reading question first" : material.title} onClick={() => openDeck(index)}>
+                <button
+                  key={material.id}
+                  type="button"
+                  aria-current={index === deckIndex ? "true" : undefined}
+                  className={index === deckIndex ? "deck-tab is-active" : "deck-tab"}
+                  disabled={Boolean(activeQuestion) && index !== deckIndex}
+                  title={activeQuestion ? "Answer the reading question first" : material.title}
+                  onClick={() => openDeck(index)}
+                >
                   <span className="deck-tab__number">{openedDecks.includes(index) && index !== deckIndex ? "✓" : index + 1}</span>
                   <span className="deck-tab__title">{material.title}</span>
                 </button>
               ))}
             </div>
           )}
-          <div className="tp-card" style={{ padding: 0, overflow: "hidden" }}>
-            <PdfReader key={deck?.id || "none"} url={deck?.pdf_url} title={deck?.title || course.title} onPageChange={setCurrentPage} />
+          <div className="tp-card reader-frame">
+            <PdfReader key={deck?.id || "none"} url={deck?.pdf_url} title={deck?.title || course.title} onPageChange={(page) => setFurthestPage((furthest) => Math.max(furthest, page))} />
           </div>
           {multiDeck && deckIndex < materials.length - 1 && (
-            <div className="deck-next"><button type="button" className="tp-btn tp-btn-ghost" disabled={Boolean(activeQuestion)} onClick={() => openDeck(deckIndex + 1)}>Next deck: {materials[deckIndex + 1].title} →</button></div>
+            <div className="deck-next">
+              <button type="button" className="tp-btn tp-btn-ghost" disabled={Boolean(activeQuestion)} onClick={() => openDeck(deckIndex + 1)}>
+                Next deck: {materials[deckIndex + 1].title} →
+              </button>
+            </div>
           )}
         </section>
 
         <aside className="reading-question-panel">
-          <div className="tp-card reading-status-card">
-            <div className="reading-status-card__heading">
-              <div>
-                <span className="tp-label">Your progress</span>
-                <strong className="tp-display">{done ? "Ready" : paused ? "Checkpoint" : "Reading"}</strong>
-              </div>
-              <span className="reading-status-card__percent">{Math.round((timeProgress + questionProgress) / 2)}%</span>
-            </div>
-            <div className="reading-progress-row">
-              <div><span>Reading time</span><b>{timeProgress}%</b></div>
-              <div className="reading-progress-track"><span style={{ width: `${timeProgress}%` }} /></div>
-            </div>
-            <div className="reading-progress-row">
-              <div><span>Checkpoints</span><b>{answeredIds.length}/{readingQuestions.length}</b></div>
-              <div className="reading-progress-track"><span style={{ width: `${questionProgress}%` }} /></div>
-            </div>
-            {multiDeck && (
-              <div className="reading-progress-row">
-                <div><span>Decks opened</span><b>{openedDecks.length}/{materials.length}</b></div>
-                <div className="reading-progress-track"><span style={{ width: `${Math.round((openedDecks.length / materials.length) * 100)}%` }} /></div>
-              </div>
-            )}
-          </div>
-          <div className="tp-card reading-question-card">
-            {questionsLoading ? (
-              <div className="reading-question-skeleton" aria-busy="true" aria-label="Loading reading questions">
-                <Skeleton style={{ width: "72%", height: 12, marginBottom: 24 }} />
-                <Skeleton style={{ width: 106, height: 21, borderRadius: 999, marginBottom: 14 }} />
-                <Skeleton style={{ width: "95%", height: 42, marginBottom: 16 }} />
-                <Skeleton style={{ width: "100%", height: 43, marginBottom: 8 }} />
-                <Skeleton style={{ width: "100%", height: 43, marginBottom: 8 }} />
-                <Skeleton style={{ width: "100%", height: 43 }} />
-                <span className="tp-sr-only" role="status">Loading reading questions…</span>
-              </div>
-            ) : <>
-            <div style={{ color: "var(--faint)", fontSize: 12, marginBottom: 12 }}>{answeredIds.length}/{readingQuestions.length} reading questions completed</div>
-            {activeQuestion ? (
-              <div className="tp-fade-in">
-                <div className="tp-badge" style={{ background: "var(--warn-dim)", color: "var(--warn)", marginBottom: 12 }}>Reading question · {multiDeck ? `deck ${deckNumber(activeQuestion.material_id)}, ` : ""}page {activeQuestion.page_number}</div>
-                <div style={{ fontSize: 14.5, marginBottom: 16, lineHeight: 1.5 }}>{activeQuestion.question_text}</div>
-                {activeQuestion.image_url && <img className="question-media question-media--reading" src={activeQuestion.image_url} alt="Reference for this question" />}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {activeQuestion.shuffled.map((option) => {
-                    const isCorrect = answerChecked && option.originalIndex === activeQuestion.correct_index;
-                    const isWrong = answerChecked && selectedAnswer === option.originalIndex && !isCorrect;
-                    return <button key={option.originalIndex} className={`tp-opt ${!answerChecked && selectedAnswer === option.originalIndex ? "sel" : ""} ${isCorrect ? "is-correct" : ""} ${isWrong ? "is-wrong" : ""}`} disabled={answerChecked} onClick={() => setSelectedAnswer(option.originalIndex)} style={{ textAlign: "left" }}><span style={{ fontSize: 13.5 }}>{option.text}</span>{isCorrect && <span className="answer-mark">✓</span>}{isWrong && <span className="answer-mark">×</span>}</button>;
-                  })}
-                </div>
-                {answerChecked && <div className={selectedAnswer === activeQuestion.correct_index ? "answer-feedback is-correct" : "answer-feedback is-wrong"}>{selectedAnswer === activeQuestion.correct_index ? "Correct. " : "That answer is incorrect. "}{activeQuestion.explanation}</div>}
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button className="tp-btn tp-btn-primary" disabled={selectedAnswer === undefined} onClick={handleAnswerAction}>{answerChecked ? answerIsCorrect ? "Continue reading" : "Try again" : "Check answer"}</button></div>
-              </div>
-            ) : answeredIds.length === readingQuestions.length && readingQuestions.length > 0 ? (
-              <div className="reading-question-complete tp-fade-in"><div className="reading-question-complete__icon">✓</div><div className="tp-display">Reading questions completed</div><p>You answered all {readingQuestions.length} reading checkpoints.</p></div>
-            ) : (
-              <div className="tp-fade-in"><div className="tp-label" style={{ marginBottom: 8 }}>Reading questions</div><div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--dim)" }}>{readingQuestions.length ? (multiDeck ? "Keep reading through each deck. This panel will change when you reach the next question." : "Keep scrolling through the PDF. This panel will change when you reach the next question.") : "No reading questions have been added for this course."}</div></div>
-            )}
-            </>}
-          </div>
+          <ReadingProgressCard
+            status={done ? "Ready" : paused ? "Checkpoint" : "Reading"}
+            timeProgress={timeProgress}
+            questionProgress={questionProgress}
+            answeredCount={answeredIds.length}
+            questionCount={readingQuestions.length}
+            decks={multiDeck ? { opened: openedDecks.length, total: materials.length } : null}
+          />
+          <CheckpointCard
+            loading={questionsLoading}
+            questionCount={readingQuestions.length}
+            answeredCount={answeredIds.length}
+            multiDeck={multiDeck}
+            activeQuestion={activeQuestion}
+            location={activeQuestion ? questionLocation(activeQuestion) : ""}
+            selectedAnswer={selectedAnswer}
+            feedback={feedback}
+            checking={checking}
+            onSelect={setSelectedAnswer}
+            onAction={handleAnswerAction}
+          />
         </aside>
       </div>
 
       <div className="reading-footer">
-        <span>{progressError || saveError || (done ? "All requirements complete" : (viewOnly ? "Complete the reading requirements to get your certificate." : "Complete the reading requirements to unlock your assessment."))}</span>
-        <button className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>{completing ? "Saving progress…" : done ? (viewOnly ? "Finish and get certificate →" : "Start assessment →") : elapsed < total ? `Continue reading · ${total - elapsed}s left` : answeredIds.length < readingQuestions.length ? `Complete ${readingQuestions.length - answeredIds.length} checkpoint${readingQuestions.length - answeredIds.length === 1 ? "" : "s"}` : `Open ${unopenedDecks} more deck${unopenedDecks === 1 ? "" : "s"}`}</button>
+        <span>{footerMessage}</span>
+        <button type="button" className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>
+          {footerLabel()}
+        </button>
       </div>
-      <style jsx>{`
-        .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
-        .reading-question-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 12px; }
-        .reading-question-card { padding: 20px; min-height: 190px; }
-        .deck-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; }
-        .deck-tab { min-width: 0; max-width: 240px; display: flex; align-items: center; gap: 8px; padding: 7px 12px 7px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--dim); font-size: 12.5px; cursor: pointer; flex: 0 0 auto; }
-        .deck-tab:disabled { cursor: not-allowed; opacity: .55; }
-        .deck-tab.is-active { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent) inset; }
-        .deck-tab__number { width: 22px; height: 22px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 6px; background: var(--accent-dim); color: var(--accent); font: 600 11px/1 'JetBrains Mono', monospace; }
-        .deck-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .deck-next { display: flex; justify-content: flex-end; margin-top: 10px; }
-        @media (max-width: 1100px) {
-          .reading-workspace { grid-template-columns: 1fr; }
-          .reading-question-panel { position: static; }
-        }
-      `}</style>
     </main>
   );
 }
