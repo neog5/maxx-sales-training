@@ -29,6 +29,7 @@ A Next.js 16 App Router application backed by Supabase. Learners read course PDF
    - `supabase/migrations/006_course_materials.sql` - multi-deck courses (several PDFs per course, read in order)
    - `supabase/migrations/007_attempt_limit.sql` - three failed attempts per course, then an admin approves more
    - `supabase/migrations/008_view_only_courses.sql` - reading-only courses (no test; finishing the reading issues the certificate)
+   - `supabase/migrations/009_admin_email_alerts.sql` - emails admins about new sign-ups and people who run out of test attempts (see [Admin email alerts](#admin-email-alerts))
    - `supabase/seed.sql` - one fictional sample course with reading and quiz questions
 
 3. Copy the environment template and add the public credentials from the Supabase project's API settings:
@@ -102,6 +103,26 @@ If the database already exists, run `supabase/requested-changes.sql` and then th
 
 If email confirmation is enabled in Supabase Auth, confirm the new account before signing in. For a frictionless local demo, adjust that setting in the Supabase dashboard.
 
+## Admin email alerts
+
+Every admin and super admin gets an email when someone signs up, and when someone fails a course test for the third time (they then need an admin to approve more attempts on their profile). The database sends these itself through [Resend](https://resend.com), using triggers and the `pg_net` extension (migration 009), so they go out whatever happens in the browser. If sending fails, the sign-up or attempt still saves.
+
+Setup, once per Supabase project:
+
+1. In Resend, verify the sending domain (e.g. `maxxorthoportal.com`) and create an API key with sending access.
+2. In the Supabase SQL Editor, store the settings in Vault:
+
+   ```sql
+   select vault.create_secret('re_your_api_key', 'resend_api_key');
+   select vault.create_secret('Maxx Training <alerts@maxxorthoportal.com>', 'alert_from_email');
+   select vault.create_secret('https://training.maxxorthoportal.com', 'portal_url');  -- for the profile link
+   select vault.create_secret('[DEV] ', 'alert_subject_prefix');                      -- dev project only
+   ```
+
+   To change one later, use `vault.update_secret` or Project Settings → Vault.
+
+No emails are sent until `resend_api_key` is set. To check whether Resend accepted recent emails: `select status_code, content from net._http_response order by created desc limit 10;` (kept for about 6 hours).
+
 ## Deploying to Cloudflare Workers
 
 The app deploys to Cloudflare Workers with the [OpenNext Cloudflare adapter](https://opennext.js.org/cloudflare). Config lives in `wrangler.jsonc` and `open-next.config.ts`.
@@ -143,6 +164,7 @@ Not done yet. When moving to training.maxxorthoportal.com:
 2. Create a second Worker named exactly `maxx-sales-training` from this repo: Git branch `main`, build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`.
 3. Build variables: the production `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Do **not** set `NEXT_PUBLIC_APP_ENV` (no dev banner).
 4. Runtime secret (Settings → Variables and Secrets, not Build): `OPENROUTER_API_KEY`.
+   Also set up [admin email alerts](#admin-email-alerts) in the production Supabase project (Resend key and Vault settings, without the `[DEV]` prefix).
 5. Merge `dev` into `main`; the push builds and deploys production.
 6. **Restrict the dev site with Cloudflare Access** so employees cannot land on it by mistake (production users are also `@maxxortho.com`, so allow a named list of testers, not the whole domain):
    - Zero Trust → Settings → Authentication: confirm the One-time PIN login method.
