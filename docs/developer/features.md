@@ -16,7 +16,7 @@ How each part of the portal behaves and where its code lives. For what users see
 
 - **Required courses** are those in `required_courses()` for the person. Everything else visible is under **Other courses**, marked optional.
 - `CourseCatalog.jsx` shows the tiles and filters them in the browser by code, title and description (every typed word must match).
-- **Tile badge** (`app/courses/CourseCard.jsx`), first match wins: *Completed* (passed, or reading-only with certificate; also a big green tick), *Not passed yet*, *In progress* (has a reading session), *Not started*.
+- **Tile badge** (`app/courses/CourseCard.jsx`), first match wins: *Completed* (passed, or reading-only with certificate; also a big green tick), *Not passed yet*, *In progress* (has a reading session), *Not started*. The cover strip uses the same status colour: grey, orange, red or green.
 - The tile's checklist shows *Read the course* → *Pass the assessment* → *Get your certificate*, ticked as each is done. Reading-only courses skip the assessment.
 - One button goes to the next step: *Start course* / *Continue reading* (reading page, which creates or resumes the reading session), *Take assessment* / *Retake assessment*, *View certificate*.
 - The tile doesn't know about the attempt limit: someone who is locked out still sees *Retake assessment* and finds out on the quiz page.

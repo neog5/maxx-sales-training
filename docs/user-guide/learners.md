@@ -25,7 +25,7 @@ Each tile shows where you are:
 | Not passed yet | You've taken the assessment but not passed yet |
 | Completed | You've finished the course (a large green tick also appears) |
 
-The tile lists the steps with a tick next to each one you've finished. The orange button always takes you to the next step: **Start course**, **Continue reading**, **Take assessment** or **View certificate**.
+The colour at the top of each tile matches its badge: grey for not started, orange for in progress, red for not passed yet, green for completed. The tile lists the steps with a tick next to each one you've finished. The orange button always takes you to the next step: **Start course**, **Continue reading**, **Take assessment** or **View certificate**.
 
 ## Step 1: Reading
 

@@ -2,13 +2,12 @@ import Link from "next/link";
 import BigTick from "@/components/BigTick";
 import StatusBadge from "@/components/StatusBadge";
 
-const COVER_TONES = ["blue", "orange", "slate", "sky"];
-
-// The same course always gets the same cover colour.
-function coverTone(code = "") {
-  let hash = 0;
-  for (const char of code) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return COVER_TONES[hash % COVER_TONES.length];
+// The cover colour matches the badge: grey not started, orange in progress, red not passed, green done.
+function coverTone({ complete, attempted, enrolled }) {
+  if (complete) return "done";
+  if (attempted) return "retry";
+  if (enrolled) return "progress";
+  return "new";
 }
 import { routes } from "@/lib/routes";
 
@@ -58,7 +57,7 @@ export default function CourseCard({ course, enrolled, readingComplete, history,
 
   return (
     <article className={complete ? "tp-card course-card course-card--passed" : "tp-card course-card"}>
-      <div className={`course-card__cover course-card__cover--${complete ? "done" : coverTone(course.code)}`}>
+      <div className={`course-card__cover course-card__cover--${coverTone({ complete, attempted, enrolled })}`}>
         <span className="course-card__code">{course.code}</span>
         {complete
           ? <BigTick size={48} label="Course completed" />
