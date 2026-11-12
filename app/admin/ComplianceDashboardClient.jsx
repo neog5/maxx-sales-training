@@ -66,9 +66,8 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, watchl
     <main className="tp-page tp-fade-in">
       <div className="page-heading section-heading-row">
         <div>
-          <div className="tp-label">Training compliance</div>
           <h1 className="tp-display">Dashboard</h1>
-          <p>Everyone’s required courses, completed versus assigned. A person is compliant once they’ve passed every course assigned to them or their training groups.</p>
+          <p>Compliant means every course assigned to the person or their training groups is passed.</p>
         </div>
         <button type="button" className="tp-btn tp-btn-ghost" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</button>
       </div>

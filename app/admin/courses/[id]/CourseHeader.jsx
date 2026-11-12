@@ -13,8 +13,8 @@ export default function CourseHeader({ course, active, questionCount, recordCoun
         <h1 className="tp-display">{course.title}</h1>
         <p>
           {archived
-            ? <>Archived <LocalDate value={course.archived_at} />{course.archiver?.full_name ? ` by ${course.archiver.full_name}` : ""}. Learners can no longer start it, and it no longer counts toward compliance.</>
-            : `${recordCount} training ${recordCount === 1 ? "record" : "records"} (reading sessions and assessment attempts).`}
+            ? <>Archived <LocalDate value={course.archived_at} />{course.archiver?.full_name ? ` by ${course.archiver.full_name}` : ""}. Learners can’t start it and it doesn’t count toward compliance.</>
+            : `${recordCount} training ${recordCount === 1 ? "record" : "records"}`}
         </p>
       </div>
       <nav className="course-tabs" aria-label="Course sections">

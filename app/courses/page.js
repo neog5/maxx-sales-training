@@ -60,7 +60,6 @@ export default async function CoursesPage() {
         <section className="courses-hero">
           <div>
             <h1 className="tp-display">Welcome back, {firstName(profile.full_name)}</h1>
-            <p>Read each course, then pass its assessment to get your certificate.</p>
           </div>
           {requiredCourses.length > 0 && (
             <div className="courses-hero__summary">

@@ -45,7 +45,7 @@ export default async function AttemptPage({ params }) {
 
         <div className="page-heading attempt-detail-heading">
           <div>
-            <div className="tp-label">Attempt review · {attempt.courses?.code || "Assessment"}</div>
+            <div className="tp-label">Attempt review</div>
             <h1 className="tp-display">{attempt.courses?.title || "Assessment attempt"}</h1>
             <p>{name} · submitted <LocalDate value={attempt.submitted_at} withTime /></p>
           </div>
@@ -76,7 +76,6 @@ export default async function AttemptPage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Performance by question type</div>
-              <span>This attempt only</span>
             </div>
           </div>
           <div className="tp-card question-performance-card">
@@ -88,7 +87,6 @@ export default async function AttemptPage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Questions asked</div>
-              <span>{total} {total === 1 ? "question" : "questions"} in this attempt</span>
             </div>
           </div>
           <div className="attempt-question-list">

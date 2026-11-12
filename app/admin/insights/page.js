@@ -62,9 +62,7 @@ export default async function InsightsPage() {
     <AdminPage profile={profile}>
       <main className="tp-page">
         <div className="page-heading">
-          <div className="tp-label">Admin workspace</div>
           <h1 className="tp-display">Assessment insights</h1>
-          <p>Compare learner outcomes, question-type accuracy, and individual assessment attempts.</p>
         </div>
 
         <div className="metric-grid metric-grid--admin">
@@ -104,9 +102,7 @@ export default async function InsightsPage() {
             <div className="section-heading-row">
               <div>
                 <div className="tp-label">Performance by question type</div>
-                <span>Accuracy across all completed attempts</span>
               </div>
-              <span>Groups can overlap</span>
             </div>
             <div className="tp-card question-performance-card">
               <QuestionPerformance groups={questionPerformance} compact />
@@ -118,7 +114,6 @@ export default async function InsightsPage() {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Attempt log</div>
-              <span>Open an attempt to review every question and answer</span>
             </div>
           </div>
           <div className="tp-card attempt-table">

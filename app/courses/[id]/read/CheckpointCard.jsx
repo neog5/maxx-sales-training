@@ -65,7 +65,7 @@ function ActiveCheckpoint({ question, location, selectedAnswer, feedback, checki
 // The side panel that asks a question when the reader reaches its page.
 // `location` describes where the active question sits, e.g. "deck 2, page 4".
 // Not shown at all for a course without reading questions.
-export default function CheckpointCard({ loading, questionCount, answeredCount, multiDeck, activeQuestion, location, selectedAnswer, feedback, checking, onSelect, onAction }) {
+export default function CheckpointCard({ loading, questionCount, answeredCount, activeQuestion, location, selectedAnswer, feedback, checking, onSelect, onAction }) {
   if (loading) {
     return <div className="tp-card reading-question-card"><CheckpointSkeleton /></div>;
   }
@@ -74,7 +74,6 @@ export default function CheckpointCard({ loading, questionCount, answeredCount, 
 
   return (
     <div className="tp-card reading-question-card">
-      <div className="checkpoint-count">{answeredCount} of {questionCount} reading questions answered</div>
       {activeQuestion ? (
         <ActiveCheckpoint
           question={activeQuestion}
@@ -89,15 +88,11 @@ export default function CheckpointCard({ loading, questionCount, answeredCount, 
         <div className="reading-question-complete tp-fade-in">
           <BigTick size={64} />
           <div className="tp-display">All reading questions answered</div>
-          <p>Nice work. Finish any remaining reading time, then continue.</p>
         </div>
       ) : (
         <div className="tp-fade-in">
-          <div className="tp-label checkpoint-idle__label">Reading questions</div>
           <div className="checkpoint-idle__copy">
-            {multiDeck
-                ? "Keep reading through each deck. This panel will change when you reach the next question."
-                : "Keep scrolling through the PDF. This panel will change when you reach the next question."}
+            The next question will appear here when you reach its page.
           </div>
         </div>
       )}

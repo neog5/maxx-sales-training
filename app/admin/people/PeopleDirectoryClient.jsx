@@ -51,9 +51,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
     <main className="tp-page people-page tp-fade-in">
       <div className="page-heading people-heading">
         <div>
-          <div className="tp-label">Team management</div>
           <h1 className="tp-display">People</h1>
-          <p>Find team members, review training performance, and open profiles to manage access.</p>
         </div>
         <div className="people-summary" aria-label="Team summary">
           <span><strong>{people.length}</strong> people</span>

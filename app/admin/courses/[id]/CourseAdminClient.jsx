@@ -215,7 +215,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
       )}
 
       <section className="profile-report-section">
-        <div className="section-heading-row"><div><div className="tp-label">History</div><span>Changes to this course and its assignments</span></div></div>
+        <div className="section-heading-row"><div><div className="tp-label">History</div></div></div>
         <div className="tp-card audit-list">
           {history.map((entry) => (
             <div className="audit-list__row" key={entry.id}>

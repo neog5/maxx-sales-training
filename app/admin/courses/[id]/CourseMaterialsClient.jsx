@@ -88,7 +88,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
   return (
     <section className="tp-card tp-form-card course-decks">
       <div className="tp-label form-section-label--tight">Reading decks</div>
-      <p className="course-admin__hint">Learners read these PDFs in order and must open every deck before the assessment. Keep each deck under {FREE_PDF_PARSER_LIMIT_TEXT} to use AI question suggestions.</p>
+      <p className="course-admin__hint">Learners must open every deck before the assessment. AI suggestions need decks under {FREE_PDF_PARSER_LIMIT_TEXT}.</p>
       {notices}
 
       <ol className="course-decks__list">

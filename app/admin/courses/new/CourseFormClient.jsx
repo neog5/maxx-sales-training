@@ -129,9 +129,8 @@ export default function CourseFormClient() {
   return (
     <main className="tp-form-page tp-fade-in">
       <div className="tp-form-heading">
-        <div className="tp-label">Admin workspace</div>
         <h1 className="tp-display">Add a course</h1>
-        <p>Upload the training PDF now. We’ll prepare reading and assessment questions for you to review on the next screen.</p>
+        <p>Upload the PDF and you’ll review suggested questions on the next screen.</p>
       </div>
 
       <form className="tp-card tp-form-card" onSubmit={createCourse}>
@@ -144,7 +143,7 @@ export default function CourseFormClient() {
           <div className="tp-label form-label">Training PDFs</div>
           <input className="tp-input" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => setPdfs(Array.from(event.target.files || []))} />
           <div className="form-hint">
-            Optional · Choose several PDFs for a course with more than one deck; you can rename and reorder them after the course is created. Each PDF can be up to {megabytes(MAX_PDF_BYTES)} MB. Suggestions are generated from the first deck, which must be under {FREE_PDF_PARSER_LIMIT_TEXT}.
+            Optional. Up to {megabytes(MAX_PDF_BYTES)} MB each; pick several for a multi-deck course. Suggestions use the first PDF, which must be under {FREE_PDF_PARSER_LIMIT_TEXT}.
           </div>
           {pdfs.length > 1 && <ol className="form-file-list">{pdfs.map((file) => <li key={file.name}>{file.name}</li>)}</ol>}
           {pdfTooLargeForSuggestions && (

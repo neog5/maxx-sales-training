@@ -118,7 +118,6 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   return (
     <main className="tp-page tp-fade-in">
       <div className="page-heading">
-        <div className="tp-label">Admin workspace</div>
         <h1 className="tp-display">Training groups</h1>
         <p>Training groups decide what people must complete. Put people in a group, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several training groups.</p>
       </div>

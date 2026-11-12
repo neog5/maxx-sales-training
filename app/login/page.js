@@ -7,8 +7,8 @@ import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 
 const COPY = {
-  signin: { title: "Welcome back", intro: "Sign in to continue your assigned training.", submit: "Sign in" },
-  signup: { title: "Create your account", intro: "Set up your account to begin training.", submit: "Create account" },
+  signin: { title: "Welcome back", submit: "Sign in" },
+  signup: { title: "Create your account", submit: "Create account" },
   forgot: { title: "Reset your password", intro: "Enter your email and we’ll send you a link to choose a new password.", submit: "Send reset link" },
 };
 
@@ -80,7 +80,7 @@ export default function LoginPage() {
   return (
     <AuthCard>
       <h1 className="tp-display login-title">{copy.title}</h1>
-      <p className="login-form__intro">{copy.intro}</p>
+      {copy.intro && <p className="login-form__intro">{copy.intro}</p>}
 
       <form onSubmit={submit} className="login-fields">
         {mode === "signup" && (

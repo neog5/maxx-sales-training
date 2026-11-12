@@ -94,9 +94,7 @@ export default async function ProfilePage({ params }) {
       <main className="tp-page tp-fade-in">
         {canViewReports(viewer.role) && <Link href={routes.people} className="tp-btn tp-btn-ghost back-link">← Back to people</Link>}
         <div className="page-heading profile-heading">
-          <div className="tp-label">{isSelf ? "Your profile" : "User performance"}</div>
           <h1 className="tp-display">{isSelf ? "Your training record" : name}</h1>
-          <p>{isSelf ? "Your required courses, certificates and assessment results." : "Required courses, certificates and every completed assessment attempt."}</p>
         </div>
 
         <section className="tp-card profile-summary">
@@ -128,7 +126,6 @@ export default async function ProfilePage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Certificates</div>
-              <span>You get a certificate when you complete a course</span>
             </div>
           </div>
           <div className="tp-card certificate-list">
@@ -141,7 +138,7 @@ export default async function ProfilePage({ params }) {
                 <Link href={routes.certificate(certificate.id)} className="tp-btn tp-btn-ghost attempt-review-link">View</Link>
               </div>
             ))}
-            {certificates.length === 0 && <div className="admin-insight-empty">No certificates yet. Complete a course to get one.</div>}
+            {certificates.length === 0 && <div className="admin-insight-empty">No certificates yet.</div>}
           </div>
         </section>
 
@@ -158,7 +155,6 @@ export default async function ProfilePage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Performance by question type</div>
-              <span>{isSelf ? "How often you answered each type of question correctly" : "Accuracy across this user’s completed attempts"}</span>
             </div>
           </div>
           <div className="tp-card question-performance-card">
@@ -173,7 +169,6 @@ export default async function ProfilePage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Assessment attempts</div>
-              <span>Open an attempt to review every question and answer</span>
             </div>
           </div>
           <div className="tp-card profile-history">

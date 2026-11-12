@@ -82,9 +82,7 @@ export default async function CoursesAdminPage() {
       <main className="tp-page tp-fade-in">
         <div className="page-heading section-heading-row">
           <div>
-            <div className="tp-label">Admin workspace</div>
             <h1 className="tp-display">Courses</h1>
-            <p>Manage course details, who must complete each course, and archive courses you no longer use. Archived courses keep every training record.</p>
           </div>
           <Link href={routes.newCourse} className="tp-btn tp-btn-primary">+ Add course</Link>
         </div>
@@ -95,7 +93,7 @@ export default async function CoursesAdminPage() {
         </section>
 
         <section className="profile-report-section">
-          <div className="section-heading-row"><div><div className="tp-label">Archived courses</div><span>Hidden from learners, kept for compliance records</span></div></div>
+          <div className="section-heading-row"><div><div className="tp-label">Archived courses</div><span>Hidden from learners</span></div></div>
           <CourseRows rows={archived} counts={counts} empty="No archived courses." />
         </section>
       </main>

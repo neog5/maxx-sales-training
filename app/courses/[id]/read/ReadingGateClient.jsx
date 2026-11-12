@@ -143,7 +143,6 @@ export default function ReadingGateClient({ course, materials }) {
       <BackToCourses />
       <header className="reading-header">
         <div>
-          <div className="tp-label">{viewOnly ? "Reading only" : "Step 1 of 2"}</div>
           <h1 className="tp-display">{course.title}</h1>
         </div>
         <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>
@@ -152,7 +151,6 @@ export default function ReadingGateClient({ course, materials }) {
       <div className="reading-workspace">
         <section>
           <div className="reader-heading">
-            <span className="tp-label">{multiDeck ? `Course documents · ${materials.length} decks` : "Course document"}</span>
             <span className="reader-heading__hint">
               {multiDeck ? "Open and read every deck" : "Scroll down to read the whole document"}
               {readingQuestions.length > 0 && " · questions appear as you read"}
@@ -201,7 +199,6 @@ export default function ReadingGateClient({ course, materials }) {
             loading={questionsLoading}
             questionCount={readingQuestions.length}
             answeredCount={answeredIds.length}
-            multiDeck={multiDeck}
             activeQuestion={activeQuestion}
             location={activeQuestion ? questionLocation(activeQuestion) : ""}
             selectedAnswer={selectedAnswer}
