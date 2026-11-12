@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AuthCard from "@/components/AuthCard";
 import Notice from "@/components/Notice";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
@@ -77,61 +78,53 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="login-page">
-      <div className="login-card tp-fade-in">
-        <section className="login-form">
-          <div className="login-brand-mark">
-            <img src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />
-            <span className="tp-display">Sales Training</span>
-          </div>
-          <h1 className="tp-display login-title">{copy.title}</h1>
-          <p className="login-form__intro">{copy.intro}</p>
+    <AuthCard>
+      <h1 className="tp-display login-title">{copy.title}</h1>
+      <p className="login-form__intro">{copy.intro}</p>
 
-          <form onSubmit={submit} className="login-fields">
-            {mode === "signup" && (
-              <div className="login-field">
-                <label className="tp-label" htmlFor="login-name">Full name</label>
-                <input id="login-name" className="tp-input" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Jane Smith" autoComplete="name" required />
-              </div>
-            )}
-            <div className="login-field">
-              <label className="tp-label" htmlFor="login-email">Email</label>
-              <input id="login-email" className="tp-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required />
+      <form onSubmit={submit} className="login-fields">
+        {mode === "signup" && (
+          <div className="login-field">
+            <label className="tp-label" htmlFor="login-name">Full name</label>
+            <input id="login-name" className="tp-input" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Jane Smith" autoComplete="name" required />
+          </div>
+        )}
+        <div className="login-field">
+          <label className="tp-label" htmlFor="login-email">Email</label>
+          <input id="login-email" className="tp-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required />
+        </div>
+        {mode !== "forgot" && (
+          <div className="login-field">
+            <div className="login-field__label-row">
+              <label className="tp-label" htmlFor="login-password">Password</label>
+              {mode === "signin" && <button type="button" className="login-mode-switch" onClick={() => switchMode("forgot")}>Forgot password?</button>}
             </div>
-            {mode !== "forgot" && (
-              <div className="login-field">
-                <div className="login-field__label-row">
-                  <label className="tp-label" htmlFor="login-password">Password</label>
-                  {mode === "signin" && <button type="button" className="login-mode-switch" onClick={() => switchMode("forgot")}>Forgot password?</button>}
-                </div>
-                <input id="login-password" className="tp-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} />
-              </div>
-            )}
-            <Notice tone="error" className="login-notice">{error}</Notice>
-            {resetSent && (
-              <Notice tone="success" className="login-notice">
-                If an account exists for {email}, we’ve sent it a reset link. Check your inbox (and spam folder), then open the link on this device.
-              </Notice>
-            )}
-            {confirmationSent && (
-              <Notice tone="success" className="login-notice">Check your email to confirm your account, then sign in.</Notice>
-            )}
-            <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} aria-busy={loading}>
-              {loading ? "Please wait…" : copy.submit}
-            </button>
-          </form>
-
-          <div className="login-switch">
-            {mode === "signin" ? (
-              <>New to the portal? <button type="button" className="login-mode-switch" onClick={() => switchMode("signup")}>Create an account</button></>
-            ) : mode === "forgot" ? (
-              <>Remembered it? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Back to sign in</button></>
-            ) : (
-              <>Already have an account? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Sign in</button></>
-            )}
+            <input id="login-password" className="tp-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} />
           </div>
-        </section>
+        )}
+        <Notice tone="error" className="login-notice">{error}</Notice>
+        {resetSent && (
+          <Notice tone="success" className="login-notice">
+            If an account exists for {email}, we’ve sent it a reset link. Check your inbox (and spam folder), then open the link on this device.
+          </Notice>
+        )}
+        {confirmationSent && (
+          <Notice tone="success" className="login-notice">Check your email to confirm your account, then sign in.</Notice>
+        )}
+        <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} aria-busy={loading}>
+          {loading ? "Please wait…" : copy.submit}
+        </button>
+      </form>
+
+      <div className="login-switch">
+        {mode === "signin" ? (
+          <>New to the portal? <button type="button" className="login-mode-switch" onClick={() => switchMode("signup")}>Create an account</button></>
+        ) : mode === "forgot" ? (
+          <>Remembered it? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Back to sign in</button></>
+        ) : (
+          <>Already have an account? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Sign in</button></>
+        )}
       </div>
-    </main>
+    </AuthCard>
   );
 }

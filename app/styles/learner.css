@@ -136,8 +136,5 @@
 .login-field__label-row .login-mode-switch { font-size: 15px; }
 
 /* Reset password (app/reset-password/page.js) */
-.login-brand-mark { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
-.login-brand-mark img { width: 130px; height: auto; display: block; }
-.login-brand-mark span { padding-left: 16px; border-left: 1px solid var(--border); color: var(--surface-dark); font-size: 22px; white-space: nowrap; }
 .reset-title { margin: 0 0 12px; color: var(--surface-dark); font-size: 28px; }
 .reset-action { margin-top: 16px; width: 100%; text-decoration: none; }

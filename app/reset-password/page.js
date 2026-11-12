@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import AuthCard from "@/components/AuthCard";
 import Notice from "@/components/Notice";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
@@ -52,49 +53,41 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="login-page">
-      <div className="login-card tp-fade-in">
-        <section className="login-form">
-          <div className="login-brand-mark">
-            <img src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />
-            <span className="tp-display">Sales Training</span>
+    <AuthCard>
+      <h1 className="tp-display reset-title">Choose a new password</h1>
+
+      {status === "checking" && <p className="login-form__intro" role="status">Checking your reset link…</p>}
+
+      {status === "invalid" && (
+        <>
+          <Notice tone="error" className="login-notice">
+            This reset link has expired or was already used. Links only work once, and only in the browser where you asked for them.
+          </Notice>
+          <Link href={routes.login} className="tp-btn tp-btn-primary reset-action">Request a new link</Link>
+        </>
+      )}
+
+      {status === "saved" && (
+        <Notice tone="success" className="login-notice">Your password has been changed. Taking you to your courses…</Notice>
+      )}
+
+      {status === "ready" && (
+        <form onSubmit={submit} className="login-fields">
+          <p className="login-form__intro">Your new password must be at least 6 characters.</p>
+          <div className="login-field">
+            <label className="tp-label" htmlFor="reset-password">New password</label>
+            <input id="reset-password" className="tp-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required minLength={6} />
           </div>
-          <h1 className="tp-display reset-title">Choose a new password</h1>
-
-          {status === "checking" && <p className="login-form__intro" role="status">Checking your reset link…</p>}
-
-          {status === "invalid" && (
-            <>
-              <Notice tone="error" className="login-notice">
-                This reset link has expired or was already used. Links only work once, and only in the browser where you asked for them.
-              </Notice>
-              <Link href={routes.login} className="tp-btn tp-btn-primary reset-action">Request a new link</Link>
-            </>
-          )}
-
-          {status === "saved" && (
-            <Notice tone="success" className="login-notice">Your password has been changed. Taking you to your courses…</Notice>
-          )}
-
-          {status === "ready" && (
-            <form onSubmit={submit} className="login-fields">
-              <p className="login-form__intro">Your new password must be at least 6 characters.</p>
-              <div className="login-field">
-                <label className="tp-label" htmlFor="reset-password">New password</label>
-                <input id="reset-password" className="tp-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required minLength={6} />
-              </div>
-              <div className="login-field">
-                <label className="tp-label" htmlFor="reset-confirm">Type it again</label>
-                <input id="reset-confirm" className="tp-input" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} autoComplete="new-password" required minLength={6} />
-              </div>
-              <Notice tone="error" className="login-notice">{error}</Notice>
-              <button className="tp-btn tp-btn-primary" type="submit" disabled={saving} aria-busy={saving}>
-                {saving ? "Saving…" : "Save new password"}
-              </button>
-            </form>
-          )}
-        </section>
-      </div>
-    </main>
+          <div className="login-field">
+            <label className="tp-label" htmlFor="reset-confirm">Type it again</label>
+            <input id="reset-confirm" className="tp-input" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} autoComplete="new-password" required minLength={6} />
+          </div>
+          <Notice tone="error" className="login-notice">{error}</Notice>
+          <button className="tp-btn tp-btn-primary" type="submit" disabled={saving} aria-busy={saving}>
+            {saving ? "Saving…" : "Save new password"}
+          </button>
+        </form>
+      )}
+    </AuthCard>
   );
 }
