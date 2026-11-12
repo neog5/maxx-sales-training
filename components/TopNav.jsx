@@ -12,7 +12,29 @@ export default function TopNav({ profile }) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const accountRef = useRef(null);
+
+  // Like YouTube: the bar slides away while scrolling down and comes back on any scroll up.
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let frame = 0;
+    function onScroll() {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        if (y < 80) setHidden(false);
+        else if (Math.abs(y - lastY) > 6) setHidden(y > lastY);
+        lastY = y;
+      });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
     function closeMenu(event) {
@@ -36,7 +58,7 @@ export default function TopNav({ profile }) {
   }
 
   return (
-    <header className="site-nav">
+    <header className={hidden && !menuOpen ? "site-nav is-hidden" : "site-nav"}>
       <div className="site-nav__inner">
         <Link href={routes.courses} className="site-brand">
           <img className="site-brand__logo" src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />

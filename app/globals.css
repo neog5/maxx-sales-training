@@ -168,8 +168,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tp-scroll::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
 
 /* Site navigation (components/TopNav.jsx) */
-.site-nav { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid #E6EAF0; background: rgba(255,255,255,.92); backdrop-filter: blur(14px); }
-.site-nav__inner { max-width: 1188px; min-height: 72px; margin: 0 auto; padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.site-nav { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid #E6EAF0; background: rgba(255,255,255,.92); backdrop-filter: blur(14px); transition: transform .25s ease; }
+.site-nav.is-hidden { transform: translateY(-100%); }
+.site-nav:focus-within { transform: none; }
+@media (prefers-reduced-motion: reduce) { .site-nav { transition: none; } }
+.site-nav__inner { max-width: 1188px; min-height: 80px; margin: 0 auto; padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .site-brand { display: flex; align-items: center; gap: 16px; min-width: 0; text-decoration: none; }
 .site-brand__logo { width: 112px; height: auto; display: block; flex: 0 0 auto; }
 .site-brand__title { padding-left: 16px; border-left: 1px solid var(--border); font-size: 21px; font-weight: 700; color: var(--surface-dark); white-space: nowrap; letter-spacing: -.02em; }
@@ -574,7 +577,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @media (max-width: 760px) {
   .tp-page { padding: 20px 16px 48px; }
-  .site-nav__inner { min-height: 64px; padding: 10px 18px; gap: 12px; }
+  .site-nav__inner { min-height: 68px; padding: 13px 18px; gap: 12px; }
   .site-brand__title { padding-left: 12px; font-size: 17px; }
   .site-nav:has(.site-nav__primary) .site-brand__title { display: none; }
   .site-brand { gap: 12px; }
