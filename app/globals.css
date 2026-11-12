@@ -330,7 +330,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .login-brand {
   position: relative; isolation: isolate; overflow: hidden;
   min-height: 520px; padding: 40px;
-  display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 18px;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; text-align: center;
   background: radial-gradient(120% 95% at 22% 18%, var(--surface) 0%, var(--surface-dark) 72%); color: #fff;
 }
 .login-brand::after { content: ""; position: absolute; z-index: -1; width: 290px; height: 290px; right: -145px; bottom: -160px; border: 54px solid rgba(255,255,255,.05); border-radius: 50%; }
