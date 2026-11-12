@@ -910,9 +910,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .error-page__card p { margin: 0; color: var(--dim); font-size: 15.5px; }
 
 /* Big completion tick (components/BigTick.jsx) */
-.big-tick { display: inline-block; flex: 0 0 auto; }
+.big-tick { display: inline-block; flex: 0 0 auto; border-radius: 50%; box-shadow: 0 4px 12px rgba(35,134,91,.25); }
 .big-tick svg { width: 100%; height: 100%; display: block; }
-.big-tick__circle { fill: var(--success); filter: drop-shadow(0 6px 14px rgba(35,134,91,.3)); transform-origin: center; animation: bigTickPop .45s cubic-bezier(.2,1.4,.4,1) both; }
+.big-tick__circle { fill: var(--success); transform-origin: center; animation: bigTickPop .45s cubic-bezier(.2,1.4,.4,1) both; }
 .big-tick__check { fill: none; stroke: #fff; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: bigTickDraw .45s .3s ease-out forwards; }
 @keyframes bigTickPop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes bigTickDraw { to { stroke-dashoffset: 0; } }
