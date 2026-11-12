@@ -143,7 +143,7 @@ export default function ReadingGateClient({ course, materials }) {
       <BackToCourses />
       <header className="reading-header">
         <div>
-          <div className="tp-label">{course.code} · {viewOnly ? "Reading only" : "Step 1 of 2"}</div>
+          <div className="tp-label">{viewOnly ? "Reading only" : "Step 1 of 2"}</div>
           <h1 className="tp-display">{course.title}</h1>
         </div>
         <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>

@@ -58,7 +58,7 @@ export default function CourseCard({ course, enrolled, readingComplete, history,
   return (
     <article className={complete ? "tp-card course-card course-card--passed" : "tp-card course-card"}>
       <div className={`course-card__cover course-card__cover--${coverTone({ complete, attempted, enrolled })}`}>
-        <span className="course-card__code">{course.code}</span>
+        <h3 className="tp-display course-card__title">{course.title}</h3>
         {complete
           ? <BigTick size={48} label="Course completed" />
           : (
@@ -71,7 +71,6 @@ export default function CourseCard({ course, enrolled, readingComplete, history,
         <CourseBadge complete={complete} attempted={attempted} enrolled={enrolled} />
         {viewOnly && <span className="course-card__kind">Reading only</span>}
       </div>
-      <h3 className="tp-display course-card__title">{course.title}</h3>
       {course.description && <p className="course-card__description">{course.description}</p>}
 
       <ol className="course-steps" aria-label="Course steps">

@@ -38,7 +38,7 @@ function ReviewCard({ question, number }) {
 export default function QuizResults({ course, result, attemptsLeft, onRetake }) {
   return (
     <div className="assessment-page tp-fade-in">
-      <div className="tp-label">{course.code} · Assessment results</div>
+      <div className="tp-label">{course.title} · Assessment results</div>
       <h1 className="tp-display assessment-results-title">Results</h1>
 
       <div className={`tp-card assessment-result-card ${result.passed ? "is-passed" : "is-failed"}`}>

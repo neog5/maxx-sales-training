@@ -16,7 +16,7 @@ function LockedNotice({ course }) {
     <div className="assessment-page assessment-locked tp-fade-in">
       <div className="tp-display assessment-locked__title">Assessment locked</div>
       <p className="assessment-locked__copy">
-        You have used all {MAX_ATTEMPTS} attempts for {course.code}. Ask your admin to give you more attempts. In the meantime, you can read the course again.
+        You have used all {MAX_ATTEMPTS} attempts for {course.title}. Ask your admin to give you more attempts. In the meantime, you can read the course again.
       </p>
       <BackToCourses />
     </div>
@@ -99,7 +99,7 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
     <div className="assessment-page tp-fade-in">
       <BackToCourses />
       <header className="assessment-header">
-        <div className="tp-label">{course.code} · Step 2 of 2</div>
+        <div className="tp-label">{course.title} · Step 2 of 2</div>
         <div className="assessment-header__title">
           <h1 className="tp-display">Assessment</h1>
           {questions.length > 0 && <span className="tp-mono">{answeredCount} of {questions.length} answered</span>}

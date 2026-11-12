@@ -43,7 +43,7 @@ export default function CourseCatalog({ requiredCards, otherCards }) {
         <input
           className="tp-input"
           type="search"
-          placeholder="Search courses by name or code"
+          placeholder="Search courses"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

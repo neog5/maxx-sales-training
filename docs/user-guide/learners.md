@@ -11,7 +11,7 @@ How to take your training in the Maxx Sales Training portal.
 
 ## Your courses
 
-After signing in you see your courses as tiles. Type in the search box at the top to find a course by name or code.
+After signing in you see your courses as tiles. Type in the search box at the top to find a course by name.
 
 - **Required courses** are the ones assigned to you. Your company tracks whether you've completed them.
 - **Other courses** are optional. You can take them, but they don't count toward your requirements.

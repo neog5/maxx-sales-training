@@ -32,7 +32,7 @@ export default async function CertificatePage({ params }) {
         <div className="page-heading certificate-heading">
           <BigTick size={72} label="Course completed" />
           <div>
-            <div className="tp-label">Certificate of completion · {certificate.course_code}</div>
+            <div className="tp-label">Certificate of completion</div>
             <h1 className="tp-display">{certificate.course_title}</h1>
             <p>{certificate.recipient_name} · completed <LocalDate value={certificate.issued_at} />{certificate.expires_at && <> · valid until <LocalDate value={certificate.expires_at} /></>} · {certificate.certificate_number}</p>
           </div>
