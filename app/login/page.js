@@ -79,26 +79,12 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <div className="login-card tp-fade-in">
-        <section className="login-brand">
-          <div className="login-brand__top">
-            <img src="/maxx-ortho-logo-white.png" alt="Maxx Orthopedics" />
-            <span>Learning portal</span>
-          </div>
-          <div>
-            <div className="login-brand__eyebrow">Rep enablement portal</div>
-            <h1 className="tp-display">Knowledge that moves with you.</h1>
-            <p>Focused product learning, practical checkpoints, and clear progress—all in one place.</p>
-            <div className="login-brand__features" aria-label="Portal benefits">
-              <span><b>✓</b> Self-paced learning</span>
-              <span><b>✓</b> Immediate feedback</span>
-              <span><b>✓</b> Progress tracking</span>
-            </div>
-          </div>
-          <div className="login-brand__footer">Maxx Orthopedics · Sales enablement</div>
-        </section>
         <section className="login-form">
-          <div className="login-form__eyebrow">Secure access</div>
-          <h2 className="tp-display">{copy.title}</h2>
+          <div className="login-brand-mark">
+            <img src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />
+            <span className="tp-display">Sales Training</span>
+          </div>
+          <h1 className="tp-display login-title">{copy.title}</h1>
           <p className="login-form__intro">{copy.intro}</p>
 
           <form onSubmit={submit} className="login-fields">

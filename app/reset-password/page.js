@@ -53,9 +53,12 @@ export default function ResetPasswordPage() {
 
   return (
     <main className="login-page">
-      <div className="login-card login-card--single tp-fade-in">
+      <div className="login-card tp-fade-in">
         <section className="login-form">
-          <img className="reset-logo" src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />
+          <div className="login-brand-mark">
+            <img src="/maxx-ortho-logo.png" alt="Maxx Orthopedics" />
+            <span className="tp-display">Sales Training</span>
+          </div>
           <h1 className="tp-display reset-title">Choose a new password</h1>
 
           {status === "checking" && <p className="login-form__intro" role="status">Checking your reset link…</p>}
