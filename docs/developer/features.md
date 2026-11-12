@@ -6,6 +6,7 @@ How each part of the portal behaves and where its code lives. For what users see
 
 - `app/login/page.js` uses Supabase email and password auth. Sign-up sends `full_name` as user metadata. The `handle_new_user` trigger creates the profile as a `learner` and emails the admins.
 - If Supabase returns no session (email confirmation is on), the page says "Check your email to confirm your account, then sign in."
+- **Forgot password**: the sign-in page calls `resetPasswordForEmail` with `redirectTo` set to `/reset-password`. The browser client exchanges the link's code as it starts (PKCE, so the link works only in the browser that asked for it), and `app/reset-password/page.js` calls `updateUser({ password })`. The Supabase project must list `<site>/reset-password` under **Auth → URL Configuration → Redirect URLs** for each environment.
 - Sign-out is in the avatar menu (`components/TopNav.jsx`).
 - Route protection is described in [Architecture](architecture.md#how-a-request-flows).
 
@@ -13,10 +14,12 @@ How each part of the portal behaves and where its code lives. For what users see
 
 `app/courses/page.js` loads the active, unarchived courses, the person's completed attempts, reading sessions, certificates and `required_courses()`.
 
-- **Required courses** are those in `required_courses()` for the person. Everything else visible is under **Other available courses**, marked optional.
-- **Card badge** (`app/courses/CourseCardClient.jsx`), first match wins: *Completed* (reading-only with certificate), *Passed · {score}%*, *Not yet passed*, *Enrolled* (has a reading session), *Not enrolled*.
-- **Start course** creates a reading session. The card then shows the steps: *PDF reading* → *Assessment* (locked until the reading is done) → *Certificate* (once issued). Reading-only courses skip *Assessment*.
-- The card doesn't know about the attempt limit: someone who is locked out still sees "Retake available" and finds out on the quiz page.
+- **Required courses** are those in `required_courses()` for the person. Everything else visible is under **Other courses**, marked optional.
+- `CourseCatalog.jsx` shows the tiles and filters them in the browser by code, title and description (every typed word must match).
+- **Tile badge** (`app/courses/CourseCard.jsx`), first match wins: *Completed* (passed, or reading-only with certificate; also a big green tick), *Not passed yet*, *In progress* (has a reading session), *Not started*.
+- The tile's checklist shows *Read the course* → *Pass the assessment* → *Get your certificate*, ticked as each is done. Reading-only courses skip the assessment.
+- One button goes to the next step: *Start course* / *Continue reading* (reading page, which creates or resumes the reading session), *Take assessment* / *Retake assessment*, *View certificate*.
+- The tile doesn't know about the attempt limit: someone who is locked out still sees *Retake assessment* and finds out on the quiz page.
 
 ## Reading (`/courses/[id]/read`)
 

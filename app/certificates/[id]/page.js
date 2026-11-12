@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BigTick from "@/components/BigTick";
 import { mustFind } from "@/lib/db";
 import LocalDate from "@/components/LocalDate";
 import TopNav from "@/components/TopNav";
@@ -28,10 +29,13 @@ export default async function CertificatePage({ params }) {
         <Link href={isOwn ? routes.courses : routes.profile(certificate.user_id)} className="tp-btn tp-btn-ghost back-link">
           ← Back to {isOwn ? "my courses" : certificate.recipient_name}
         </Link>
-        <div className="page-heading">
-          <div className="tp-label">Certificate of completion · {certificate.course_code}</div>
-          <h1 className="tp-display">{certificate.course_title}</h1>
-          <p>{certificate.recipient_name} · completed <LocalDate value={certificate.issued_at} />{certificate.expires_at && <> · valid until <LocalDate value={certificate.expires_at} /></>} · {certificate.certificate_number}</p>
+        <div className="page-heading certificate-heading">
+          <BigTick size={72} label="Course completed" />
+          <div>
+            <div className="tp-label">Certificate of completion · {certificate.course_code}</div>
+            <h1 className="tp-display">{certificate.course_title}</h1>
+            <p>{certificate.recipient_name} · completed <LocalDate value={certificate.issued_at} />{certificate.expires_at && <> · valid until <LocalDate value={certificate.expires_at} /></>} · {certificate.certificate_number}</p>
+          </div>
         </div>
         <CertificateViewer certificate={certificate} />
       </main>

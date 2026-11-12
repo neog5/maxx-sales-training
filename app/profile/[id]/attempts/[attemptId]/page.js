@@ -49,25 +49,27 @@ export default async function AttemptPage({ params }) {
             <h1 className="tp-display">{attempt.courses?.title || "Assessment attempt"}</h1>
             <p>{name} · submitted <LocalDate value={attempt.submitted_at} withTime /></p>
           </div>
-          <StatusBadge tone={attempt.passed ? "success" : "danger"} className="attempt-detail-result">{attempt.passed ? "Passed" : "Failed"}</StatusBadge>
+          <StatusBadge tone={attempt.passed ? "success" : "danger"} className="attempt-detail-result">{attempt.passed ? "Passed" : "Not passed"}</StatusBadge>
         </div>
 
         <div className="metric-grid metric-grid--attempt">
           <div className="tp-card metric-card">
             <div className="tp-label">Score</div>
             <div className="tp-mono metric-value">{attempt.score}%</div>
-            <small>Threshold {attempt.courses?.pass_threshold ?? "—"}%</small>
+            <small>Passing score: {attempt.courses?.pass_threshold ?? "—"}%</small>
           </div>
           <div className="tp-card metric-card">
             <div className="tp-label">Questions correct</div>
-            <div className="tp-mono metric-value">{correctCount}/{total}</div>
+            <div className="tp-mono metric-value">{correctCount} of {total}</div>
             <small>{total ? Math.round((correctCount / total) * 100) : 0}% accuracy</small>
           </div>
-          <div className={`tp-card metric-card mandatory-metric ${mandatoryPassed ? "is-met" : "is-unmet"}`}>
-            <div className="tp-label">Mandatory requirement</div>
-            <div className="tp-mono metric-value">{mandatoryCount ? `${mandatoryCorrectCount}/${mandatoryCount}` : "—"}</div>
-            <small>{mandatoryCount ? (mandatoryPassed ? "All mandatory questions correct" : "Requirement not met") : "No mandatory questions asked"}</small>
-          </div>
+          {mandatoryCount > 0 && (
+            <div className={`tp-card metric-card mandatory-metric ${mandatoryPassed ? "is-met" : "is-unmet"}`}>
+              <div className="tp-label">Mandatory questions</div>
+              <div className="tp-mono metric-value">{mandatoryCorrectCount} of {mandatoryCount}</div>
+              <small>{mandatoryPassed ? "All mandatory questions correct" : "Every mandatory question must be right to pass"}</small>
+            </div>
+          )}
         </div>
 
         <section className="profile-report-section">
@@ -76,7 +78,6 @@ export default async function AttemptPage({ params }) {
               <div className="tp-label">Performance by question type</div>
               <span>This attempt only</span>
             </div>
-            <span>Groups can overlap</span>
           </div>
           <div className="tp-card question-performance-card">
             <QuestionPerformance groups={calculateQuestionPerformance(questions)} />

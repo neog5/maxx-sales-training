@@ -7,25 +7,25 @@ How to take your training in the Maxx Sales Training portal.
 1. Go to the training portal and choose **Create an account** the first time. Enter your full name as it should appear on your certificates, your work email and a password of at least 6 characters.
 2. If asked, confirm your email from the message you receive, then sign in.
 3. Use **Sign in** next time. To sign out, click your initials in the top-right corner and choose **Sign out**.
+4. **Forgot your password?** On the sign-in page, click **Forgot password?**, enter your email and click **Send reset link**. Open the link in the email on the same computer or phone, then choose a new password.
 
 ## Your courses
 
-After signing in you see **Courses**:
+After signing in you see your courses as tiles. Type in the search box at the top to find a course by name or code.
 
 - **Required courses** are the ones assigned to you. Your company tracks whether you've completed them.
-- **Other available courses** are optional. You can take them, but they don't count toward your requirements.
+- **Other courses** are optional. You can take them, but they don't count toward your requirements.
 
-Each course card shows where you are:
+Each tile shows where you are:
 
 | Badge | Meaning |
 |---|---|
-| Not enrolled | You haven't started |
-| Enrolled | You've started the reading |
-| Not yet passed | You've taken the assessment but not passed yet |
-| Passed · 90% | You passed (with your latest passing score) |
-| Completed | You finished a reading-only course |
+| Not started | You haven't opened the course yet |
+| In progress | You've started the reading |
+| Not passed yet | You've taken the assessment but not passed yet |
+| Completed | You've finished the course (a large green tick also appears) |
 
-Click **Start course** to begin. The card then lists the steps.
+The tile lists the steps with a tick next to each one you've finished. The orange button always takes you to the next step: **Start course**, **Continue reading**, **Take assessment** or **View certificate**.
 
 ## Step 1: Reading
 

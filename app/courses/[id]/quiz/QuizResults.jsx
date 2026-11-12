@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BackToCourses from "@/components/BackToCourses";
+import BigTick from "@/components/BigTick";
 import Dial from "@/components/Dial";
 import StatusBadge from "@/components/StatusBadge";
 import { MAX_ATTEMPTS } from "@/lib/attempts";
@@ -41,31 +42,35 @@ export default function QuizResults({ course, result, attemptsLeft, onRetake }) 
       <h1 className="tp-display assessment-results-title">Results</h1>
 
       <div className={`tp-card assessment-result-card ${result.passed ? "is-passed" : "is-failed"}`}>
-        <Dial pct={result.score} size={120} color={result.passed ? "var(--success)" : "var(--danger)"} label={`${result.score}%`} sub="score" />
+        {result.passed
+          ? <BigTick size={120} label="Passed" />
+          : <Dial pct={result.score} size={120} color="var(--danger)" label={`${result.score}%`} sub="score" />}
         <div className="assessment-result-card__copy">
           <StatusBadge tone={result.passed ? "success" : "danger"}>{result.passed ? "Passed" : "Not passed"}</StatusBadge>
-          <h2 className="tp-display">{result.passed ? "Course complete" : "Keep building your knowledge"}</h2>
+          <h2 className="tp-display">{result.passed ? "Well done — you passed. This course is complete." : "Not passed this time"}</h2>
           <div className="assessment-result-card__detail">
-            {result.correctCount} of {result.total} correct · threshold {course.pass_threshold}%
+            Your score: {result.score}% ({result.correctCount} of {result.total} correct) · Passing score: {course.pass_threshold}%
           </div>
-          <div className={`assessment-requirement ${result.mandatoryPassed ? "is-met" : "is-unmet"}`}>
-            <strong>{result.mandatoryCount ? `Mandatory questions: ${result.mandatoryCorrectCount} of ${result.mandatoryCount} correct` : "No mandatory questions in this assessment"}</strong>
-            <span>{result.mandatoryPassed ? "Requirement met" : "All mandatory questions must be correct to pass"}</span>
-          </div>
+          {result.mandatoryCount > 0 && (
+            <div className={`assessment-requirement ${result.mandatoryPassed ? "is-met" : "is-unmet"}`}>
+              <strong>Mandatory questions: {result.mandatoryCorrectCount} of {result.mandatoryCount} correct</strong>
+              <span>{result.mandatoryPassed ? "Requirement met" : "Every mandatory question must be right to pass"}</span>
+            </div>
+          )}
           {result.passed && result.certificateId && (
             <div className="assessment-result-card__actions">
-              <Link href={routes.certificate(result.certificateId)} className="tp-btn tp-btn-primary">View certificate</Link>
+              <Link href={routes.certificate(result.certificateId)} className="tp-btn tp-btn-primary">View your certificate</Link>
             </div>
           )}
           {!result.passed && attemptsLeft > 0 && (
             <div className="assessment-result-card__actions">
-              <div className="assessment-result-card__detail assessment-result-card__attempts">{attemptsLeft} of {MAX_ATTEMPTS} attempts left</div>
+              <div className="assessment-result-card__detail assessment-result-card__attempts">You have {attemptsLeft} of {MAX_ATTEMPTS} attempts left. Review the answers below, then try again.</div>
               <button type="button" className="tp-btn tp-btn-primary" onClick={onRetake}>Retake assessment</button>
             </div>
           )}
           {!result.passed && attemptsLeft <= 0 && (
             <div className="assessment-result-card__detail assessment-result-card__actions">
-              You have used all {MAX_ATTEMPTS} attempts. Ask an admin to approve more attempts.
+              You have used all {MAX_ATTEMPTS} attempts. Ask your admin to give you more attempts.
             </div>
           )}
         </div>

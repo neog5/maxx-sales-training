@@ -8,17 +8,19 @@ import { createClient } from "@/lib/supabase/client";
 const COPY = {
   signin: { title: "Welcome back", intro: "Sign in to continue your assigned training.", submit: "Sign in" },
   signup: { title: "Create your account", intro: "Set up your account to begin training.", submit: "Create account" },
+  forgot: { title: "Reset your password", intro: "Enter your email and we’ll send you a link to choose a new password.", submit: "Send reset link" },
 };
 
 export default function LoginPage() {
   const supabase = createClient();
   const router = useRouter();
-  const [mode, setMode] = useState("signin"); // signin | signup
+  const [mode, setMode] = useState("signin"); // signin | signup | forgot
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const copy = COPY[mode];
 
@@ -26,6 +28,7 @@ export default function LoginPage() {
     setMode(nextMode);
     setError("");
     setConfirmationSent(false);
+    setResetSent(false);
   }
 
   async function submit(event) {
@@ -34,6 +37,11 @@ export default function LoginPage() {
     setError("");
     setConfirmationSent(false);
     setLoading(true);
+    if (mode === "forgot") {
+      await sendResetLink();
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error: authError } = mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
@@ -53,6 +61,19 @@ export default function LoginPage() {
       setError("Unable to connect. Please try again.");
     }
     setLoading(false);
+  }
+
+  // Supabase emails a link that signs the person in on /reset-password, where they choose a new password.
+  // The message is the same whether or not the email has an account, so it can't be used to look accounts up.
+  async function sendResetLink() {
+    try {
+      const { error: authError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}${routes.resetPassword}` });
+      if (authError && authError.status === 429) setError("Too many reset emails were requested. Please wait a few minutes and try again.");
+      else if (authError && authError.status !== 400 && authError.status !== 404) setError(authError.message);
+      else setResetSent(true);
+    } catch {
+      setError("Unable to connect. Please try again.");
+    }
   }
 
   return (
@@ -91,22 +112,34 @@ export default function LoginPage() {
               <label className="tp-label" htmlFor="login-email">Email</label>
               <input id="login-email" className="tp-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required />
             </div>
-            <div className="login-field">
-              <label className="tp-label" htmlFor="login-password">Password</label>
-              <input id="login-password" className="tp-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} />
-            </div>
+            {mode !== "forgot" && (
+              <div className="login-field">
+                <div className="login-field__label-row">
+                  <label className="tp-label" htmlFor="login-password">Password</label>
+                  {mode === "signin" && <button type="button" className="login-mode-switch" onClick={() => switchMode("forgot")}>Forgot password?</button>}
+                </div>
+                <input id="login-password" className="tp-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} />
+              </div>
+            )}
             <Notice tone="error" className="login-notice">{error}</Notice>
+            {resetSent && (
+              <Notice tone="success" className="login-notice">
+                If an account exists for {email}, we’ve sent it a reset link. Check your inbox (and spam folder), then open the link on this device.
+              </Notice>
+            )}
             {confirmationSent && (
               <Notice tone="success" className="login-notice">Check your email to confirm your account, then sign in.</Notice>
             )}
             <button className="tp-btn tp-btn-primary" type="submit" disabled={loading} aria-busy={loading}>
-              {loading ? "Loading…" : copy.submit}
+              {loading ? "Please wait…" : copy.submit}
             </button>
           </form>
 
           <div className="login-switch">
             {mode === "signin" ? (
               <>New to the portal? <button type="button" className="login-mode-switch" onClick={() => switchMode("signup")}>Create an account</button></>
+            ) : mode === "forgot" ? (
+              <>Remembered it? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Back to sign in</button></>
             ) : (
               <>Already have an account? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Sign in</button></>
             )}

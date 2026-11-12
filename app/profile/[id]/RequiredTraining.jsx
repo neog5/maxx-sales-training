@@ -50,7 +50,7 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
       <div className="section-heading-row">
         <div>
           <div className="tp-label">Required training</div>
-          <span>{required.length ? `${completed} of ${required.length} required courses passed` : "No courses assigned"}</span>
+          <span>{required.length ? `${completed} of ${required.length} required courses done` : "No courses assigned"}</span>
         </div>
         {status !== "none" && (
           <span className={`training-status training-status--${status}`}>
@@ -94,7 +94,7 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
                   {showGroups && course.reasons.length > 0 && ` · ${course.reasons.map((reason) => (reason.group_id ? groupNames.get(reason.group_id) : "Assigned individually")).join(", ")}`}
                 </small>
               </span>
-              <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : "Outstanding"}</span>
+              <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : "Not done yet"}</span>
               {canEdit && directCourseIds.includes(course.id) && (
                 <button type="button" className="tp-btn tp-btn-ghost required-course__remove" disabled={busy}
                   onClick={() => mutate("unassign-course", () => supabase.from("course_assignments").delete().eq("course_id", course.id).eq("user_id", personId))}>

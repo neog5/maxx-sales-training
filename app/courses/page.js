@@ -3,7 +3,7 @@ import { requireViewer } from "@/lib/auth";
 import { passedCoursesByUser } from "@/lib/compliance";
 import { must } from "@/lib/db";
 import { firstName } from "@/lib/people";
-import CourseCardClient from "./CourseCardClient";
+import CourseCatalog from "./CourseCatalog";
 
 // Map<courseId, rows> for rows that carry a course_id.
 function groupByCourse(rows) {
@@ -41,23 +41,16 @@ export default async function CoursesPage() {
   const otherCourses = courses.filter((course) => !requiredIds.has(course.id));
   const passedCourseIds = passedCoursesByUser(attempts, certificates).get(user.id) || new Set();
   const requiredPassed = requiredCourses.filter((course) => passedCourseIds.has(course.id)).length;
-  const readingsDone = new Set(readingSessions.filter((session) => session.checkpoint_passed).map((session) => session.course_id)).size;
 
-  function renderCourses(list, offset = 0) {
-    return list.map((course, index) => {
-      const sessions = sessionsByCourse.get(course.id) || [];
-      return (
-        <CourseCardClient
-          key={course.id}
-          course={course}
-          initiallyEnrolled={sessions.length > 0}
-          readingComplete={sessions.some((session) => session.checkpoint_passed)}
-          history={attemptsByCourse.get(course.id) || []}
-          certificateId={certificateIdByCourse.get(course.id)}
-          index={index + offset}
-        />
-      );
-    });
+  function cardProps(course) {
+    const sessions = sessionsByCourse.get(course.id) || [];
+    return {
+      course,
+      enrolled: sessions.length > 0,
+      readingComplete: sessions.some((session) => session.checkpoint_passed),
+      history: attemptsByCourse.get(course.id) || [],
+      certificateId: certificateIdByCourse.get(course.id),
+    };
   }
 
   return (
@@ -66,44 +59,21 @@ export default async function CoursesPage() {
       <main className="tp-page courses-page tp-fade-in">
         <section className="courses-hero">
           <div className="courses-hero__copy">
-            <div className="tp-label">Learning hub</div>
-            <h1 className="tp-display">Welcome back, {firstName(profile.full_name)}.</h1>
-            <p>Build product confidence at your pace. Read the material, complete the checkpoints, and pass each assessment.</p>
+            <h1 className="tp-display">Welcome back, {firstName(profile.full_name)}</h1>
+            <p>Read each course, then pass its assessment to get your certificate.</p>
           </div>
-          <div className="courses-hero__summary" aria-label="Training summary">
-            <div><strong className="tp-display">{requiredCourses.length}</strong><span>Required</span></div>
-            <div><strong className="tp-display">{readingsDone}</strong><span>Readings done</span></div>
-            <div><strong className="tp-display">{passedCourseIds.size}</strong><span>Completed</span></div>
-          </div>
+          {requiredCourses.length > 0 && (
+            <div className="courses-hero__summary" aria-label="Training summary">
+              <strong className="tp-display">{requiredPassed} of {requiredCourses.length}</strong>
+              <span>required courses done</span>
+            </div>
+          )}
         </section>
 
-        <div className="section-heading">
-          <div>
-            <div className="tp-label">Assigned training</div>
-            <h2 className="tp-display">Required courses</h2>
-          </div>
-          <span>{requiredPassed} of {requiredCourses.length} complete</span>
-        </div>
-
-        <div className="course-list">
-          {renderCourses(requiredCourses)}
-          {requiredCourses.length === 0 && <div className="tp-card courses-empty">No courses have been assigned to you yet.</div>}
-        </div>
-
-        {otherCourses.length > 0 && (
-          <>
-            <div className="section-heading section-heading--spaced">
-              <div>
-                <div className="tp-label">Optional</div>
-                <h2 className="tp-display">Other available courses</h2>
-              </div>
-              <span>Not required for your compliance</span>
-            </div>
-            <div className="course-list">{renderCourses(otherCourses, requiredCourses.length)}</div>
-          </>
-        )}
-
-        {courses.length === 0 && <div className="tp-card courses-empty courses-empty--spaced">No courses are available yet.</div>}
+        <CourseCatalog
+          requiredCards={requiredCourses.map(cardProps)}
+          otherCards={otherCourses.map(cardProps)}
+        />
       </main>
     </div>
   );

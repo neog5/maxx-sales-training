@@ -7,8 +7,10 @@ function ProgressRow({ label, value, percent }) {
   );
 }
 
-// Reading time, checkpoints and (for multi-deck courses) decks opened.
+// Reading time, checkpoints (when the course has any) and, for multi-deck courses, decks opened.
 export default function ReadingProgressCard({ status, timeProgress, questionProgress, answeredCount, questionCount, decks }) {
+  const parts = [timeProgress, ...(questionCount ? [questionProgress] : []), ...(decks ? [Math.round((decks.opened / decks.total) * 100)] : [])];
+  const overall = Math.round(parts.reduce((sum, part) => sum + part, 0) / parts.length);
   return (
     <div className="tp-card reading-status-card">
       <div className="reading-status-card__heading">
@@ -16,11 +18,11 @@ export default function ReadingProgressCard({ status, timeProgress, questionProg
           <span className="tp-label">Your progress</span>
           <strong className="tp-display">{status}</strong>
         </div>
-        <span className="reading-status-card__percent">{Math.round((timeProgress + questionProgress) / 2)}%</span>
+        <span className="reading-status-card__percent">{overall}%</span>
       </div>
       <ProgressRow label="Reading time" value={`${timeProgress}%`} percent={timeProgress} />
-      <ProgressRow label="Checkpoints" value={`${answeredCount}/${questionCount}`} percent={questionProgress} />
-      {decks && <ProgressRow label="Decks opened" value={`${decks.opened}/${decks.total}`} percent={Math.round((decks.opened / decks.total) * 100)} />}
+      {questionCount > 0 && <ProgressRow label="Reading questions" value={`${answeredCount} of ${questionCount}`} percent={questionProgress} />}
+      {decks && <ProgressRow label="Decks opened" value={`${decks.opened} of ${decks.total}`} percent={Math.round((decks.opened / decks.total) * 100)} />}
     </div>
   );
 }

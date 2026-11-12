@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import BackToCourses from "@/components/BackToCourses";
+import BigTick from "@/components/BigTick";
 import { shuffleOptions } from "@/lib/assessment";
 import { startReading } from "@/lib/queries";
 import { routes } from "@/lib/routes";
@@ -11,6 +12,8 @@ import PdfReader from "./PdfReader";
 import ReadingProgressCard from "./ReadingProgressCard";
 
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+// 75 → "1 min 15 s"; under a minute → "40 s".
+const formatTimeLeft = (seconds) => (seconds >= 60 ? `${Math.floor(seconds / 60)} min ${seconds % 60} s` : `${seconds} s`);
 
 // The database picks the checkpoint questions, checks each answer and decides when the reading
 // is finished (migration 011), so the browser never sees the correct answers.
@@ -125,21 +128,22 @@ export default function ReadingGateClient({ course, materials }) {
   function footerLabel() {
     if (completing) return "Saving progress…";
     if (done) return viewOnly ? "Finish and get certificate →" : "Start assessment →";
-    if (!timeUp) return `Continue reading · ${total - elapsed}s left`;
-    if (remainingQuestions > 0) return `Complete ${plural(remainingQuestions, "checkpoint")}`;
+    if (paused) return "Answer the reading question to continue";
+    if (!timeUp) return `Keep reading · ${formatTimeLeft(total - elapsed)} left`;
+    if (remainingQuestions > 0) return `Answer ${plural(remainingQuestions, "more reading question")}`;
     return `Open ${plural(unopenedDecks, "more deck")}`;
   }
 
   const footerMessage = progressError || saveError || (done
-    ? "All requirements complete"
-    : `Complete the reading requirements to ${viewOnly ? "get your certificate" : "unlock your assessment"}.`);
+    ? "Reading complete"
+    : `Finish the reading to ${viewOnly ? "get your certificate" : "unlock the assessment"}.`);
 
   return (
     <main className="reading-shell tp-fade-in">
       <BackToCourses />
       <header className="reading-header">
         <div>
-          <div className="tp-label">{course.code} · Step 01</div>
+          <div className="tp-label">{course.code} · {viewOnly ? "Reading only" : "Step 1 of 2"}</div>
           <h1 className="tp-display">{course.title}</h1>
         </div>
         <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>
@@ -149,7 +153,10 @@ export default function ReadingGateClient({ course, materials }) {
         <section>
           <div className="reader-heading">
             <span className="tp-label">{multiDeck ? `Course documents · ${materials.length} decks` : "Course document"}</span>
-            <span className="reader-heading__hint">{multiDeck ? "Read every deck and reach each reading checkpoint" : "Scroll to reach each reading checkpoint"}</span>
+            <span className="reader-heading__hint">
+              {multiDeck ? "Open and read every deck" : "Scroll down to read the whole document"}
+              {readingQuestions.length > 0 && " · questions appear as you read"}
+            </span>
           </div>
           {multiDeck && (
             <div className="deck-tabs" role="group" aria-label="Course decks">
@@ -183,7 +190,7 @@ export default function ReadingGateClient({ course, materials }) {
 
         <aside className="reading-question-panel">
           <ReadingProgressCard
-            status={done ? "Ready" : paused ? "Checkpoint" : "Reading"}
+            status={done ? "Reading complete" : paused ? "Answer the question" : "Reading"}
             timeProgress={timeProgress}
             questionProgress={questionProgress}
             answeredCount={answeredIds.length}
@@ -207,7 +214,9 @@ export default function ReadingGateClient({ course, materials }) {
       </div>
 
       <div className="reading-footer">
-        <span>{footerMessage}</span>
+        {done && !progressError && !saveError
+          ? <span className="reading-footer__done"><BigTick size={40} label="Reading complete" /> {footerMessage}</span>
+          : <span>{footerMessage}</span>}
         <button type="button" className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>
           {footerLabel()}
         </button>

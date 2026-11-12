@@ -16,7 +16,7 @@ function LockedNotice({ course }) {
     <div className="assessment-page assessment-locked tp-fade-in">
       <div className="tp-display assessment-locked__title">Assessment locked</div>
       <p className="assessment-locked__copy">
-        You have used all {MAX_ATTEMPTS} attempts for {course.code}. Ask an admin to approve more attempts. In the meantime, revisit the course material.
+        You have used all {MAX_ATTEMPTS} attempts for {course.code}. Ask your admin to give you more attempts. In the meantime, you can read the course again.
       </p>
       <BackToCourses />
     </div>
@@ -69,7 +69,7 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
     const { data, error } = await supabase.rpc("submit_attempt", { p_attempt_id: attemptId, p_answers: answers });
     if (error) {
       setSubmitError(OUT_OF_ATTEMPTS.test(error.message)
-        ? "You have no attempts left for this course. Ask an admin to approve more attempts."
+        ? "You have no attempts left for this course. Ask your admin to give you more attempts."
         : "Your attempt could not be saved. Please try again.");
       setSubmitting(false);
       return;
@@ -99,19 +99,23 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
     <div className="assessment-page tp-fade-in">
       <BackToCourses />
       <header className="assessment-header">
-        <div className="tp-label">{course.code} · Step 02</div>
+        <div className="tp-label">{course.code} · Step 2 of 2</div>
         <div className="assessment-header__title">
           <h1 className="tp-display">Assessment</h1>
-          <span className="tp-mono">{answeredCount}/{questions.length} answered</span>
+          {questions.length > 0 && <span className="tp-mono">{answeredCount} of {questions.length} answered</span>}
         </div>
         <div className="assessment-progress" aria-label={`${answeredCount} of ${questions.length} questions answered`}>
           <span style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} />
         </div>
-        <p>Choose the best answer for each question. You must meet the score threshold and answer every mandatory question correctly to pass. Attempts left: {attemptsLeft} of {MAX_ATTEMPTS}.</p>
+        <p>
+          Choose the best answer for each question. To pass, you need a score of at least {course.pass_threshold}%
+          {questions.some((question) => question.is_mandatory) && <> and every question marked <b>Mandatory</b> answered correctly</>}.
+          {" "}You have {attemptsLeft} of {MAX_ATTEMPTS} attempts left.
+        </p>
       </header>
 
       <Notice tone="error">{loadError}</Notice>
-      {!loadError && questions.length === 0 && <Notice>No questions have been added to this assessment yet.</Notice>}
+      {!loadError && questions.length === 0 && <Notice>This assessment has no questions yet. Please check back later or ask your admin.</Notice>}
 
       <div className="assessment-list">
         {questions.map((question, index) => (
@@ -146,11 +150,11 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
       </div>
 
       <Notice tone="error" className="assessment-submit__error">{submitError}</Notice>
-      <div className="assessment-submit">
+      {questions.length > 0 && <div className="assessment-submit">
         <button type="button" className="tp-btn tp-btn-primary assessment-submit__button" disabled={!allAnswered || !attemptId || submitting} onClick={submit}>
           {submitting ? "Submitting…" : allAnswered ? "Submit assessment" : `Answer all to submit (${questions.length - answeredCount} left)`}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

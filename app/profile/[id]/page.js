@@ -85,6 +85,8 @@ export default async function ProfilePage({ params }) {
   const questionsByAttempt = groupBy(attemptQuestions, "attempt_id");
   const roleOptions = person.id === viewer.id ? [] : assignableRoles(viewer.role, person.role);
   const name = displayName(person);
+  const isSelf = person.id === viewer.id;
+  const hasAttempts = attempts.length > 0;
 
   return (
     <div>
@@ -92,9 +94,9 @@ export default async function ProfilePage({ params }) {
       <main className="tp-page tp-fade-in">
         {canViewReports(viewer.role) && <Link href={routes.people} className="tp-btn tp-btn-ghost back-link">← Back to people</Link>}
         <div className="page-heading profile-heading">
-          <div className="tp-label">User performance</div>
-          <h1 className="tp-display">{name}</h1>
-          <p>Review overall outcomes, accuracy by question type, and every completed assessment attempt.</p>
+          <div className="tp-label">{isSelf ? "Your profile" : "User performance"}</div>
+          <h1 className="tp-display">{isSelf ? "Your training record" : name}</h1>
+          <p>{isSelf ? "Your required courses, certificates and assessment results." : "Required courses, certificates and every completed assessment attempt."}</p>
         </div>
 
         <section className="tp-card profile-summary">
@@ -111,7 +113,7 @@ export default async function ProfilePage({ params }) {
         <RequiredTraining
           personId={person.id}
           canEdit={isAdmin(viewer.role)}
-          showGroups={isAdmin(viewer.role) || viewer.id === person.id}
+          showGroups={isAdmin(viewer.role) || (isSelf && groupIds.length > 0)}
           requiredCourseIds={requiredRows.map((row) => row.course_id)}
           groups={groups}
           initialGroupIds={groupIds}
@@ -126,7 +128,7 @@ export default async function ProfilePage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Certificates</div>
-              <span>Issued automatically the first time a course is passed or a reading-only course is read</span>
+              <span>You get a certificate when you complete a course</span>
             </div>
           </div>
           <div className="tp-card certificate-list">
@@ -139,10 +141,12 @@ export default async function ProfilePage({ params }) {
                 <Link href={routes.certificate(certificate.id)} className="tp-btn tp-btn-ghost attempt-review-link">View</Link>
               </div>
             ))}
-            {certificates.length === 0 && <div className="admin-insight-empty">No certificates yet.</div>}
+            {certificates.length === 0 && <div className="admin-insight-empty">No certificates yet. Complete a course to get one.</div>}
           </div>
         </section>
 
+        {hasAttempts && (
+        <>
         <div className="metric-grid metric-grid--profile">
           <MetricCard label="Completed attempts" value={attempts.length} />
           <MetricCard label="Average score" value={percent(averageScore)} />
@@ -154,14 +158,16 @@ export default async function ProfilePage({ params }) {
           <div className="section-heading-row">
             <div>
               <div className="tp-label">Performance by question type</div>
-              <span>Accuracy across this user’s completed attempts</span>
+              <span>{isSelf ? "How often you answered each type of question correctly" : "Accuracy across this user’s completed attempts"}</span>
             </div>
-            <span>Groups can overlap</span>
           </div>
           <div className="tp-card question-performance-card">
             <QuestionPerformance groups={calculateQuestionPerformance(attemptQuestions)} />
           </div>
         </section>
+
+        </>
+        )}
 
         <section className="profile-report-section">
           <div className="section-heading-row">
@@ -184,16 +190,16 @@ export default async function ProfilePage({ params }) {
                       <small>{summary.total} {summary.total === 1 ? "question" : "questions"}</small>
                     </div>
                     <div className="tp-mono">{attempt.score}%</div>
-                    <div><StatusBadge tone={attempt.passed ? "success" : "danger"}>{attempt.passed ? "Passed" : "Failed"}</StatusBadge></div>
+                    <div><StatusBadge tone={attempt.passed ? "success" : "danger"}>{attempt.passed ? "Passed" : "Not passed"}</StatusBadge></div>
                     <div className={summary.mandatoryPassed ? "mandatory-status is-met" : "mandatory-status is-unmet"}>
-                      {summary.mandatoryCount ? `${summary.mandatoryCorrectCount}/${summary.mandatoryCount} correct` : "None asked"}
+                      {summary.mandatoryCount ? `${summary.mandatoryCorrectCount} of ${summary.mandatoryCount} correct` : "—"}
                     </div>
                     <div className="profile-attempt-date"><LocalDate value={attempt.submitted_at} /></div>
                     <div><Link href={routes.attempt(person.id, attempt.id)} className="tp-btn tp-btn-ghost attempt-review-link">Review</Link></div>
                   </div>
                 );
               })}
-              {attempts.length === 0 && <div className="admin-insight-empty">No completed assessments yet.</div>}
+              {!hasAttempts && <div className="admin-insight-empty">No assessments taken yet.</div>}
             </div>
           </div>
         </section>

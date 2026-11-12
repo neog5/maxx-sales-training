@@ -53,7 +53,7 @@ Next 16 renamed middleware to `proxy`, but `proxy.js` always runs on the Node.js
 
 Not done yet. When moving to training.maxxorthoportal.com:
 
-1. Create the production Supabase project on the business account. Run `supabase/setup.sql`, `supabase/requested-changes.sql`, then every `supabase/migrations/NNN_*.sql` in order (not the `.undo.sql` files, and not `seed.sql`). Set Authentication → URL Configuration → Site URL to `https://training.maxxorthoportal.com`.
+1. Create the production Supabase project on the business account. Run `supabase/setup.sql`, `supabase/requested-changes.sql`, then every `supabase/migrations/NNN_*.sql` in order (not the `.undo.sql` files, and not `seed.sql`). Set Authentication → URL Configuration → Site URL to `https://training.maxxorthoportal.com` and add `https://training.maxxorthoportal.com/reset-password` to Redirect URLs (for forgot password).
 2. Create a Worker named exactly `maxx-sales-training` from this repo: branch `main`, build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`.
 3. Build variables: the production `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Do **not** set `NEXT_PUBLIC_APP_ENV`.
 4. Runtime secret: `OPENROUTER_API_KEY`.

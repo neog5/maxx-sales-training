@@ -1,3 +1,4 @@
+import BigTick from "@/components/BigTick";
 import Skeleton from "@/components/Skeleton";
 import StatusBadge from "@/components/StatusBadge";
 
@@ -63,14 +64,17 @@ function ActiveCheckpoint({ question, location, selectedAnswer, feedback, checki
 
 // The side panel that asks a question when the reader reaches its page.
 // `location` describes where the active question sits, e.g. "deck 2, page 4".
+// Not shown at all for a course without reading questions.
 export default function CheckpointCard({ loading, questionCount, answeredCount, multiDeck, activeQuestion, location, selectedAnswer, feedback, checking, onSelect, onAction }) {
   if (loading) {
     return <div className="tp-card reading-question-card"><CheckpointSkeleton /></div>;
   }
 
+  if (!questionCount) return null;
+
   return (
     <div className="tp-card reading-question-card">
-      <div className="checkpoint-count">{answeredCount}/{questionCount} reading questions completed</div>
+      <div className="checkpoint-count">{answeredCount} of {questionCount} reading questions answered</div>
       {activeQuestion ? (
         <ActiveCheckpoint
           question={activeQuestion}
@@ -83,17 +87,15 @@ export default function CheckpointCard({ loading, questionCount, answeredCount, 
         />
       ) : questionCount > 0 && answeredCount === questionCount ? (
         <div className="reading-question-complete tp-fade-in">
-          <div className="reading-question-complete__icon">✓</div>
-          <div className="tp-display">Reading questions completed</div>
-          <p>You answered all {questionCount} reading checkpoints.</p>
+          <BigTick size={64} />
+          <div className="tp-display">All reading questions answered</div>
+          <p>Nice work. Finish any remaining reading time, then continue.</p>
         </div>
       ) : (
         <div className="tp-fade-in">
           <div className="tp-label checkpoint-idle__label">Reading questions</div>
           <div className="checkpoint-idle__copy">
-            {!questionCount
-              ? "No reading questions have been added for this course."
-              : multiDeck
+            {multiDeck
                 ? "Keep reading through each deck. This panel will change when you reach the next question."
                 : "Keep scrolling through the PDF. This panel will change when you reach the next question."}
           </div>
