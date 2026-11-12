@@ -6,7 +6,7 @@ How each part of the portal behaves and where its code lives. For what users see
 
 - `app/login/page.js` uses Supabase email and password auth. Sign-up sends `full_name` as user metadata. The `handle_new_user` trigger creates the profile as a `learner` and emails the admins.
 - If Supabase returns no session (email confirmation is on), the page says "Check your email to confirm your account, then sign in."
-- **Forgot password**: the sign-in page calls `resetPasswordForEmail` with `redirectTo` set to `/reset-password`. The browser client exchanges the link's code as it starts (PKCE, so the link works only in the browser that asked for it), and `app/reset-password/page.js` calls `updateUser({ password })`. The Supabase project must list `<site>/reset-password` under **Auth → URL Configuration → Redirect URLs** for each environment.
+- **Forgot password**: the sign-in page calls `resetPasswordForEmail` with `redirectTo` set to `/reset-password`. The browser client exchanges the link's code as it starts (PKCE, so the link works only in the browser that asked for it), and `app/reset-password/page.js` calls `updateUser({ password })`. Each Supabase project needs the redirect URL and its own SMTP server: see [Sign-in emails](operations.md#sign-in-emails-smtp).
 - Sign-out is in the avatar menu (`components/TopNav.jsx`).
 - Route protection is described in [Architecture](architecture.md#how-a-request-flows).
 

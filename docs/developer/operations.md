@@ -47,6 +47,29 @@ No emails are sent until `resend_api_key` is set. To check what Resend said abou
 select status_code, content from net._http_response order by created desc limit 10;
 ```
 
+## Sign-in emails (SMTP)
+
+Supabase Auth sends the sign-up confirmation and forgot-password emails itself, separately from the admin alerts above. Its built-in sender only delivers to members of the Supabase organisation and only a few emails an hour, so every project that real people use needs its own SMTP server. Use Resend.
+
+Setup, once per Supabase project:
+
+1. **Authentication → Emails → SMTP Settings**: turn on **Custom SMTP** and enter:
+
+   | Field | Value |
+   |---|---|
+   | Host | `smtp.resend.com` |
+   | Port | `465` |
+   | Username | `resend` |
+   | Password | a Resend API key with sending access (the alerts key works, or create a separate one) |
+   | Sender email | an address on the verified domain, e.g. `no-reply@maxxorthoportal.com` |
+   | Sender name | `Maxx Sales Training` (dev: `[DEV] Maxx Sales Training`) |
+
+2. **Authentication → Rate Limits**: raise *Rate limit for sending emails* if needed; Supabase starts custom SMTP at 30 an hour.
+3. **Authentication → URL Configuration**: Site URL is the portal address, and Redirect URLs include `<portal>/reset-password` (dev also `http://localhost:3000/reset-password`). A missing redirect sends people to the home page instead of the reset form.
+4. Optional: **Authentication → Emails → Templates → Reset Password**: set a clearer subject such as "Reset your Maxx Sales Training password". Keep the `{{ .ConfirmationURL }}` link.
+
+To test, use **Forgot password?** on the sign-in page and open the emailed link in the same browser. Failed sends show under **Logs → Auth**.
+
 ## Changing the certificate template
 
 1. Design the certificate in Canva: one template for every course, with the name, course and date areas left blank.

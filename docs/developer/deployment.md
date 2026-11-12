@@ -58,6 +58,7 @@ Not done yet. When moving to training.maxxorthoportal.com:
 3. Build variables: the production `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Do **not** set `NEXT_PUBLIC_APP_ENV`.
 4. Runtime secret: `OPENROUTER_API_KEY`.
 5. Set up [admin email alerts](operations.md#admin-email-alerts) in the production project (no `[DEV]` subject prefix).
+   Also set up [sign-in emails (SMTP)](operations.md#sign-in-emails-smtp), or confirmation and forgot-password emails won't reach anyone outside the Supabase organisation.
 6. Sign up and [make the first super admin](operations.md#the-first-super-admin).
 7. Read [Security](security.md) and decide whether any open points must be closed first (for example, private storage for confidential PDFs).
 8. Merge `dev` into `main`; the push builds and deploys production.
