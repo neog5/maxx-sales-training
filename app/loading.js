@@ -1,5 +1,5 @@
-import { CoursesSkeleton } from "@/components/Skeleton";
+import { BlankSkeleton } from "@/components/Skeleton";
 
 export default function Loading() {
-  return <CoursesSkeleton />;
+  return <BlankSkeleton />;
 }

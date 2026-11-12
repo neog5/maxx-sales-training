@@ -1,5 +1,5 @@
-import { QuestionBankSkeleton } from "@/components/Skeleton";
+import { CoursesAdminSkeleton } from "@/components/Skeleton";
 
 export default function Loading() {
-  return <QuestionBankSkeleton />;
+  return <CoursesAdminSkeleton />;
 }

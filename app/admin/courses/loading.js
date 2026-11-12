@@ -1,5 +1,5 @@
-import { AdminDashboardSkeleton } from "@/components/Skeleton";
+import { CoursesAdminSkeleton } from "@/components/Skeleton";
 
 export default function Loading() {
-  return <AdminDashboardSkeleton />;
+  return <CoursesAdminSkeleton />;
 }
