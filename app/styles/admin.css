@@ -28,7 +28,7 @@
 .course-decks { margin-top: 18px; }
 .course-decks__list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .course-decks__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto auto auto auto; gap: 8px; align-items: center; }
-.course-decks__number { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: var(--accent-dim); color: var(--accent); font: 600 11.5px/1 'JetBrains Mono', monospace; }
+.course-decks__number { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: var(--accent-dim); color: var(--accent); font: 600 13px/1 "Inter", sans-serif; font-variant-numeric: tabular-nums; }
 .course-decks__meta { color: var(--faint); font-size: 13px; white-space: nowrap; }
 .course-decks__upload { cursor: pointer; }
 @media (max-width: 700px) {
@@ -68,4 +68,4 @@
 .dial__progress { transition: stroke-dashoffset .4s ease; }
 .dial__label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dial__value { font-weight: 600; color: var(--text); }
-.dial__sub { margin-top: 2px; color: var(--faint); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+.dial__sub { margin-top: 2px; color: var(--faint); font-size: 13px; }

@@ -58,14 +58,16 @@ export default async function CoursesPage() {
       <TopNav profile={profile} />
       <main className="tp-page courses-page tp-fade-in">
         <section className="courses-hero">
-          <div className="courses-hero__copy">
+          <div>
             <h1 className="tp-display">Welcome back, {firstName(profile.full_name)}</h1>
             <p>Read each course, then pass its assessment to get your certificate.</p>
           </div>
           {requiredCourses.length > 0 && (
-            <div className="courses-hero__summary" aria-label="Training summary">
-              <strong className="tp-display">{requiredPassed} of {requiredCourses.length}</strong>
-              <span>required courses done</span>
+            <div className="courses-hero__summary">
+              <span><strong>{requiredPassed} of {requiredCourses.length}</strong> required courses done</span>
+              <div className="courses-hero__bar" role="progressbar" aria-label="Required courses done" aria-valuemin={0} aria-valuemax={requiredCourses.length} aria-valuenow={requiredPassed}>
+                <span style={{ width: `${(requiredPassed / requiredCourses.length) * 100}%` }} />
+              </div>
             </div>
           )}
         </section>

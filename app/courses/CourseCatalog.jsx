@@ -8,14 +8,12 @@ const matches = (course, words) => {
   return words.every((word) => text.includes(word));
 };
 
-function Section({ label, title, cards, empty }) {
+function Section({ title, note, cards, empty }) {
   return (
     <section className="course-section">
       <div className="section-heading">
-        <div>
-          <div className="tp-label">{label}</div>
-          <h2 className="tp-display">{title}</h2>
-        </div>
+        <h2 className="tp-display">{title}</h2>
+        {note && <span>{note}</span>}
       </div>
       {cards.length > 0
         ? <div className="course-list">{cards.map((card) => <CourseCard key={card.course.id} {...card} />)}</div>
@@ -60,13 +58,13 @@ export default function CourseCatalog({ requiredCards, otherCards }) {
         <>
           {(!searching || required.length > 0) && (
             <Section
-              label="Assigned to you"
               title="Required courses"
+              note="Assigned to you"
               cards={required}
               empty="No courses have been assigned to you yet."
             />
           )}
-          {other.length > 0 && <Section label="Optional" title="Other courses" cards={other} />}
+          {other.length > 0 && <Section title="Other courses" note="Optional" cards={other} />}
         </>
       )}
     </>

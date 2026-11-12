@@ -1,5 +1,15 @@
 import Link from "next/link";
+import BigTick from "@/components/BigTick";
 import StatusBadge from "@/components/StatusBadge";
+
+const COVER_TONES = ["blue", "orange", "slate", "sky"];
+
+// The same course always gets the same cover colour.
+function coverTone(code = "") {
+  let hash = 0;
+  for (const char of code) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return COVER_TONES[hash % COVER_TONES.length];
+}
 import { routes } from "@/lib/routes";
 
 function CourseBadge({ complete, attempted, enrolled }) {
@@ -48,10 +58,19 @@ export default function CourseCard({ course, enrolled, readingComplete, history,
 
   return (
     <article className={complete ? "tp-card course-card course-card--passed" : "tp-card course-card"}>
-      {complete && <span className="course-card__tick" aria-hidden="true">✓</span>}
-      <div className="course-card__meta">
+      <div className={`course-card__cover course-card__cover--${complete ? "done" : coverTone(course.code)}`}>
         <span className="course-card__code">{course.code}</span>
+        {complete
+          ? <BigTick size={48} label="Course completed" />
+          : (
+            <svg className="course-card__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z" /><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5Z" />
+            </svg>
+          )}
+      </div>
+      <div className="course-card__meta">
         <CourseBadge complete={complete} attempted={attempted} enrolled={enrolled} />
+        {viewOnly && <span className="course-card__kind">Reading only</span>}
       </div>
       <h3 className="tp-display course-card__title">{course.title}</h3>
       {course.description && <p className="course-card__description">{course.description}</p>}
