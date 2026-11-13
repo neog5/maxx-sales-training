@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { COURSE_PDF_BUCKET, deckFileError, materialStoragePathFromUrl, reorderedPositions, titleFromFileName, uploadCourseDeck } from "@/lib/course-materials";
+import { COURSE_PDF_BUCKET, deckFileError, materialStoragePathFromUrl, reorderedPositions, titleFromFileName, uploadCourseDeck, withSignedDeckUrls } from "@/lib/course-materials";
 import { FREE_PDF_PARSER_LIMIT_TEXT } from "@/lib/question-suggestions";
 import { createClient } from "@/lib/supabase/client";
 import useAdminMutation from "../../useAdminMutation";
@@ -50,6 +50,15 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
     change("upload", () => uploadDecks(files),
       { success: files.length === 1 ? "Deck added. Give it a clear title below." : `${files.length} decks added. Give them clear titles below.` },
       { refreshOnFailure: true });
+  }
+
+  // The bucket is private, so each "Open" gets a fresh link that works for an hour.
+  // The tab is opened first, while the click still counts, so pop-up blockers allow it.
+  async function open(material) {
+    const tab = window.open("", "_blank");
+    const [deck] = await withSignedDeckUrls(supabase, [material], 60 * 60);
+    if (tab) tab.location = deck.pdf_url;
+    else window.location.assign(deck.pdf_url);
   }
 
   function saveTitle(material) {
@@ -100,7 +109,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
               onBlur={() => saveTitle(material)}
               onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
             <span className="course-decks__meta">{readingCounts[material.id] || 0} reading q.</span>
-            <a className="tp-btn tp-btn-ghost" href={material.pdf_url} target="_blank" rel="noreferrer">Open</a>
+            <button type="button" className="tp-btn tp-btn-ghost" onClick={() => open(material)}>Open</button>
             {!readOnly && <>
               <button type="button" className="tp-btn tp-btn-ghost" aria-label={`Move ${material.title} up`} disabled={Boolean(busy) || index === 0} onClick={() => move(index, index - 1)}>↑</button>
               <button type="button" className="tp-btn tp-btn-ghost" aria-label={`Move ${material.title} down`} disabled={Boolean(busy) || index === materials.length - 1} onClick={() => move(index, index + 1)}>↓</button>

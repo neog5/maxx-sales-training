@@ -41,7 +41,7 @@ export default async function InsightsPage() {
         .order("id"),
       "completed attempts"
     ),
-    fetchPeople(supabase, "id, full_name, email, role"),
+    fetchPeople(supabase, "id, full_name, email, role, archived_at", { includeArchived: true }),
     fetchAll(() => supabase.from("attempt_questions").select("attempt_id, is_mandatory, image_url, is_correct").order("id"), "answered questions"),
   ]);
 
@@ -51,7 +51,8 @@ export default async function InsightsPage() {
   const avgScore = total ? Math.round(attempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / total) : 0;
 
   const statsFor = summarizeAttemptsByUser(attempts);
-  const userPerformance = people.map((person) => ({ ...person, ...statsFor(person.id) })).sort(byPassRate);
+  const activePeople = people.filter((person) => !person.archived_at);
+  const userPerformance = activePeople.map((person) => ({ ...person, ...statsFor(person.id) })).sort(byPassRate);
   const questionPerformance = calculateQuestionPerformance(attemptQuestions);
   const questionsByAttempt = new Map();
   for (const question of attemptQuestions) {
@@ -66,7 +67,7 @@ export default async function InsightsPage() {
         </div>
 
         <div className="metric-grid metric-grid--admin">
-          <MetricCard label="Users" value={people.length} />
+          <MetricCard label="Users" value={activePeople.length} />
           <MetricCard label="Completed attempts" value={total} />
           <MetricCard label="Pass rate" value={`${passRate}%`} accent />
           <MetricCard label="Average score" value={`${avgScore}%`} />

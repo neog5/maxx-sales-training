@@ -69,3 +69,19 @@
 .dial__label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dial__value { font-weight: 600; color: var(--text); }
 .dial__sub { margin-top: 2px; color: var(--faint); font-size: 13px; }
+
+/* People: invites and archiving */
+.invite-panel { padding: 16px 18px; margin-bottom: 14px; }
+.invite-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.invite-panel__head span { color: var(--faint); font-size: 14px; }
+.invite-panel__form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: 12px; margin: 16px 0 12px; }
+.invite-panel__form label { display: grid; gap: 6px; }
+.invite-panel__form textarea { resize: vertical; }
+.invite-panel__list small { display: block; color: var(--faint); font-size: 13px; }
+.profile-summary__actions { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.archive-editor .notice { margin: 8px 0 0; }
+@media (max-width: 760px) {
+  .invite-panel__head { align-items: stretch; flex-direction: column; }
+  .invite-panel__form { grid-template-columns: 1fr; }
+  .profile-summary__actions { justify-content: flex-start; }
+}

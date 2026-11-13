@@ -327,3 +327,104 @@ test("assessments: the database grades them and hides answers until submitted", 
   const certificate = (await asOwner("select c.id, c.issued_at = a.submitted_at as dated from public.certificates c join public.quiz_attempts a on a.id = c.attempt_id where c.user_id = $1 and c.course_id = $2", [users.learner, course])).rows[0];
   assert.deepEqual(certificate, { id: passed.certificate_id, dated: true });
 });
+
+test("invites: admin-only, and a sign-up uses its invite and joins the invite's group", { skip }, async (t) => {
+  const email = `invited.${randomUUID().slice(0, 8)}@test.invalid`;
+  assert.match((await as(users.learner, "insert into public.invites (email) values ($1)", [email])).error, /row-level security/);
+  assert.match((await as(users.manager, "insert into public.invites (email) values ($1)", [email])).error, /row-level security/);
+  assert.match((await as(users.admin, "insert into public.invites (email) values ($1)", [email.toUpperCase()])).error, /check constraint/);
+  const invite = (await as(users.admin, "insert into public.invites (email, group_id, invited_by) values ($1, $2, $3) returning id, invited_by", [email, ids.group, users.learner])).rows[0];
+  assert.equal(invite.invited_by, users.admin);
+  assert.equal((await as(users.learner, "select count(*)::int as n from public.invites")).rows[0].n, 0);
+
+  // Supabase Auth connects as its own role; without an invite it can't create the account.
+  const authSignUp = async (address) => {
+    await client.query("savepoint signup");
+    try {
+      await client.query("set local session authorization supabase_auth_admin");
+    } catch (error) {
+      await client.query("rollback to savepoint signup");
+      return { unsupported: error.message };
+    }
+    try {
+      const id = randomUUID();
+      await client.query("insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)", [id, address, { full_name: "Invited" }]);
+      await client.query("reset session authorization");
+      await client.query("release savepoint signup");
+      return { id };
+    } catch (error) {
+      await client.query("rollback to savepoint signup");
+      return { error: error.message };
+    }
+  };
+  const uninvited = await authSignUp(`stranger.${randomUUID().slice(0, 8)}@test.invalid`);
+  let invitedId;
+  if (uninvited.unsupported) {
+    // This database user can't act as Supabase Auth; sign up as the owner instead.
+    t.diagnostic(`Refusing uninvited sign-ups was not checked: ${uninvited.unsupported}`);
+    invitedId = randomUUID();
+    await asOwner("insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)", [invitedId, email, { full_name: "Invited" }]);
+  } else {
+    assert.match(uninvited.error, /has not been invited/);
+    invitedId = (await authSignUp(email)).id;
+    assert.ok(invitedId, "an invited email can sign up");
+  }
+
+  const used = (await asOwner("select accepted_by, accepted_at from public.invites where id = $1", [invite.id])).rows[0];
+  assert.equal(used.accepted_by, invitedId);
+  assert.ok(used.accepted_at);
+  assert.equal((await asOwner("select added_by from public.group_members where group_id = $1 and user_id = $2", [ids.group, invitedId])).rows[0].added_by, users.admin);
+  // A used invite is a record: it can't be withdrawn. An unused one can.
+  assert.equal((await as(users.admin, "delete from public.invites where id = $1", [invite.id])).count, 0);
+  const spare = (await as(users.admin, "insert into public.invites (email) values ($1) returning id", [`spare.${randomUUID().slice(0, 8)}@test.invalid`])).rows[0].id;
+  assert.equal((await as(users.admin, "delete from public.invites where id = $1", [spare])).count, 1);
+});
+
+test("archived people lose all access, keep their records, and can be restored", { skip }, async () => {
+  const course = await makeCourse({ optional: 5 });
+  await asOwner("insert into public.course_assignments (course_id, user_id) values ($1, $2)", [course, users.other]);
+  const archive = (actor, target, value = "now()") => as(actor, `update public.profiles set archived_at = ${value} where id = $1 returning archived_at, archived_by`, [target]);
+
+  assert.match((await archive(users.learner, users.learner)).error, /Only an admin/);
+  assert.equal((await archive(users.manager, users.other)).count, 0);
+  assert.match((await archive(users.admin, users.admin)).error, /cannot archive yourself/);
+  assert.match((await archive(users.admin, users.superAdmin)).error, /Only a super admin/);
+
+  const archived = (await archive(users.admin, users.other, "'2000-01-01'")).rows[0];
+  assert.equal(archived.archived_by, users.admin);
+  assert.ok(new Date(archived.archived_at) > new Date("2020-01-01"), "the database sets the time");
+
+  // The archived person sees only their own profile row, and nothing else works.
+  assert.equal((await as(users.other, "select count(*)::int as n from public.profiles")).rows[0].n, 1);
+  assert.equal((await as(users.other, "select count(*)::int as n from public.courses")).rows[0].n, 0);
+  assert.equal((await as(users.other, "select count(*)::int as n from public.quiz_attempts")).rows[0].n, 0);
+  assert.equal((await as(users.other, "select count(*)::int as n from public.required_courses()")).rows[0].n, 0);
+  assert.match((await call(users.other, "public.start_reading($1)", [course])).error, /deactivated/);
+  assert.equal((await as(users.other, "update public.profiles set full_name = 'Back again' where id = $1", [users.other])).count, 0);
+  assert.equal((await archive(users.other, users.other, "null")).count, 0);
+  // They no longer count towards compliance, but their records are still there for admins.
+  assert.equal((await as(users.admin, "select count(*)::int as n from public.required_courses() where user_id = $1", [users.other])).rows[0].n, 0);
+  assert.ok((await as(users.admin, "select count(*)::int as n from public.quiz_attempts where user_id = $1", [users.other])).rows[0].n > 0);
+  assert.equal((await as(users.admin, "select action from public.audit_log where entity_id = $1 order by id desc limit 1", [users.other])).rows[0].action, "profile.archived");
+
+  // An archived admin holds no role.
+  await asOwner("update public.profiles set archived_at = now() where id = $1", [users.admin]);
+  assert.equal((await as(users.admin, "select count(*)::int as n from public.profiles")).rows[0].n, 1);
+  assert.match((await as(users.admin, "insert into public.invites (email) values ('x@test.invalid')")).error, /row-level security/);
+  await asOwner("update public.profiles set archived_at = null where id = $1", [users.admin]);
+
+  const restored = (await archive(users.admin, users.other, "null")).rows[0];
+  assert.equal(restored.archived_at, null);
+  assert.equal(restored.archived_by, null);
+  assert.equal((await as(users.other, "select count(*)::int as n from public.required_courses()")).rows[0].n, 1);
+});
+
+test("course PDFs: signed-in people can read the files, archived people and visitors can't", { skip }, async () => {
+  assert.equal((await asOwner("select public from storage.buckets where id = 'course-pdfs'")).rows[0].public, false);
+  const visible = (userId) => as(userId, "select count(*)::int as n from storage.objects where bucket_id = 'course-pdfs'");
+  const total = (await asOwner("select count(*)::int as n from storage.objects where bucket_id = 'course-pdfs'")).rows[0].n;
+  assert.equal((await visible(users.learner)).rows[0].n, total);
+  await asOwner("update public.profiles set archived_at = now() where id = $1", [users.learner]);
+  assert.equal((await visible(users.learner)).rows[0].n, 0);
+  await asOwner("update public.profiles set archived_at = null where id = $1", [users.learner]);
+});

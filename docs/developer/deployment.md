@@ -43,7 +43,7 @@ Changing a build variable needs a rebuild.
 - **CPU time**: Free plan allows 10 ms of CPU per request (waiting on Supabase or OpenRouter doesn't count). Error 1102 in logs means it was exceeded; move to the Paid plan.
 - **Next.js version**: keep `next` within the range `@opennextjs/cloudflare` supports. Next 16.4 isn't supported by adapter 1.20.10 yet.
 - **PDF size for AI suggestions**: 5 MiB with the free `cloudflare-ai` parser. Compress larger PDFs or use `OPENROUTER_PDF_ENGINE=mistral-ocr` (paid). Uploads are capped at 50 MB and the reader works at any size. The Worker never downloads PDFs (OpenRouter fetches them by URL), so memory isn't a concern. If that ever changes, PDFs over about 20 MB could exhaust the 128 MB Worker memory.
-- **Public PDFs**: suggestions need the `course-pdfs` bucket to stay public. If it goes private, pass OpenRouter a short-lived signed URL instead.
+- **Private PDFs**: the `course-pdfs` bucket is private (migration 013). OpenRouter gets a signed link that works for 15 minutes.
 
 ### Why `middleware.js` and not `proxy.js`
 

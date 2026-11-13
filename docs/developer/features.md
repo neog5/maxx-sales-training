@@ -5,6 +5,8 @@ How each part of the portal behaves and where its code lives. For what users see
 ## Sign-up and sign-in
 
 - `app/login/page.js` uses Supabase email and password auth. Sign-up sends `full_name` as user metadata. The `handle_new_user` trigger creates the profile as a `learner` and emails the admins.
+- **Sign-up is invite-only** (migration 012). The trigger refuses emails that aren't in `invites`; Supabase then answers "Database error saving new user", which `signUpErrorMessage` (`lib/invites.js`) turns into "hasn't been invited yet". A used invite is marked `accepted_at`, and adds the person to the invite's training group if it names one.
+- **Archived people** are sent to `/deactivated` by `requireViewer` (`lib/auth.js`), where they can only sign out.
 - If Supabase returns no session (email confirmation is on), the page says "Check your email to confirm your account, then sign in."
 - **Forgot password**: the sign-in page calls `resetPasswordForEmail` with `redirectTo` set to `/reset-password`. The browser client exchanges the link's code as it starts (PKCE, so the link works only in the browser that asked for it), and `app/reset-password/page.js` calls `updateUser({ password })`. Each Supabase project needs the redirect URL and its own SMTP server: see [Sign-in emails](operations.md#sign-in-emails-smtp).
 - Sign-out is in the avatar menu (`components/TopNav.jsx`).
@@ -117,9 +119,9 @@ UI: `SuggestionLauncher.jsx` and `SuggestionPanel.jsx`. Server: `app/api/admin/q
 - **Training groups** (`/admin/training-groups`, `GroupsClient.jsx`): create, rename, delete groups; add or remove members (search or paste emails); assign courses to the whole group. *View compliance* opens the Dashboard filtered to that group. Managers can't see this page.
 - **Dashboard** (`/admin`, `ComplianceDashboardClient.jsx`): a card for everyone plus one per training group (admins), then a table of each person's completed/assigned courses and status. Filter by search, group or watchlist, and status. `?group=` and `?status=` preselect them. **Export CSV** downloads the filtered rows: Name, Role, Groups (admins only), Completed, Assigned, Status.
 - **Watchlists** (`WatchlistBar.jsx`): private lists of people that managers and admins make to follow a team. They only filter the Dashboard.
-- **People** (`/admin/people`): everyone with search, role and status filters and sorting, attempts, average score and pass rate.
+- **People** (`/admin/people`): everyone with search, role and status filters and sorting, attempts, average score and pass rate. Archived people show only under the *Archived* status. Admins also get **Invites** (`InvitePanel.jsx`): paste email addresses, optionally pick a training group, and withdraw invites nobody has used. The database emails each invite if Resend and `portal_url` are set up.
 - **Insights** (`/admin/insights`): totals, the 6 people with the lowest pass rate, accuracy by question type (mandatory, image-based…), and the full attempt log with links to each attempt review.
-- **Profile** (`/profile/[id]`): role editor (admins), required training with reasons and assignment controls, training groups, locked assessments with *Allow 3 more attempts*, certificates, stats and every attempt. **Attempt review** (`/profile/[id]/attempts/[attemptId]`) shows the frozen questions with the person's answers.
+- **Profile** (`/profile/[id]`): role editor (admins), **Archive person / Restore person** (`ArchiveEditor.jsx`; admins for learners and managers, super admins for admins), required training with reasons and assignment controls, training groups, locked assessments with *Allow 3 more attempts*, certificates, stats and every attempt. **Attempt review** (`/profile/[id]/attempts/[attemptId]`) shows the frozen questions with the person's answers.
 
 ## Admin email alerts
 

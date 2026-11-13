@@ -42,8 +42,11 @@ audit_log (append-only, written by triggers)
 | `role` | `learner` (default), `manager`, `admin`, `super_admin` |
 | `email` | Copied from `auth.users` and kept in sync by trigger |
 | `region`, `created_at` | `region` is unused by the UI |
+| `archived_at`, `archived_by` | Set by the `stamp_profile_archive` trigger when an admin archives the person. Archived people lose all access and aren't required to complete anything; see [Security](security.md) |
 
-RLS: read your own, or everyone if reports. Update your own (except `role`), or anyone's if admin. Role changes are checked by the `prevent_profile_privilege_escalation` trigger: only admins may change roles, and only a super admin may grant or remove `super_admin`. Sessions without a signed-in user (SQL Editor, service role) skip the check.
+RLS: read your own, or everyone if reports. Update your own (except `role`), or anyone's if admin. Role changes are checked by the `prevent_profile_privilege_escalation` trigger: only admins may change roles, and only a super admin may grant or remove `super_admin`. The same trigger decides who may archive: admins, but only super admins for an admin, and nobody for themselves. Sessions without a signed-in user (SQL Editor, service role) skip the check.
+
+**`invites`**: email addresses allowed to sign up. `email` (unique, lowercase), optional `group_id` to join on sign-up, `invited_by`, `invited_at`, and `accepted_at` / `accepted_by` once used. Admin-only. Unused invites can be deleted; used ones can't.
 
 ### Courses and content
 
@@ -123,7 +126,8 @@ One certificate per person per course (unique). Read your own (reports read all)
 | Courses created, changed, deleted, archived, restored | `course.insert`, `course.update` (with a from/to diff of changed columns), `course.delete`, `course.archived`, `course.unarchived` |
 | Decks added or removed | `course_materials.insert`, `course_materials.delete` |
 | Training groups, members, assignments | `group.*`, `group_member.*`, `course_assignment.*` |
-| Role changes | `profile.role_changed` |
+| Role changes; people archived or restored | `profile.role_changed`, `profile.archived`, `profile.unarchived` |
+| Invites sent or withdrawn | `invite.insert`, `invite.delete` |
 | Attempts approved | `attempt_unlocks.insert` |
 
 Not logged: question edits, deck renames and reorders, certificates, watchlists, sign-ups and non-role profile edits. Each row stores `actor_id` and `actor_name` at the time.
@@ -150,7 +154,9 @@ Used inside the database:
 | `attempts_remaining(user, course)` | `3 − failed attempts` since the later of the last pass and the last admin approval (never below 0). Used by `start_attempt`, `submit_attempt` and the out-of-attempts email. `lib/attempts.js` mirrors it for the UI. |
 | `issue_certificate(attempt)` | Issues a certificate for a passed, completed attempt unless one exists |
 | `current_learner()`, `open_course(course)`, `reading_session_payload(session)` | Helpers for the reading and assessment functions: the signed-in user, the course if it can be worked on (visible, or an admin previewing, and not archived), and a session's questions without answers |
-| `is_admin()`, `is_super_admin()`, `can_view_reports()` | Role checks for policies |
+| `is_admin()`, `is_super_admin()`, `can_view_reports()` | Role checks for policies. Always false for an archived person |
+| `is_active_user()` | The signed-in user has a profile that isn't archived. Used by the `active_users_only` restrictive policy on every table |
+| `send_email`, `email_invite` | Queue an email through Resend; the invite email |
 | `alert_setting`, `send_admin_alert`, `alert_profile_link`, `alert_html` | Admin email alerts; see [Operations](operations.md#admin-email-alerts) |
 
 The reading and assessment functions are `security definer`: they run with the owner's rights, which is how they write records learners can't write themselves. Each one checks who is calling and that the session or attempt is theirs. See [Security](security.md).
@@ -159,10 +165,12 @@ The reading and assessment functions are `security definer`: they run with the o
 
 | Table | Trigger | Does |
 |---|---|---|
-| `auth.users` | `on_auth_user_created` | Creates the profile as `learner` |
+| `auth.users` | `on_auth_user_created` | Refuses emails without an invite; creates the profile as `learner`; marks the invite used and adds its training group |
 | `auth.users` | `on_auth_user_email_changed` | Copies the new email to the profile |
-| `profiles` | `prevent_profile_privilege_escalation` | Enforces who may change roles |
-| `profiles` | `audit_profiles` | Logs role changes |
+| `profiles` | `prevent_profile_privilege_escalation` | Enforces who may change roles and who may archive |
+| `profiles` | `stamp_profile_archive` | Sets `archived_at`/`archived_by` from the server and real user |
+| `profiles` | `audit_profiles` | Logs role changes, archiving and restoring |
+| `invites` | `stamp_invite`, `email_invite`, `audit_invites` | Real inviter and time; emails the invite; writes `audit_log` |
 | `profiles` | `alert_new_signup` | Emails admins "New sign-up: <name>" |
 | `courses` | `stamp_course_archive` | Sets `archived_at`/`archived_by` from the server and real user |
 | `courses`, `course_materials`, `groups`, `group_members`, `course_assignments`, `attempt_unlocks` | `audit_*` | Writes `audit_log` |
@@ -187,10 +195,10 @@ The reading and assessment functions are `security definer`: they run with the o
 
 | Bucket | Public | Limit | Types | Path |
 |---|---|---|---|---|
-| `course-pdfs` | Yes | 50 MB | PDF | `{course code lowercase}/{uuid}-{file name}` |
+| `course-pdfs` | No | 50 MB | PDF | `{course code lowercase}/{uuid}-{file name}` |
 | `question-images` | Yes | 5 MB | JPEG, PNG, WebP, GIF | `{course id}/{uuid}.{ext}` |
 
-Anyone with a file's URL can read it. Only admins can upload, list or delete through the API. AI suggestions depend on `course-pdfs` staying public (OpenRouter fetches the PDF by URL).
+Course PDFs need a sign-in (migration 013): any signed-in person who isn't archived can read them, and the app opens them through signed links that expire (`withSignedDeckUrls` in `lib/course-materials.js`). `course_materials.pdf_url` still holds the file's old public address; it is only used to work out the file's path in the bucket. Anyone with a question image's URL can see it. Only admins can upload, list or delete through the API.
 
 ## Changing the schema
 

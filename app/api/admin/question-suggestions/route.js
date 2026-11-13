@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiViewer } from "@/lib/auth";
-import { MAX_PDF_BYTES } from "@/lib/course-materials";
+import { COURSE_PDF_BUCKET, MAX_PDF_BYTES, materialStoragePathFromUrl, storedDeckSize } from "@/lib/course-materials";
 import {
   DEFAULT_GENERATION_COUNTS,
   FREE_PDF_PARSER_MAX_BYTES,
@@ -20,7 +20,8 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const PDF_CHECK_TIMEOUT_MS = 30_000;
+// How long OpenRouter can fetch the PDF for: long enough for the request and its repair pass.
+const PDF_LINK_SECONDS = 15 * 60;
 const MODEL_CALL_TIMEOUT_MS = 180_000;
 // Stop a little before maxDuration so we can still answer with a useful error.
 const REQUEST_BUDGET_MS = 285_000;
@@ -39,15 +40,17 @@ function isAbort(cause) {
   return cause?.name === "AbortError" || cause?.name === "TimeoutError";
 }
 
-// OpenRouter fetches the public PDF URL itself, so the Worker never buffers the
-// file (Workers have a 128 MB memory limit). Only confirm it exists and its size.
-async function checkPdf(pdfUrl, signal) {
-  const response = await fetch(pdfUrl, { method: "HEAD", signal: timeoutSignal(signal, PDF_CHECK_TIMEOUT_MS) });
-  if (!response.ok) throw new Error("Could not reach the course PDF.");
-
-  const contentLength = Number(response.headers.get("content-length"));
-  if (contentLength && contentLength > MAX_PDF_BYTES) throw new Error("The course PDF is too large to process.");
-  return contentLength || 0;
+// OpenRouter fetches the PDF itself through a short-lived signed link (the bucket is
+// private), so the Worker never buffers the file (Workers have a 128 MB memory limit).
+// Confirms the file exists and returns { bytes, url }.
+async function signPdf(supabase, pdfUrl) {
+  const path = materialStoragePathFromUrl(pdfUrl);
+  const bytes = await storedDeckSize(supabase, path);
+  if (bytes === null) throw new Error("Could not reach the course PDF.");
+  if (bytes > MAX_PDF_BYTES) throw new Error("The course PDF is too large to process.");
+  const { data, error: signError } = await supabase.storage.from(COURSE_PDF_BUCKET).createSignedUrl(path, PDF_LINK_SECONDS);
+  if (signError || !data?.signedUrl) throw new Error("Could not reach the course PDF.");
+  return { bytes, url: data.signedUrl };
 }
 
 // Sends one chat completion. A failed connection is retried once; timeouts and
@@ -118,12 +121,12 @@ export async function POST(request) {
 
   const model = process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
   const pdfEngine = process.env.OPENROUTER_PDF_ENGINE || "cloudflare-ai";
-  const firstMessage = { role: "user", content: suggestionMessageContent({ course, deck, ...counts }) };
   const requestBody = (messages) => openRouterRequestBody({ model, pdfEngine, messages });
 
   try {
-    const pdfBytes = await checkPdf(deck.pdf_url, request.signal);
-    if (pdfEngine === "cloudflare-ai" && pdfBytes > FREE_PDF_PARSER_MAX_BYTES) return error(PDF_TOO_LARGE_MESSAGE, 413);
+    const pdf = await signPdf(supabase, deck.pdf_url);
+    if (pdfEngine === "cloudflare-ai" && pdf.bytes > FREE_PDF_PARSER_MAX_BYTES) return error(PDF_TOO_LARGE_MESSAGE, 413);
+    const firstMessage = { role: "user", content: suggestionMessageContent({ course, deck: { ...deck, pdf_url: pdf.url }, ...counts }) };
 
     const first = await callOpenRouter(requestBody([firstMessage]), request.signal, deadline);
     if (!first.response.ok) {

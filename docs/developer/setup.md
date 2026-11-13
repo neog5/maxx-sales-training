@@ -33,6 +33,8 @@ For a **new** Supabase project, run these files in the SQL Editor, in this order
 | `supabase/migrations/009_admin_email_alerts.sql` | Emails to admins about sign-ups and people out of attempts |
 | `supabase/migrations/010_storage_cleanup.sql` | Lets admins actually delete stored PDFs and images |
 | `supabase/migrations/011_server_side_grading.sql` | The database checks reading and grades assessments; answers no longer reach the browser |
+| `supabase/migrations/012_invites_and_user_archive.sql` | Invite-only sign-up; archiving people (they lose access, their records stay) |
+| `supabase/migrations/013_private_course_pdfs.sql` | Course PDFs need a sign-in; the app opens them through signed links |
 | `supabase/seed.sql` | Optional: one fictional sample course, `DEMO-101` |
 
 Skip the `*.undo.sql` files; they reverse a migration. For an **existing** database, run only the migrations it doesn't have yet. Never rerun `setup.sql` against a database that has data. See [Database changes](operations.md#database-changes).

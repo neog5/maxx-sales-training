@@ -3,12 +3,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthCard from "@/components/AuthCard";
 import Notice from "@/components/Notice";
+import { signUpErrorMessage } from "@/lib/invites";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 
 const COPY = {
   signin: { title: "Welcome back", submit: "Sign in" },
-  signup: { title: "Create your account", submit: "Create account" },
+  signup: { title: "Create your account", intro: "You need an invite from your admin. Sign up with the email address they invited.", submit: "Create account" },
   forgot: { title: "Reset your password", intro: "Enter your email and we’ll send you a link to choose a new password.", submit: "Send reset link" },
 };
 
@@ -49,7 +50,7 @@ export default function LoginPage() {
         : await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
 
       if (authError) {
-        setError(authError.message);
+        setError(mode === "signup" ? signUpErrorMessage(authError.message) : authError.message);
       } else if (!data.session) {
         // Sign-up with email confirmation turned on: there is no session until the link is clicked.
         setConfirmationSent(true);
@@ -118,7 +119,7 @@ export default function LoginPage() {
 
       <div className="login-switch">
         {mode === "signin" ? (
-          <>New to the portal? <button type="button" className="login-mode-switch" onClick={() => switchMode("signup")}>Create an account</button></>
+          <>Been invited? <button type="button" className="login-mode-switch" onClick={() => switchMode("signup")}>Create an account</button></>
         ) : mode === "forgot" ? (
           <>Remembered it? <button type="button" className="login-mode-switch" onClick={() => switchMode("signin")}>Back to sign in</button></>
         ) : (

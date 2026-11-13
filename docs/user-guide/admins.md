@@ -69,6 +69,18 @@ Groups are different from **watchlists**: groups decide what people must complet
 
 ## People and profiles
 
+### Invite people
+
+Only people you invite can create an account.
+
+1. Open **People** and click **Invite people**.
+2. Paste their email addresses. Optionally pick a training group they should join when they sign up.
+3. Click **Send invites**. Each person must sign up with exactly the address you invited.
+
+The list under the form shows invites nobody has used yet. Click **Withdraw** to cancel one.
+
+### Profiles
+
 Open anyone's profile from the Dashboard or People. As an admin you can:
 
 - **Change their role** and click **Save role**:
@@ -81,6 +93,7 @@ Open anyone's profile from the Dashboard or People. As an admin you can:
 - **Assign extra courses** just to them, or remove an individual assignment.
 - **Approve more attempts.** When someone fails a course 3 times it locks, and you get an email. Their profile shows it under **Locked assessments**. Click **Allow 3 more attempts**.
 - See their certificates and **Review** any attempt.
+- **Archive person** when someone leaves. They lose access to the portal straight away and stop counting towards compliance, but their attempts, certificates and history are kept. Find them again on **People** by choosing the **Archived** status, and click **Restore person** to undo it. Only a super admin can archive an admin.
 
 ## Emails you'll receive
 

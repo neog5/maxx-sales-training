@@ -4,7 +4,7 @@ How to take your training in the Maxx Sales Training portal.
 
 ## Signing in
 
-1. Go to the training portal and choose **Create an account** the first time. Enter your full name as it should appear on your certificates, your work email and a password of at least 6 characters.
+1. Your admin invites you by email first. Then go to the training portal and choose **Create an account**, using the email address they invited. Enter your full name as it should appear on your certificates, your work email and a password of at least 6 characters.
 2. If asked, confirm your email from the message you receive, then sign in.
 3. Use **Sign in** next time. To sign out, click your initials in the top-right corner and choose **Sign out**.
 4. **Forgot your password?** On the sign-in page, click **Forgot password?**, enter your email and click **Send reset link**. Open the link in the email on the same computer or phone, then choose a new password.

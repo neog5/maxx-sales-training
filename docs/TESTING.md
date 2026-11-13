@@ -26,6 +26,9 @@ How the training portal is tested: what runs automatically, and the manual test 
 - Assessments need a finished reading and come without answers. The database grades them: a wrong mandatory question fails, and every question needs a valid answer. Nobody can read an unsubmitted attempt's questions, edit an attempt, or submit someone else's. Passing issues the certificate, dated by the server.
 - The attempt limit: three failed attempts, then an admin approves more; passing resets it.
 - Reading-only courses issue one certificate, only after the reading time.
+- Invites are admin-only; signing up uses the invite and joins its training group; used invites can't be withdrawn. (Refusing an uninvited sign-up is manual case A8: the test user can't act as Supabase Auth.)
+- Archived people see nothing but their own profile row, can't read or take courses, aren't required to complete anything, and hold no role; only admins archive, only super admins archive admins, nobody archives themselves; restoring gives it all back.
+- The course PDF bucket is private: signed-in people can read the files, archived people can't.
 
 To test a migration **before** it's on the database, apply it inside the test transaction; it's rolled back with everything else:
 
@@ -52,6 +55,14 @@ Result key: ✅ pass · ❌ fail · ⏭ not run.
 | A5 | Admin | Open a learner's profile → change role to Manager | Saves; "Super admin" isn't offered |
 | A6 | Super admin | Open an admin's profile → role options | "Super admin" is offered |
 | A7 | Any | Open your own profile | No role editor for yourself |
+| A8 | Visitor | Create an account with an email nobody invited | Refused: "This email address hasn't been invited yet" |
+| A9 | Admin | People → Invite people → paste a new email, one that already has an account, and "abc" → pick a training group → Send invites | The new email is listed as waiting; the other two are reported and skipped |
+| A10 | Visitor | Create an account with the invited email | Account created; the person is in the chosen training group; the invite is no longer listed |
+| A11 | Admin | Invite an email, then Withdraw it | Gone from the list; that email can't sign up |
+| A12 | Admin | A learner's profile → Archive person → confirm | "Archived <date> by <you>" notice; the person is gone from the Dashboard and pickers, and is on People only under the Archived status |
+| A13 | Archived person | Sign in | "Your account is deactivated" page with Sign out; `/courses` and `/profile/<id>` lead back to it |
+| A14 | Admin | The archived profile → Restore person | They can sign in again and count towards compliance |
+| A15 | Admin | Open another admin's profile | No Archive button (super admins see it) |
 
 ### B. Courses
 
@@ -111,6 +122,9 @@ Result key: ✅ pass · ❌ fail · ⏭ not run.
 | E1 | Learner | Courses page | "Required courses" lists assigned courses; other live courses under "Other available courses" |
 | E2 | Learner | Start a required course → read → pass checkpoints → pass the quiz | Course shows Passed; Dashboard shows them compliant once all required courses are passed |
 | E3 | Learner | Own profile | Required training with ✓ for passed courses; own training groups listed |
+| E4 | Learner | Open a course's reading | The PDF loads (through a signed link) |
+| E5 | Visitor | Open a deck's old public address (`…/object/public/course-pdfs/…`) in a private window | Refused |
+| E6 | Admin | Course Overview → a deck's **Open** button; Questions → Generate | The PDF opens in a new tab; suggestions are generated |
 
 ### F. Layout
 

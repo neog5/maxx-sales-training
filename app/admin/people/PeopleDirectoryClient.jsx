@@ -9,6 +9,7 @@ import { ATTENTION_LABELS, ATTENTION_STATUSES } from "@/lib/attempt-stats";
 import { byName } from "@/lib/people";
 import { ROLES, ROLE_LABELS } from "@/lib/roles";
 import { routes } from "@/lib/routes";
+import InvitePanel from "./InvitePanel";
 
 const SORTS = {
   attention: (a, b) => ATTENTION_STATUSES.indexOf(a.attentionStatus) - ATTENTION_STATUSES.indexOf(b.attentionStatus) || byName(a, b),
@@ -17,7 +18,11 @@ const SORTS = {
   score: (a, b) => (b.averageScore ?? -1) - (a.averageScore ?? -1),
 };
 
-export default function PeopleDirectoryClient({ people, initialStatus = "all" }) {
+// `people` includes archived people; they show only under the "Archived" status filter.
+// `invites` is the list of unused invites for admins, or null for managers.
+export default function PeopleDirectoryClient({ people: everyone, initialStatus = "all", invites = null, groups = [] }) {
+  const people = useMemo(() => everyone.filter((person) => !person.archived_at), [everyone]);
+  const archivedPeople = useMemo(() => everyone.filter((person) => person.archived_at), [everyone]);
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
   const [status, setStatus] = useState(initialStatus);
@@ -26,16 +31,16 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
   const filteredPeople = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
 
-    return people
+    return (status === "archived" ? archivedPeople : people)
       .filter((person) => {
         const matchesQuery = !normalizedQuery
           || `${person.full_name || ""} ${person.email || ""}`.toLocaleLowerCase().includes(normalizedQuery);
         return matchesQuery
           && (role === "all" || person.role === role)
-          && (status === "all" || person.attentionStatus === status);
+          && (status === "all" || status === "archived" || person.attentionStatus === status);
       })
       .sort(SORTS[sort]);
-  }, [people, query, role, status, sort]);
+  }, [people, archivedPeople, query, role, status, sort]);
 
   const attentionCount = people.filter((person) => person.attentionStatus === "needs-attention").length;
   const notStartedCount = people.filter((person) => person.attentionStatus === "not-started").length;
@@ -60,6 +65,8 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
         </div>
       </div>
 
+      {invites && <InvitePanel invites={invites} groups={groups} existingEmails={everyone.map((person) => person.email)} />}
+
       <section className="tp-card directory-toolbar" aria-label="Directory filters">
         <SearchField value={query} onChange={setQuery} />
         <label>
@@ -74,6 +81,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
           <select className="tp-input" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="all">All statuses</option>
             {ATTENTION_STATUSES.map((value) => <option key={value} value={value}>{ATTENTION_LABELS[value]}</option>)}
+            <option value="archived">Archived ({archivedPeople.length})</option>
           </select>
         </label>
         <label>
@@ -88,7 +96,7 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
       </section>
 
       <div className="directory-result-count" role="status">
-        Showing {filteredPeople.length} of {people.length} people
+        {status === "archived" ? `Showing ${filteredPeople.length} of ${archivedPeople.length} archived people` : `Showing ${filteredPeople.length} of ${people.length} people`}
       </div>
 
       <section className="tp-card people-table">
@@ -103,12 +111,12 @@ export default function PeopleDirectoryClient({ people, initialStatus = "all" })
               </PersonIdentity>
               <div><span className={`tp-badge role-badge role-badge--${person.role}`}>{ROLE_LABELS[person.role] || person.role}</span></div>
               <div>
-                <span
+                {person.archived_at ? <span className="tp-badge">Archived <LocalDate value={person.archived_at} /></span> : <span
                   className={`training-status training-status--${person.attentionStatus}`}
                   title={person.attentionStatus === "not-started" ? "No completed attempts" : "Based on the latest completed attempt"}
                 >
                   <span aria-hidden="true"></span>{ATTENTION_LABELS[person.attentionStatus]}
-                </span>
+                </span>}
               </div>
               <div className="tp-mono">{person.attemptCount}</div>
               <div className="people-performance">

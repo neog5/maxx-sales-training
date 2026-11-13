@@ -10,8 +10,10 @@ import { isRequirableCourse, passedCoursesByUser } from "@/lib/compliance";
 import { fetchAll, must, mustFind } from "@/lib/db";
 import { displayName, initial } from "@/lib/people";
 import { fetchAssignmentsForUser } from "@/lib/queries";
-import { ROLE_LABELS, assignableRoles, canViewReports, isAdmin } from "@/lib/roles";
+import { ROLE_LABELS, assignableRoles, canViewReports, isAdmin, isSuperAdmin } from "@/lib/roles";
 import { routes } from "@/lib/routes";
+import Notice from "@/components/Notice";
+import ArchiveEditor from "./ArchiveEditor";
 import LockedAssessments from "./LockedAssessments";
 import RequiredTraining from "./RequiredTraining";
 import RoleEditor from "./RoleEditor";
@@ -40,7 +42,7 @@ export default async function ProfilePage({ params }) {
   const rows = async (query, what) => must(await query, what) || [];
 
   const [person, attempts, memberships, groups, courses, certificates, unlocks, requiredRows] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, role").eq("id", id).maybeSingle().then((result) => mustFind(result, "this person")),
+    supabase.from("profiles").select("id, full_name, role, archived_at, archived_by").eq("id", id).maybeSingle().then((result) => mustFind(result, "this person")),
     rows(
       supabase
         .from("quiz_attempts")
@@ -87,6 +89,12 @@ export default async function ProfilePage({ params }) {
   const name = displayName(person);
   const isSelf = person.id === viewer.id;
   const hasAttempts = attempts.length > 0;
+  const archived = Boolean(person.archived_at);
+  // Admins archive learners and managers; only super admins archive admins. Nobody archives themselves.
+  const canArchive = !isSelf && isAdmin(viewer.role) && (!isAdmin(person.role) || isSuperAdmin(viewer.role));
+  const archiver = person.archived_by
+    ? must(await supabase.from("profiles").select("full_name").eq("id", person.archived_by).maybeSingle(), "who archived this person")
+    : null;
 
   return (
     <div>
@@ -105,12 +113,21 @@ export default async function ProfilePage({ params }) {
               <div className="profile-summary__role">{ROLE_LABELS[person.role] || person.role}</div>
             </div>
           </div>
-          {roleOptions.length > 0 && <RoleEditor profileId={person.id} initialRole={person.role} roles={roleOptions} />}
+          <div className="profile-summary__actions">
+            {roleOptions.length > 0 && <RoleEditor profileId={person.id} initialRole={person.role} roles={roleOptions} />}
+            {canArchive && <ArchiveEditor profileId={person.id} name={name} archived={archived} />}
+          </div>
         </section>
+
+        {archived && (
+          <Notice>
+            Archived <LocalDate value={person.archived_at} />{archiver?.full_name && <> by {archiver.full_name}</>}. {name} can’t sign in to the portal and doesn’t count towards compliance. Their training records are kept.
+          </Notice>
+        )}
 
         <RequiredTraining
           personId={person.id}
-          canEdit={isAdmin(viewer.role)}
+          canEdit={isAdmin(viewer.role) && !archived}
           showGroups={isAdmin(viewer.role) || (isSelf && groupIds.length > 0)}
           requiredCourseIds={requiredRows.map((row) => row.course_id)}
           groups={groups}
@@ -120,7 +137,7 @@ export default async function ProfilePage({ params }) {
           passedCourseIds={[...passedCourseIds]}
         />
 
-        <LockedAssessments personId={person.id} viewerId={viewer.id} courses={lockedCourses} canApprove={isAdmin(viewer.role)} />
+        <LockedAssessments personId={person.id} viewerId={viewer.id} courses={lockedCourses} canApprove={isAdmin(viewer.role) && !archived} />
 
         <section className="profile-report-section">
           <div className="section-heading-row">
