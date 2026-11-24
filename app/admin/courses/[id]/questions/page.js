@@ -19,7 +19,7 @@ export default async function CourseQuestionsPage({ params, searchParams }) {
 
   const [questions, materials] = await Promise.all([
     fetchAll(() => supabase.from("questions").select("*").eq("course_id", id).order("created_at").order("id"), "questions"),
-    fetchCourseMaterials(supabase, id, "id, position, title"),
+    fetchCourseMaterials(supabase, id, "id, position, title, kind"),
   ]);
 
   return (

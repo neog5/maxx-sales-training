@@ -6,7 +6,7 @@ import LocalDate from "@/components/LocalDate";
 import MemberList from "@/components/MemberList";
 import MultiPicker from "@/components/MultiPicker";
 import { describeAuditEntry } from "@/lib/audit";
-import { COURSE_PDF_BUCKET, materialStoragePathFromUrl } from "@/lib/course-materials";
+import { COURSE_PDF_BUCKET, COURSE_VIDEO_BUCKET, storedMaterialFile } from "@/lib/course-materials";
 import { byName, displayName } from "@/lib/people";
 import { groupItems, personItems } from "@/lib/picker-items";
 import { QUESTION_IMAGE_BUCKET } from "@/lib/question-images";
@@ -30,12 +30,15 @@ function detailsFrom(course) {
   };
 }
 
-// Deletes a deleted course's deck PDFs and question images. Best effort: the course is
+// Deletes a deleted course's deck PDFs, videos and question images. Best effort: the course is
 // already gone, so a failure only leaves unused files behind.
 async function removeCourseFiles(supabase, course, materials) {
-  await removeStoredFiles(supabase, COURSE_PDF_BUCKET, materials.map((material) => materialStoragePathFromUrl(material.pdf_url)));
-  const { data: files } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).list(course.id, { limit: 1000 });
-  await removeStoredFiles(supabase, QUESTION_IMAGE_BUCKET, (files || []).map((file) => `${course.id}/${file.name}`));
+  const files = materials.map(storedMaterialFile).filter(Boolean);
+  for (const bucket of [COURSE_PDF_BUCKET, COURSE_VIDEO_BUCKET]) {
+    await removeStoredFiles(supabase, bucket, files.filter((file) => file.bucket === bucket).map((file) => file.path));
+  }
+  const { data: images } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).list(course.id, { limit: 1000 });
+  await removeStoredFiles(supabase, QUESTION_IMAGE_BUCKET, (images || []).map((file) => `${course.id}/${file.name}`));
 }
 
 // A course's details, assignments, decks and history. The assignments, decks, header and

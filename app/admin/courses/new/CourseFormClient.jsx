@@ -143,7 +143,7 @@ export default function CourseFormClient() {
           <div className="tp-label form-label">Training PDFs</div>
           <input className="tp-input" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => setPdfs(Array.from(event.target.files || []))} />
           <div className="form-hint">
-            Optional. Up to {megabytes(MAX_PDF_BYTES)} MB each; pick several for a multi-deck course. Suggestions use the first PDF, which must be under {FREE_PDF_PARSER_LIMIT_TEXT}.
+            Optional. Up to {megabytes(MAX_PDF_BYTES)} MB each; pick several for a multi-deck course. Suggestions use the first PDF, which must be under {FREE_PDF_PARSER_LIMIT_TEXT}. Add videos on the course page after creating it.
           </div>
           {pdfs.length > 1 && <ol className="form-file-list">{pdfs.map((file) => <li key={file.name}>{file.name}</li>)}</ol>}
           {pdfTooLargeForSuggestions && (

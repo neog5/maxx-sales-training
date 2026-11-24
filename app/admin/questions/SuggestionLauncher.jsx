@@ -11,7 +11,7 @@ export default function SuggestionLauncher({ materials, deckId, onDeckChange, co
         <label>
           <b>Generate from deck</b>
           <select className="tp-input" value={deckId} onChange={(event) => onDeckChange(event.target.value)}>
-            {materials.map((material, index) => <option key={material.id} value={material.id}>{index + 1}. {material.title}</option>)}
+            {materials.map((material, index) => <option key={material.id} value={material.id}>{material.number ?? index + 1}. {material.title}</option>)}
           </select>
         </label>
       ) : <span>Generate from this course’s PDF</span>}

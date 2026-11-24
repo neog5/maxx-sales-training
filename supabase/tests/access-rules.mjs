@@ -428,3 +428,55 @@ test("course PDFs: signed-in people can read the files, archived people and visi
   assert.equal((await visible(users.learner)).rows[0].n, 0);
   await asOwner("update public.profiles set archived_at = null where id = $1", [users.learner]);
 });
+
+test("videos: admin-only, no reading questions, no minimum time, finished once every video is watched", { skip }, async () => {
+  // A reading-only course with a long minimum time and two videos, and no PDF.
+  const course = (await asOwner("insert into public.courses (code, title, read_seconds, view_only) values ($1, 'Video fixture', 600, true) returning id",
+    [`TEST-${randomUUID().slice(0, 6)}`])).rows[0].id;
+  const addVideo = (userId, position) => as(userId,
+    "insert into public.course_materials (course_id, position, title, kind, video_path, duration_seconds) values ($1, $2, 'Video', 'video', 'test/v.mp4', 90) returning id", [course, position]);
+  assert.match((await addVideo(users.learner, 1)).error, /row-level security/);
+  const first = (await addVideo(users.admin, 1)).rows[0].id;
+  const second = (await addVideo(users.admin, 2)).rows[0].id;
+
+  // A material is a PDF or a video, never neither or both.
+  assert.match((await asOwner("insert into public.course_materials (course_id, position, title, kind, pdf_url) values ($1, 3, 'x', 'video', '/x.pdf')", [course])).error, /course_materials_kind_check/);
+  assert.match((await asOwner("insert into public.course_materials (course_id, position, title, kind) values ($1, 3, 'x', 'pdf')", [course])).error, /course_materials_kind_check/);
+
+  // Reading questions can't go on a video.
+  assert.match((await as(users.admin,
+    "insert into public.questions (course_id, material_id, question_type, page_number, question_text, options, correct_index) values ($1, $2, 'reading_test', 1, 'Q', '[\"a\",\"b\"]', 0)",
+    [course, first])).error, /only go on a PDF deck/);
+
+  // Video bucket: private, admin uploads only, MP4 only.
+  assert.deepEqual((await asOwner("select public, allowed_mime_types from storage.buckets where id = 'course-videos'")).rows[0], { public: false, allowed_mime_types: ["video/mp4"] });
+  assert.match((await as(users.learner, "insert into storage.objects (bucket_id, name, owner) values ('course-videos', 'test/x.mp4', $1)", [users.learner])).error, /row-level security/);
+
+  // No minimum time for a video-only course, but every video must be watched to the end.
+  const reading = await call(users.other, "public.start_reading($1)", [course]);
+  assert.deepEqual(reading.watched_videos, []);
+  assert.match((await call(users.other, "public.finish_reading($1)", [reading.session_id])).error, /Watch every video/);
+  // Learners can only mark their own session, and only the course's videos.
+  assert.match((await call(users.learner, "public.mark_video_watched($1, $2)", [reading.session_id, first])).error, /not part of your reading session/);
+  const otherCourse = await makeCourse();
+  const pdfDeck = (await asOwner("select id from public.course_materials where course_id = $1", [otherCourse])).rows[0].id;
+  assert.match((await call(users.other, "public.mark_video_watched($1, $2)", [reading.session_id, pdfDeck])).error, /not part of your reading session/);
+  assert.match((await as(users.other, "insert into public.reading_session_videos (session_id, material_id) values ($1, $2)", [reading.session_id, first])).error, /permission denied|row-level security/);
+
+  const afterFirst = await call(users.other, "public.mark_video_watched($1, $2)", [reading.session_id, first]);
+  assert.deepEqual(afterFirst.watched_videos, [first]);
+  await call(users.other, "public.mark_video_watched($1, $2)", [reading.session_id, first]);
+  assert.match((await call(users.other, "public.finish_reading($1)", [reading.session_id])).error, /Watch every video/);
+  await call(users.other, "public.mark_video_watched($1, $2)", [reading.session_id, second]);
+  // Reloading the page keeps what was watched.
+  assert.deepEqual((await call(users.other, "public.start_reading($1)", [course])).watched_videos, [first, second]);
+  const finished = await call(users.other, "public.finish_reading($1)", [reading.session_id]);
+  assert.ok(finished.certificate_id, "a reading-only video course issues its certificate without waiting");
+
+  // Adding a PDF brings back the course's minimum reading time.
+  await asOwner("insert into public.course_materials (course_id, position, title, pdf_url) values ($1, 3, 'Deck', '/deck.pdf')", [course]);
+  const mixed = await call(users.learner, "public.start_reading($1)", [course]);
+  await call(users.learner, "public.mark_video_watched($1, $2)", [mixed.session_id, first]);
+  await call(users.learner, "public.mark_video_watched($1, $2)", [mixed.session_id, second]);
+  assert.match((await call(users.learner, "public.finish_reading($1)", [mixed.session_id])).error, /minimum reading time/);
+});

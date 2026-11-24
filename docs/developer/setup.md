@@ -35,6 +35,7 @@ For a **new** Supabase project, run these files in the SQL Editor, in this order
 | `supabase/migrations/011_server_side_grading.sql` | The database checks reading and grades assessments; answers no longer reach the browser |
 | `supabase/migrations/012_invites_and_user_archive.sql` | Invite-only sign-up; archiving people (they lose access, their records stay) |
 | `supabase/migrations/013_private_course_pdfs.sql` | Course PDFs need a sign-in; the app opens them through signed links |
+| `supabase/migrations/014_course_videos.sql` | Videos as reading materials (private `course-videos` bucket, watched-to-the-end tracking). Raise the project's global upload limit to 2 GB first: Supabase dashboard → Storage → Settings, which needs the Owner or Administrator role |
 | `supabase/seed.sql` | Optional: one fictional sample course, `DEMO-101` |
 
 Skip the `*.undo.sql` files; they reverse a migration. For an **existing** database, run only the migrations it doesn't have yet. Never rerun `setup.sql` against a database that has data. See [Database changes](operations.md#database-changes).

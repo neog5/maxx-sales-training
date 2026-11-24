@@ -64,14 +64,16 @@ RLS: read your own, or everyone if reports. Update your own (except `role`), or 
 
 RLS: everyone can read active courses; admins read all. Admins insert and update. Only super admins delete. Archived courses are **not** hidden by RLS (the app filters `archived_at` itself), but the database blocks new reading sessions and attempts on them.
 
-**`course_materials`**: a course's PDF "decks", read in `position` order. Columns: `course_id`, `position`, `title`, `pdf_url`. Readable by anyone who can see the course; admin-only writes. Deleting a deck deletes its reading questions.
+**`course_materials`**: a course's reading materials, PDF "decks" and videos, in `position` order. Columns: `course_id`, `position`, `title`, `kind` (`pdf` or `video`), `pdf_url` (PDFs only), `video_path` (videos only: the path in `course-videos`), `duration_seconds` (videos, optional, for display). A check constraint keeps each row's fields matching its kind. Readable by anyone who can see the course; admin-only writes. Deleting a deck deletes its reading questions.
+
+**`reading_session_videos`**: which videos a reading session has watched to the end (`session_id`, `material_id`, `watched_at`). No policies: only `mark_video_watched`, `reading_session_payload` and `finish_reading` use it (migration 014).
 
 **`questions`**: the question bank.
 
 | Column | Notes |
 |---|---|
 | `question_type` | `main_test` (the assessment) or `reading_test` (a checkpoint inside the reader) |
-| `material_id`, `page_number` | Reading questions must have both (the page is within that deck); main-test questions must have neither |
+| `material_id`, `page_number` | Reading questions must have both (the page is within that deck, which must be a PDF); main-test questions must have neither |
 | `question_text`, `image_url` | Image optional |
 | `options`, `correct_index` | `options` is a JSON array of at least 2 strings |
 | `explanation` | Shown after answering |
@@ -124,7 +126,7 @@ One certificate per person per course (unique). Read your own (reports read all)
 | Logged | Action names |
 |---|---|
 | Courses created, changed, deleted, archived, restored | `course.insert`, `course.update` (with a from/to diff of changed columns), `course.delete`, `course.archived`, `course.unarchived` |
-| Decks added or removed | `course_materials.insert`, `course_materials.delete` |
+| Decks or videos added or removed | `course_materials.insert`, `course_materials.delete` |
 | Training groups, members, assignments | `group.*`, `group_member.*`, `course_assignment.*` |
 | Role changes; people archived or restored | `profile.role_changed`, `profile.archived`, `profile.unarchived` |
 | Invites sent or withdrawn | `invite.insert`, `invite.delete` |
@@ -140,9 +142,10 @@ Called by the app with `.rpc()`:
 
 | Function | Returns | Used by |
 |---|---|---|
-| `start_reading(p_course_id)` | Reuses the person's unfinished reading session or starts one, and picks up to 3 random checkpoint questions for it the first time. Returns `{ session_id, questions }`, the questions **without answers**, each with `answered`. | Course card, Reader |
+| `start_reading(p_course_id)` | Reuses the person's unfinished reading session or starts one, and picks up to 3 random checkpoint questions for it the first time. Returns `{ session_id, questions, watched_videos }`: the questions **without answers**, each with `answered`, and the ids of videos already watched to the end. | Course card, Reader |
+| `mark_video_watched(p_session_id, p_material_id)` | Records that the person reached the end of one of the course's videos in their unfinished session. Returns the same payload as `start_reading`. | Reader |
 | `answer_reading_question(p_session_id, p_question_id, p_selected_index)` | `{ correct, explanation }`. Records a correct answer. Doesn't reveal the right option. | Reader |
-| `finish_reading(p_session_id)` | Marks the reading finished, once every checkpoint is answered and `read_seconds` have passed since `started_at` (5 s grace). Returns `{ certificate_id }` (reading-only courses get one). | Reader |
+| `finish_reading(p_session_id)` | Marks the reading finished, once every checkpoint is answered, every video has been watched to the end and, if the course has a PDF, `read_seconds` have passed since `started_at` (5 s grace). Video-only courses have no minimum time. Returns `{ certificate_id }` (reading-only courses get one). | Reader |
 | `start_attempt(p_course_id)` | Needs a finished reading and an attempt left. Resumes the in-progress attempt, or starts one. The set is every active mandatory main-test question, topped up with random optional ones to `max(5, round(mandatory ÷ 0.6))`, in random order. Returns `{ attempt_id, attempts_left, questions }`, the questions **without answers** (`attempt_id` is null when the course has no questions). | Quiz |
 | `submit_attempt(p_attempt_id, p_answers)` | `p_answers` maps each attempt question id to the chosen option index, and every question needs a valid answer. Grades, completes the attempt and returns the score, pass/fail, counts, `attempts_left`, `certificate_id` and the questions with correct answers and explanations. | Quiz |
 | `required_courses()` | `(user_id, course_id)` pairs everyone must complete: direct and group assignments combined, active unarchived courses only. Reports get everyone; others get only their own rows. Lets managers see accurate compliance without seeing groups. | Courses, Dashboard, Profile |
@@ -175,11 +178,11 @@ The reading and assessment functions are `security definer`: they run with the o
 | `courses` | `stamp_course_archive` | Sets `archived_at`/`archived_by` from the server and real user |
 | `courses`, `course_materials`, `groups`, `group_members`, `course_assignments`, `attempt_unlocks` | `audit_*` | Writes `audit_log` |
 | `groups`, `group_members`, `course_assignments` | `stamp_actor` | Forces `created_by` / `added_by` / `assigned_by` to the real user |
-| `questions` | `check_question_material` | A reading question's deck must belong to the same course |
+| `questions` | `check_question_material` | A reading question's deck must belong to the same course and be a PDF, not a video |
 | `quiz_attempts` | `issue_certificate_on_pass` | Issues the certificate on a passed, completed attempt |
 | `quiz_attempts` | `alert_attempts_exhausted_on_submit` (and `alert_attempts_exhausted` for directly inserted attempts) | Emails admins "Out of attempts: <name> · <course>" when a failed attempt uses the last one |
 | `reading_sessions` | `protect_reading_started_at` | Server-set start time that can't be changed later |
-| `reading_sessions` | `issue_reading_certificate` | Reading-only courses: when the reading is marked finished, checks the course isn't archived and that `read_seconds` have passed since `started_at` (5 s grace), then issues the certificate |
+| `reading_sessions` | `issue_reading_certificate` | Reading-only courses: when the reading is marked finished, checks the course isn't archived and, if the course has a PDF, that `read_seconds` have passed since `started_at` (5 s grace), then issues the certificate |
 | `certificates` | `set_certificate_expiry` | `expires_at = issued_at + 2 years` |
 | `audit_log` | `prevent_audit_log_changes` | Refuses updates and deletes |
 
@@ -196,9 +199,10 @@ The reading and assessment functions are `security definer`: they run with the o
 | Bucket | Public | Limit | Types | Path |
 |---|---|---|---|---|
 | `course-pdfs` | No | 50 MB | PDF | `{course code lowercase}/{uuid}-{file name}` |
+| `course-videos` | No | 2 GB | MP4 | `{course code lowercase}/{uuid}-{file name}` |
 | `question-images` | Yes | 5 MB | JPEG, PNG, WebP, GIF | `{course id}/{uuid}.{ext}` |
 
-Course PDFs need a sign-in (migration 013): any signed-in person who isn't archived can read them, and the app opens them through signed links that expire (`withSignedDeckUrls` in `lib/course-materials.js`). `course_materials.pdf_url` still holds the file's old public address; it is only used to work out the file's path in the bucket. Anyone with a question image's URL can see it. Only admins can upload, list or delete through the API.
+Course PDFs need a sign-in (migration 013): any signed-in person who isn't archived can read them, and the app opens them through signed links that expire (`withSignedMaterialUrls` in `lib/course-materials.js`). Videos work the same way (migration 014); admins upload them with resumable uploads (`lib/video-upload.js`), and the bucket limit only applies once the project's global upload limit is at least 2 GB. `course_materials.pdf_url` still holds the file's old public address; it is only used to work out the file's path in the bucket. Anyone with a question image's URL can see it. Only admins can upload, list or delete through the API.
 
 ## Changing the schema
 

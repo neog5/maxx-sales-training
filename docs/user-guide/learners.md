@@ -30,12 +30,12 @@ The colour at the top of each tile matches its badge: grey for not started, oran
 ## Step 1: Reading
 
 1. Read the course PDF in the portal. Use the arrows to move between pages and **−** / **+** to zoom. **Open PDF ↗** opens it in a new tab.
-2. Some courses have several documents ("decks"). They appear as numbered tabs. You need to open every one.
+2. Some courses have several documents ("decks") or videos. They appear as numbered tabs. You need to open every deck and watch every video to the end. You can skip ahead in a video and change its speed up to 2×; it counts as soon as you reach the end.
 3. As you scroll, **reading questions** appear at certain pages. Answer each one correctly to keep going. If you get one wrong, read the explanation and try again.
-4. Each course has a **minimum reading time**. The panel on the right shows your time, reading questions and decks. The timer pauses while a reading question is open.
+4. Courses with PDFs have a **minimum reading time** (videos don't). The panel on the right shows your time, reading questions and decks. The timer pauses while a reading question is open.
 5. When everything is done, click **Start assessment →**. For a reading-only course, click **Finish and get certificate →**.
 
-If you leave and come back, the reading questions you've already answered stay answered, but the decks you opened and the on-screen timer start again.
+If you leave and come back, the reading questions you've already answered and the videos you've finished stay done, but the decks you opened and the on-screen timer start again.
 
 ## Step 2: Assessment
 

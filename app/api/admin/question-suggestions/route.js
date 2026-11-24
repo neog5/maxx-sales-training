@@ -106,8 +106,9 @@ export async function POST(request) {
   if (courseError) return error("Could not load the course. Please try again.", 500);
   if (!course) return error("Course not found.", 404);
 
-  // Suggestions come from one deck: the one asked for, or the course's first deck.
-  let deckQuery = supabase.from("course_materials").select("id, title, pdf_url").eq("course_id", courseId);
+  // Suggestions come from one PDF deck: the one asked for, or the course's first deck.
+  // Videos are left out until suggestions can use them (docs/video-materials-plan.md).
+  let deckQuery = supabase.from("course_materials").select("id, title, pdf_url").eq("course_id", courseId).eq("kind", "pdf");
   deckQuery = materialId ? deckQuery.eq("id", materialId) : deckQuery.order("position").order("created_at");
   const { data: deck, error: deckError } = await deckQuery.limit(1).maybeSingle();
   if (deckError) return error("Could not load the course decks. Please try again.", 500);

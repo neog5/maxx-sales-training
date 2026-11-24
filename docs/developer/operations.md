@@ -22,7 +22,7 @@ The SQL Editor can change roles because it runs without a signed-in user. After 
 ## Database changes
 
 - Schema changes go in a new numbered pair: `supabase/migrations/NNN_name.sql` and `NNN_name.undo.sql`.
-- Run migrations in number order in the SQL Editor. Run them on dev first, then production, and always **before** deploying code that needs them. Two exceptions, where the old app breaks once the migration has run, so run it and deploy the matching code together: 011 (the old app can't save reading or attempts) and 013 (the old app can't open course PDFs).
+- Run migrations in number order in the SQL Editor. Run them on dev first, then production, and always **before** deploying code that needs them. Two exceptions, where the old app breaks once the migration has run, so run it and deploy the matching code together: 011 (the old app can't save reading or attempts) and 013 (the old app can't open course PDFs). 014 is safe to run first: the old app ignores the new columns, but can't show videos.
 - Test a migration before running it with `TEST_MIGRATIONS=supabase/migrations/NNN_name.sql npm run test:db` (see [TESTING.md](../TESTING.md)).
 - Back up first (Supabase → Database → Backups, or `pg_dump` with `SUPABASE_DB_URL`).
 - `requested-changes.sql` is safe to rerun. `setup.sql` is for empty projects only.

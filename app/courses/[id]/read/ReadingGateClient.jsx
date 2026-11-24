@@ -4,19 +4,32 @@ import { useRouter } from "next/navigation";
 import BackToCourses from "@/components/BackToCourses";
 import BigTick from "@/components/BigTick";
 import { shuffleOptions } from "@/lib/assessment";
+import { isVideo } from "@/lib/course-materials";
 import { startReading } from "@/lib/queries";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 import CheckpointCard from "./CheckpointCard";
 import PdfReader from "./PdfReader";
 import ReadingProgressCard from "./ReadingProgressCard";
+import VideoReader from "./VideoReader";
 
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 // 75 → "1 min 15 s"; under a minute → "40 s".
+// What the learner has to do, shown above the reader.
+function readingHint(materials) {
+  const videoCount = materials.filter(isVideo).length;
+  const deckCount = materials.length - videoCount;
+  if (!videoCount) return deckCount > 1 ? "Open and read every deck" : "Scroll down to read the whole document";
+  if (!deckCount) return videoCount > 1 ? "Watch every video to the end · you can skip ahead" : "Watch the video to the end · you can skip ahead";
+  return "Read every deck and watch every video to the end";
+}
 const formatTimeLeft = (seconds) => (seconds >= 60 ? `${Math.floor(seconds / 60)} min ${seconds % 60} s` : `${seconds} s`);
 
 // The database picks the checkpoint questions, checks each answer and decides when the reading
-// is finished (migration 011), so the browser never sees the correct answers.
+// is finished (migrations 011 and 014), so the browser never sees the correct answers.
+// Materials are PDF decks and videos. Videos have no checkpoints and no minimum time: each
+// one counts once the learner reaches its end. The minimum reading time applies only when
+// the course has a PDF.
 export default function ReadingGateClient({ course, materials }) {
   const [supabase] = useState(createClient);
   const router = useRouter();
@@ -30,6 +43,8 @@ export default function ReadingGateClient({ course, materials }) {
   const [furthestPage, setFurthestPage] = useState(1);
   const [deckIndex, setDeckIndex] = useState(0);
   const [openedDecks, setOpenedDecks] = useState([0]);
+  // Ids of the videos watched to the end, as recorded by the database.
+  const [watchedVideos, setWatchedVideos] = useState([]);
   const [selectedAnswer, setSelectedAnswer] = useState(undefined);
   // The database's verdict on the selected answer: { correct, explanation }, or null.
   const [feedback, setFeedback] = useState(null);
@@ -39,11 +54,14 @@ export default function ReadingGateClient({ course, materials }) {
   // Saving can be retried, unlike failing to load the session or checkpoints.
   const [saveError, setSaveError] = useState("");
 
-  const total = course.read_seconds;
+  const videos = materials.filter(isVideo);
+  const hasPdf = materials.some((material) => !isVideo(material));
+  const total = hasPdf ? course.read_seconds : 0;
   const viewOnly = course.view_only;
   const deck = materials[deckIndex];
   const multiDeck = materials.length > 1;
-  const unopenedDecks = materials.length - openedDecks.length;
+  const unopenedDecks = materials.filter((material, index) => !isVideo(material) && !openedDecks.includes(index)).length;
+  const unwatchedVideos = videos.filter((video) => !watchedVideos.includes(video.id)).length;
   const timeUp = elapsed >= total;
   const remainingQuestions = readingQuestions.length - answeredIds.length;
   const orderedQuestions = useMemo(() => [...readingQuestions].sort((a, b) => a.page_number - b.page_number), [readingQuestions]);
@@ -52,7 +70,7 @@ export default function ReadingGateClient({ course, materials }) {
   // The checkpoint stays open until answered, even if the reader scrolls back.
   const activeQuestion = unanswered && furthestPage >= unanswered.page_number ? unanswered : null;
   const paused = Boolean(activeQuestion);
-  const done = timeUp && remainingQuestions === 0 && unopenedDecks === 0;
+  const done = timeUp && remainingQuestions === 0 && unopenedDecks === 0 && unwatchedVideos === 0;
   const timeProgress = total ? Math.min(100, Math.round((elapsed / total) * 100)) : 100;
   const questionProgress = questionsLoading ? 0 : readingQuestions.length ? Math.round((answeredIds.length / readingQuestions.length) * 100) : 100;
 
@@ -65,6 +83,7 @@ export default function ReadingGateClient({ course, materials }) {
         setSessionId(data.session_id);
         setReadingQuestions(data.questions.map((question) => shuffleOptions(question)));
         setAnsweredIds(data.questions.filter((question) => question.answered).map((question) => question.id));
+        setWatchedVideos(data.watched_videos || []);
       })
       .catch(() => setProgressError("We couldn’t start your reading session. Refresh the page to try again."))
       .finally(() => setQuestionsLoading(false));
@@ -83,13 +102,28 @@ export default function ReadingGateClient({ course, materials }) {
     setOpenedDecks((opened) => (opened.includes(index) ? opened : [...opened, index]));
   }
 
+  // Saves that the open video was watched to the end. A failure can be retried by playing
+  // the end again or refreshing.
+  async function markWatched(material) {
+    if (!sessionId || watchedVideos.includes(material.id)) return;
+    const { data, error } = await supabase.rpc("mark_video_watched", { p_session_id: sessionId, p_material_id: material.id });
+    if (error) {
+      setSaveError("We couldn’t save that you watched this video. Play the last few seconds again, or refresh the page.");
+      return;
+    }
+    setSaveError("");
+    setWatchedVideos(data.watched_videos || []);
+  }
+
   async function proceed() {
     if (!sessionId || completing) return;
     setCompleting(true);
     setSaveError("");
     const { data, error } = await supabase.rpc("finish_reading", { p_session_id: sessionId });
     if (error) {
-      setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time isn’t complete yet. Keep reading, then try again." : "We couldn’t save your reading progress. Please try again.");
+      setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time isn’t complete yet. Keep reading, then try again."
+        : /watch every video/i.test(error.message) ? "Watch every video to the end, then try again."
+        : "We couldn’t save your reading progress. Please try again.");
       setCompleting(false);
       return;
     }
@@ -131,7 +165,8 @@ export default function ReadingGateClient({ course, materials }) {
     if (paused) return "Answer the reading question to continue";
     if (!timeUp) return `Keep reading · ${formatTimeLeft(total - elapsed)} left`;
     if (remainingQuestions > 0) return `Answer ${plural(remainingQuestions, "more reading question")}`;
-    return `Open ${plural(unopenedDecks, "more deck")}`;
+    if (unopenedDecks > 0) return `Open ${plural(unopenedDecks, "more deck")}`;
+    return `Watch ${plural(unwatchedVideos, "more video")} to the end`;
   }
 
   const footerMessage = progressError || saveError || (done
@@ -152,7 +187,7 @@ export default function ReadingGateClient({ course, materials }) {
         <section>
           <div className="reader-heading">
             <span className="reader-heading__hint">
-              {multiDeck ? "Open and read every deck" : "Scroll down to read the whole document"}
+              {readingHint(materials)}
               {readingQuestions.length > 0 && " · questions appear as you read"}
             </span>
           </div>
@@ -168,19 +203,21 @@ export default function ReadingGateClient({ course, materials }) {
                   title={activeQuestion ? "Answer the reading question first" : material.title}
                   onClick={() => openDeck(index)}
                 >
-                  <span className="deck-tab__number">{openedDecks.includes(index) && index !== deckIndex ? "✓" : index + 1}</span>
+                  <span className="deck-tab__number">{(isVideo(material) ? watchedVideos.includes(material.id) : openedDecks.includes(index) && index !== deckIndex) ? "✓" : index + 1}</span>
                   <span className="deck-tab__title">{material.title}</span>
                 </button>
               ))}
             </div>
           )}
           <div className="tp-card reader-frame">
-            <PdfReader key={deck?.id || "none"} url={deck?.pdf_url} title={deck?.title || course.title} onPageChange={(page) => setFurthestPage((furthest) => Math.max(furthest, page))} />
+            {isVideo(deck)
+              ? <VideoReader key={deck.id} url={deck.video_url} title={deck.title} watched={watchedVideos.includes(deck.id)} onWatched={() => markWatched(deck)} />
+              : <PdfReader key={deck?.id || "none"} url={deck?.pdf_url} title={deck?.title || course.title} onPageChange={(page) => setFurthestPage((furthest) => Math.max(furthest, page))} />}
           </div>
           {multiDeck && deckIndex < materials.length - 1 && (
             <div className="deck-next">
               <button type="button" className="tp-btn tp-btn-ghost" disabled={Boolean(activeQuestion)} onClick={() => openDeck(deckIndex + 1)}>
-                Next deck: {materials[deckIndex + 1].title} →
+                Next{isVideo(materials[deckIndex + 1]) ? " video" : " deck"}: {materials[deckIndex + 1].title} →
               </button>
             </div>
           )}
@@ -189,11 +226,12 @@ export default function ReadingGateClient({ course, materials }) {
         <aside className="reading-question-panel">
           <ReadingProgressCard
             status={done ? "Reading complete" : paused ? "Answer the question" : "Reading"}
-            timeProgress={timeProgress}
+            timeProgress={hasPdf ? timeProgress : null}
             questionProgress={questionProgress}
             answeredCount={answeredIds.length}
             questionCount={readingQuestions.length}
-            decks={multiDeck ? { opened: openedDecks.length, total: materials.length } : null}
+            decks={multiDeck && materials.length > videos.length ? { opened: materials.length - videos.length - unopenedDecks, total: materials.length - videos.length } : null}
+            videos={videos.length ? { watched: videos.length - unwatchedVideos, total: videos.length } : null}
           />
           <CheckpointCard
             loading={questionsLoading}

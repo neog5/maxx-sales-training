@@ -12,6 +12,7 @@ import SuggestionLauncher from "./SuggestionLauncher";
 import SuggestionPanel from "./SuggestionPanel";
 import { readingLabel } from "./reading-label";
 import { removeStoredFiles } from "@/lib/storage";
+import { isVideo } from "@/lib/course-materials";
 
 const IMPORT_FAILED = { fallback: "We couldn’t add the selected questions. Please try again." };
 const DELETE_FAILED = { fallback: "We couldn’t delete that question. Please try again." };
@@ -55,6 +56,9 @@ function QuestionItem({ question, materials, readOnly, deleting, onEdit, onDelet
 
 // One course's questions, shown on the course's Questions tab. Archived courses are read-only.
 export default function QuestionBankClient({ course, materials = [], initialQuestions, autoSuggest = false, initialGenerationCounts, readOnly = false }) {
+  // Reading questions and AI suggestions only use PDF decks; videos have no checkpoints.
+  // `number` keeps each deck's place in the full reading order, videos included.
+  const pdfMaterials = materials.map((material, index) => ({ ...material, number: index + 1 })).filter((material) => !isVideo(material));
   const supabase = createClient();
   const saver = useMutation();
   const importer = useMutation();
@@ -68,7 +72,7 @@ export default function QuestionBankClient({ course, materials = [], initialQues
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState("");
   const [generationCounts, setGenerationCounts] = useState(initialGenerationCounts);
-  const [generationDeckId, setGenerationDeckId] = useState(materials[0]?.id || null);
+  const [generationDeckId, setGenerationDeckId] = useState(pdfMaterials[0]?.id || null);
   // The deck the current suggestions were generated from; their reading questions belong to it.
   const [suggestionDeckId, setSuggestionDeckId] = useState(null);
   const autoSuggestStarted = useRef(false);
@@ -187,7 +191,7 @@ export default function QuestionBankClient({ course, materials = [], initialQues
   }
 
   const editorProps = {
-    materials,
+    materials: pdfMaterials,
     draft,
     setDraft,
     imageFile,
@@ -212,9 +216,13 @@ export default function QuestionBankClient({ course, materials = [], initialQues
 
       <Notice tone="error">{deleter.error}</Notice>
 
+      {!readOnly && materials.length > 0 && pdfMaterials.length === 0 && (
+        <Notice>AI question suggestions work from PDF decks, so they aren’t available for a video-only course yet. Add main test questions by hand.</Notice>
+      )}
+
       {!readOnly && !suggestions && !generating && !suggestionError && generationDeckId && (
         <SuggestionLauncher
-          materials={materials}
+          materials={pdfMaterials}
           deckId={generationDeckId}
           onDeckChange={setGenerationDeckId}
           counts={generationCounts}

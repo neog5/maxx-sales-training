@@ -30,7 +30,7 @@ export function draftError(draft, imageFile) {
     return "Enter the question text and at least two complete answer options.";
   }
   if (draft.question_type === "reading_test" && !draft.page_number) return "A reading-test question needs a PDF page number.";
-  if (draft.question_type === "reading_test" && !draft.material_id) return "Add a reading deck to this course before adding reading-test questions.";
+  if (draft.question_type === "reading_test" && !draft.material_id) return "Add a PDF deck to this course before adding reading-test questions. Videos don’t have reading questions.";
   return questionImageError(imageFile);
 }
 
@@ -103,7 +103,7 @@ export default function QuestionEditor({ materials, draft, setDraft, imageFile, 
           {multipleDecks && (
             <Field label="Deck">
               <select className="tp-input" value={draft.material_id || ""} onChange={(event) => set({ material_id: event.target.value })}>
-                {materials.map((material, index) => <option key={material.id} value={material.id}>{index + 1}. {material.title}</option>)}
+                {materials.map((material, index) => <option key={material.id} value={material.id}>{material.number ?? index + 1}. {material.title}</option>)}
               </select>
             </Field>
           )}

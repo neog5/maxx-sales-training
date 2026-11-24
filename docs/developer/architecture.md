@@ -61,7 +61,7 @@ app/
   login/                            sign in and sign up
   courses/                          learner course list (required and optional)
     [id]/load-course.js             shared course loader (404, archived check)
-    [id]/read/                      PDF reader, decks, reading checkpoints, timer
+    [id]/read/                      PDF reader, video player, decks, reading checkpoints, timer
     [id]/quiz/                      assessment, grading, results
   certificates/[id]/                certificate preview, PDF download and print
   profile/[id]/                     person's training, role, groups, attempts, certificates
@@ -111,12 +111,13 @@ Most rules live in small, pure, unit-tested modules. If you're changing behaviou
 | `attempt-stats.js` | Per-person stats for People and Insights (On track / Needs attention / Not started) |
 | `certificates.js` | `CERTIFICATE_TEMPLATE` (text positions, fonts, colours) and the field values |
 | `certificate-pdf.js` | Draws a certificate onto the template with pdf-lib |
-| `course-materials.js` | Deck helpers: bucket name, 50 MB limit, upload paths, titles from file names, reordering |
+| `course-materials.js` | Reading material helpers: bucket names, size limits (50 MB PDFs, 2 GB videos), upload paths, signed links, titles from file names, reordering, video durations |
+| `video-upload.js` | Browser-only: resumable (TUS) video uploads to `course-videos`, and reading a video's length from the file |
 | `question-suggestions.js` | The OpenRouter prompt, response parsing and validation |
 | `question-images.js` | Question image upload and safe cleanup |
 | `storage.js` | `removeStoredFiles`, best-effort deletion of stored files |
 | `audit.js` | Turns `audit_log` rows into sentences for course History |
-| `queries.js` | Shared Supabase queries: a person's assignments, starting a reading session (`start_reading`), everyone's profiles, a course's decks |
+| `queries.js` | Shared Supabase queries: a person's assignments, starting a reading session (`start_reading`), everyone's profiles, a course's reading materials |
 | `db.js` | `must`, `mustFind` (404 on missing rows), `fetchAll` (pages past the 1,000-row limit), `friendlyDbError` |
 | `people.js`, `picker-items.js` | Name and email display; items for `MultiPicker` |
 | `format.js`, `routes.js` | Date and number formatting; URL builders for every page |

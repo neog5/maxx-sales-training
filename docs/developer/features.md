@@ -30,16 +30,17 @@ How each part of the portal behaves and where its code lives. For what users see
 The database decides everything that counts (migration 011): the browser never sees the right answers.
 
 1. On load `start_reading` reuses the person's unfinished reading session or starts one (the database sets `started_at`), and returns its checkpoint questions without answers: up to 3, picked at random the first time and kept for that session.
-2. **Decks** are shown in `position` order, with tabs when there is more than one.
+2. **Materials** (PDF decks and videos) are shown in `position` order, with tabs when there is more than one.
 3. **PDF reader**: pdf.js renders every page; zoom 50–200%, page buttons, drag-to-pan when zoomed, *Open PDF ↗*. The page nearest the middle of the view is the current page.
 4. **Checkpoints**: once the reader reaches a checkpoint's page in its deck, the question appears and the timer pauses until it's answered correctly. *Check answer* calls `answer_reading_question`, which says right or wrong and gives the explanation, without revealing the right option. Wrong answers can be retried without limit. Options are shuffled.
-5. **Timer**: counts up to the course's `read_seconds` (paused during checkpoints; it keeps running in a background tab).
-6. **Unlock**: the button turns into *Start assessment →* (or *Finish and get certificate →*) once the time is up, every checkpoint is answered, and every deck has been **opened**. Decks don't have to be scrolled to the end; only the checkpoints force scrolling.
-7. **Finish** calls `finish_reading`, which refuses until every checkpoint is answered and the minimum time has passed since the session started. Then:
+5. **Videos** (`VideoReader.jsx`): the browser's own player with signed links, speed buttons (1×–2×), and skipping allowed both ways. Reaching the end, by playing or skipping, calls `mark_video_watched`. Videos have no checkpoints and no minimum time.
+6. **Timer**: counts up to the course's `read_seconds` (paused during checkpoints; it keeps running in a background tab). It only applies when the course has at least one PDF; video-only courses have no timer.
+7. **Unlock**: the button turns into *Start assessment →* (or *Finish and get certificate →*) once the time is up, every checkpoint is answered, every deck has been **opened** and every video has been watched to the end. Decks don't have to be scrolled to the end; only the checkpoints force scrolling.
+8. **Finish** calls `finish_reading`, which refuses until every checkpoint is answered, every video is watched and (with a PDF) the minimum time has passed since the session started. Then:
    - normal course: go to the quiz;
    - reading-only course: the database issues the certificate, and the app opens it.
 
-Answered checkpoints are saved, so reloading the page keeps them. The on-screen timer and the opened decks are kept only in the browser and start again on reload. The database's time check is wall-clock time since the session started.
+Answered checkpoints and watched videos are saved, so reloading the page keeps them. The on-screen timer and the opened decks are kept only in the browser and start again on reload. The database's time check is wall-clock time since the session started.
 
 ## Assessment (`/courses/[id]/quiz`)
 
@@ -90,7 +91,7 @@ The People page uses a different, simpler measure (`lib/attempt-stats.js`): *On 
 
 - **Course details**: title, description, passing score, reading time, reading only, *Visible to learners*.
 - **Who must complete this course**: assign training groups, or individual people (search or paste emails).
-- **Reading decks** (`CourseMaterialsClient.jsx`): add PDFs, rename, reorder with ↑ ↓, remove (which also deletes that deck's reading questions).
+- **Reading materials** (`CourseMaterialsClient.jsx`): add PDFs or an MP4 video (up to 2 GB, resumable upload with a progress bar), rename, reorder with ↑ ↓, remove (which also deletes the file, and a deck's reading questions). Videos can't have reading questions, and AI suggestions only use PDF decks; a video-only course shows a note on its Questions tab.
 - **Archive / Restore**: archiving hides the course from learners, stops new reading and attempts, removes it from compliance, and keeps every record. Everything on an archived course is read-only.
 - **Delete** (super admin only): only when there are no training records. You must type the course code. Stored PDFs and question images are removed too.
 - **History**: the last 50 audit entries for the course, its decks, assignments and attempt approvals.
