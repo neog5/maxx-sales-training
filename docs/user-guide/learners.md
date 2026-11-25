@@ -50,7 +50,7 @@ If you leave and come back, the reading questions you've already answered and th
 
 ## Step 3: Certificate
 
-The first time you pass a course (or finish a reading-only course), you get a certificate. Open it from the results screen, the course card, or your profile. Use **Download PDF** to save it or **Open to print** to print it. Certificates show a "valid until" date two years after completion.
+The first time you pass a course (or finish a reading-only course), you get a certificate. Open it from the results screen, the course card, or your profile. Use **Download PDF** to save it or **Open to print** to print it.
 
 ## Your profile
 

@@ -66,7 +66,6 @@ The database picks, stores and grades every attempt (migration 011); the browser
 
 - Issued by the database the **first** time someone passes a course, or finishes the reading of a reading-only course. Retakes don't issue another. See [Data model](data-model.md#training-records).
 - The page shows the certificate and offers **Download PDF** and **Open to print**. The PDF is built in the browser: `lib/certificate-pdf.js` draws the name, course title and completion date onto `public/certificates/template.pdf` using the layout in `CERTIFICATE_TEMPLATE` (`lib/certificates.js`). Text shrinks to fit. The date uses the viewer's time zone.
-- The 2-year expiry date is shown but has no effect.
 - To change the design, see [Operations](operations.md#changing-the-certificate-template).
 
 ## Compliance (`lib/compliance.js`)
@@ -74,7 +73,7 @@ The database picks, stores and grades every attempt (migration 011); the browser
 - A person's **required courses** are their required direct assignments plus their groups' required assignments, counting only active, unarchived courses. Optional assignments only make a course visible.
 - A required course is **done** when the person has a passed attempt **or** a certificate for it (certificates cover reading-only courses).
 - **Status**: *Nothing assigned* (no required courses), *Compliant* (all done), *Not compliant* (anything outstanding).
-- Expiry is ignored. Archiving or hiding a course removes it from everyone's requirements immediately.
+- Completion never expires. Archiving or hiding a course removes it from everyone's requirements immediately.
 
 The People page uses a different, simpler measure (`lib/attempt-stats.js`): *On track*, *Needs attention* or *Not started*, based only on the person's most recent attempt in any course.
 

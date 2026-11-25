@@ -104,7 +104,7 @@ Learners can **read** their own records (reports roles read everyone's) but neve
 | `certificate_number` | `MXO-<year>-<6 digits>`, from a global sequence that never resets |
 | `recipient_name`, `course_title`, `course_code` | Copied at issue time, so later renames don't change the certificate |
 | `attempt_id` or `reading_session_id` | What earned it |
-| `issued_at`, `expires_at` | `expires_at` is always `issued_at + 2 years` (trigger). Shown only; compliance ignores it. |
+| `issued_at` | When it was issued. Certificates don't expire. |
 
 One certificate per person per course (unique). Read your own (reports read all). No one can insert, edit or delete through the API.
 
@@ -184,7 +184,6 @@ The reading and assessment functions are `security definer`: they run with the o
 | `quiz_attempts` | `alert_attempts_exhausted_on_submit` (and `alert_attempts_exhausted` for directly inserted attempts) | Emails admins "Out of attempts: <name> · <course>" when a failed attempt uses the last one |
 | `reading_sessions` | `protect_reading_started_at` | Server-set start time that can't be changed later |
 | `reading_sessions` | `issue_reading_certificate` | Reading-only courses: when the reading is marked finished, checks the course isn't archived and, if the course has a PDF, that `read_seconds` have passed since `started_at` (5 s grace), then issues the certificate |
-| `certificates` | `set_certificate_expiry` | `expires_at = issued_at + 2 years` |
 | `audit_log` | `prevent_audit_log_changes` | Refuses updates and deletes |
 
 ## What deletes do

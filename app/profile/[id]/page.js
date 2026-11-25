@@ -55,7 +55,7 @@ export default async function ProfilePage({ params }) {
     rows(supabase.from("group_members").select("group_id").eq("user_id", id), "training group memberships"),
     rows(supabase.from("groups").select("id, name").order("name"), "training groups"),
     rows(supabase.from("courses").select("id, code, title, is_active, archived_at, view_only").order("code"), "courses"),
-    rows(supabase.from("certificates").select("id, user_id, course_id, course_title, course_code, issued_at, expires_at").eq("user_id", id).order("issued_at", { ascending: false }), "certificates"),
+    rows(supabase.from("certificates").select("id, user_id, course_id, course_title, course_code, issued_at").eq("user_id", id).order("issued_at", { ascending: false }), "certificates"),
     rows(supabase.from("attempt_unlocks").select("course_id, granted_at").eq("user_id", id), "attempt approvals"),
     rows(supabase.rpc("required_courses").eq("user_id", id), "required courses"),
   ]);
@@ -150,7 +150,7 @@ export default async function ProfilePage({ params }) {
               <div key={certificate.id} className="certificate-list__row">
                 <div>
                   <strong>{certificate.course_title}</strong>
-                  <small>{certificate.course_code} · completed <LocalDate value={certificate.issued_at} />{certificate.expires_at && <> · valid until <LocalDate value={certificate.expires_at} /></>}</small>
+                  <small>{certificate.course_code} · completed <LocalDate value={certificate.issued_at} /></small>
                 </div>
                 <Link href={routes.certificate(certificate.id)} className="tp-btn tp-btn-ghost attempt-review-link">View</Link>
               </div>

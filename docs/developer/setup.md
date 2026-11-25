@@ -26,7 +26,7 @@ For a **new** Supabase project, run these files in the SQL Editor, in this order
 | `supabase/migrations/002_groups_and_assignments.sql` | Training groups and course assignments (also creates the groups *Maxx Employees*, *Normal Distributors* and *Titan Distributors*) |
 | `supabase/migrations/003_view_groups.sql` | Private watchlists, emails on profiles, `required_courses()` |
 | `supabase/migrations/004_certificates.sql` | Course completion certificates |
-| `supabase/migrations/005_certificate_expiry.sql` | Certificates valid for 2 years |
+| `supabase/migrations/005_certificate_expiry.sql` | Certificates valid for 2 years (removed again by 017) |
 | `supabase/migrations/006_course_materials.sql` | Several PDFs ("decks") per course |
 | `supabase/migrations/007_attempt_limit.sql` | Three failed attempts per course, then an admin approves more |
 | `supabase/migrations/008_view_only_courses.sql` | Reading-only courses (no test; finishing the reading issues the certificate) |
@@ -38,6 +38,7 @@ For a **new** Supabase project, run these files in the SQL Editor, in this order
 | `supabase/migrations/014_course_videos.sql` | Videos as reading materials (private `course-videos` bucket, watched-to-the-end tracking). Raise the project's global upload limit to 2 GB first: Supabase dashboard → Storage → Settings, which needs the Owner or Administrator role |
 | `supabase/migrations/015_course_audience.sql` | Who can see a course: hidden unless given to someone, or opened to everyone; optional assignments |
 | `supabase/migrations/016_remove_manager_role.sql` | Removes the manager role (learner, admin and super admin remain) |
+| `supabase/migrations/017_remove_certificate_expiry.sql` | Certificates no longer have an expiry date |
 | `supabase/seed.sql` | Optional: one fictional sample course, `DEMO-101` |
 
 Skip the `*.undo.sql` files; they reverse a migration. For an **existing** database, run only the migrations it doesn't have yet. Never rerun `setup.sql` against a database that has data. See [Database changes](operations.md#database-changes).
