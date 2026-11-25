@@ -35,7 +35,7 @@ For a **new** Supabase project, run these files in the SQL Editor, in this order
 | `supabase/migrations/011_server_side_grading.sql` | The database checks reading and grades assessments; answers no longer reach the browser |
 | `supabase/migrations/012_invites_and_user_archive.sql` | Invite-only sign-up; archiving people (they lose access, their records stay) |
 | `supabase/migrations/013_private_course_pdfs.sql` | Course PDFs need a sign-in; the app opens them through signed links |
-| `supabase/migrations/014_course_videos.sql` | Videos as reading materials (private `course-videos` bucket, watched-to-the-end tracking). Raise the project's global upload limit to 2 GB first: Supabase dashboard → Storage → Settings, which needs the Owner or Administrator role |
+| `supabase/migrations/014_course_videos.sql` | Videos as reading materials (private `course-videos` bucket, tracking which videos each learner has opened). Raise the project's global upload limit to 2 GB first: Supabase dashboard → Storage → Settings, which needs the Owner or Administrator role |
 | `supabase/migrations/015_course_audience.sql` | Who can see a course: hidden unless given to someone, or opened to everyone; optional assignments |
 | `supabase/migrations/016_remove_manager_role.sql` | Removes the manager role (learner, admin and super admin remain) |
 | `supabase/migrations/017_remove_certificate_expiry.sql` | Certificates no longer have an expiry date |

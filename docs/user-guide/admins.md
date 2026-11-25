@@ -73,7 +73,7 @@ Open a course from **Courses** to manage it:
 - **Who can see this course**: pick one of the three settings; it saves straight away. Under **Given to**, add training groups or individual people (search, or paste a list of emails). **Add new ones as** chooses whether they're added as Required or Optional, and each one has its own Required / Optional menu you can change later.
 - **Reading materials**: add PDFs or videos, rename them, change their order with ↑ ↓, or remove one. Removing a deck deletes its reading questions; past results are kept.
   - **Videos** must be MP4, up to 2 GB; 720p keeps them small and smooth on phones (HandBrake's "Web" presets work well). The upload shows its progress and survives short connection drops; keep the page open until it finishes.
-  - Learners can skip ahead and play at up to 2×. A video counts once they reach the end. Videos have no reading questions and no minimum time; the course's minimum reading time only applies when it also has a PDF.
+  - Learners can skip ahead and play at up to 2×. A video counts as done as soon as they open it. Videos have no reading questions and no minimum time; the course's minimum reading time only applies when it also has a PDF.
   - A course can be videos only. AI suggestions use PDFs, so write a video-only course's test questions by hand.
 - **History**: who changed what on this course, and when.
 

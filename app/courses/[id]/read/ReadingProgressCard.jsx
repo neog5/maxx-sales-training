@@ -10,10 +10,10 @@ function ProgressRow({ label, value, percent }) {
 const percentOf = ({ done, total }) => Math.round((done / total) * 100);
 
 // Reading time (when the course has a PDF; timeProgress is null otherwise), checkpoints (when
-// the course has any), decks opened (multi-deck courses) and videos watched to the end.
+// the course has any), decks opened (multi-deck courses) and videos opened.
 export default function ReadingProgressCard({ status, timeProgress, questionProgress, answeredCount, questionCount, decks, videos }) {
   const deckRow = decks && { done: decks.opened, total: decks.total };
-  const videoRow = videos && { done: videos.watched, total: videos.total };
+  const videoRow = videos && { done: videos.opened, total: videos.total };
   const parts = [
     ...(timeProgress === null ? [] : [timeProgress]),
     ...(questionCount ? [questionProgress] : []),
@@ -33,7 +33,7 @@ export default function ReadingProgressCard({ status, timeProgress, questionProg
       {timeProgress !== null && <ProgressRow label="Reading time" value={`${timeProgress}%`} percent={timeProgress} />}
       {questionCount > 0 && <ProgressRow label="Reading questions" value={`${answeredCount} of ${questionCount}`} percent={questionProgress} />}
       {deckRow && <ProgressRow label="Decks opened" value={`${deckRow.done} of ${deckRow.total}`} percent={percentOf(deckRow)} />}
-      {videoRow && <ProgressRow label="Videos watched" value={`${videoRow.done} of ${videoRow.total}`} percent={percentOf(videoRow)} />}
+      {videoRow && <ProgressRow label="Videos opened" value={`${videoRow.done} of ${videoRow.total}`} percent={percentOf(videoRow)} />}
     </div>
   );
 }

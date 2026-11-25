@@ -33,14 +33,14 @@ The database decides everything that counts (migration 011): the browser never s
 2. **Materials** (PDF decks and videos) are shown in `position` order, with tabs when there is more than one.
 3. **PDF reader**: pdf.js renders every page; zoom 50–200%, page buttons, drag-to-pan when zoomed, *Open PDF ↗*. The page nearest the middle of the view is the current page.
 4. **Checkpoints**: once the reader reaches a checkpoint's page in its deck, the question appears and the timer pauses until it's answered correctly. *Check answer* calls `answer_reading_question`, which says right or wrong and gives the explanation, without revealing the right option. Wrong answers can be retried without limit. Options are shuffled.
-5. **Videos** (`VideoReader.jsx`): the browser's own player with signed links, speed buttons (1×–2×), and skipping allowed both ways. Reaching the end, by playing or skipping, calls `mark_video_watched`. Videos have no checkpoints and no minimum time.
+5. **Videos** (`VideoReader.jsx`): the browser's own player with signed links, speed buttons (1×–2×), and skipping allowed both ways. Opening a video (its tab, or the first material when the page loads) calls `mark_video_watched`, and that's all a video needs: it doesn't have to be played. Videos have no checkpoints and no minimum time.
 6. **Timer**: counts up to the course's `read_seconds` (paused during checkpoints; it keeps running in a background tab). It only applies when the course has at least one PDF; video-only courses have no timer.
-7. **Unlock**: the button turns into *Start assessment →* (or *Finish and get certificate →*) once the time is up, every checkpoint is answered, every deck has been **opened** and every video has been watched to the end. Decks don't have to be scrolled to the end; only the checkpoints force scrolling.
-8. **Finish** calls `finish_reading`, which refuses until every checkpoint is answered, every video is watched and (with a PDF) the minimum time has passed since the session started. Then:
+7. **Unlock**: the button turns into *Start assessment →* (or *Finish and get certificate →*) once the time is up, every checkpoint is answered, and every deck and video has been **opened**. Decks don't have to be scrolled to the end; only the checkpoints force scrolling.
+8. **Finish** calls `finish_reading`, which refuses until every checkpoint is answered, every video is opened and (with a PDF) the minimum time has passed since the session started. Then:
    - normal course: go to the quiz;
    - reading-only course: the database issues the certificate, and the app opens it.
 
-Answered checkpoints and watched videos are saved, so reloading the page keeps them. The on-screen timer and the opened decks are kept only in the browser and start again on reload. The database's time check is wall-clock time since the session started.
+Answered checkpoints and opened videos are saved, so reloading the page keeps them. The on-screen timer and the opened decks are kept only in the browser and start again on reload. The database's time check is wall-clock time since the session started.
 
 ## Assessment (`/courses/[id]/quiz`)
 

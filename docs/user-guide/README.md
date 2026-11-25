@@ -11,7 +11,7 @@ How to use the Maxx Sales Training portal. Pick the guide for your role (it's sh
 |---|---|
 | **Course** | A set of reading (one or more PDFs) and usually an assessment |
 | **Deck** | One PDF in a course |
-| **Video** | One MP4 video in a course; it counts once you reach the end |
+| **Video** | One MP4 video in a course; it counts once you open it |
 | **Reading question** | A question that appears while reading, at a certain page |
 | **Assessment** | The test at the end of a course |
 | **Mandatory question** | An assessment question that's always asked and must be answered correctly to pass |

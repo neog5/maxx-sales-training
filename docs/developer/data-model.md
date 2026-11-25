@@ -67,7 +67,7 @@ RLS (migration 015): a course row is readable by anyone `can_see_course()` allow
 
 **`course_materials`**: a course's reading materials, PDF "decks" and videos, in `position` order. Columns: `course_id`, `position`, `title`, `kind` (`pdf` or `video`), `pdf_url` (PDFs only), `video_path` (videos only: the path in `course-videos`), `duration_seconds` (videos, optional, for display). A check constraint keeps each row's fields matching its kind. Readable by anyone who can open the course (`can_open_course()`); admin-only writes. Deleting a deck deletes its reading questions.
 
-**`reading_session_videos`**: which videos a reading session has watched to the end (`session_id`, `material_id`, `watched_at`). No policies: only `mark_video_watched`, `reading_session_payload` and `finish_reading` use it (migration 014).
+**`reading_session_videos`**: which videos a reading session has opened (`session_id`, `material_id`, `watched_at`). (The database names still say "watched": since 25 Nov 2026 the app records a video when it's opened.) No policies: only `mark_video_watched`, `reading_session_payload` and `finish_reading` use it (migration 014).
 
 **`questions`**: the question bank.
 
@@ -143,10 +143,10 @@ Called by the app with `.rpc()`:
 
 | Function | Returns | Used by |
 |---|---|---|
-| `start_reading(p_course_id)` | Reuses the person's unfinished reading session or starts one, and picks up to 3 random checkpoint questions for it the first time. Returns `{ session_id, questions, watched_videos }`: the questions **without answers**, each with `answered`, and the ids of videos already watched to the end. | Course card, Reader |
-| `mark_video_watched(p_session_id, p_material_id)` | Records that the person reached the end of one of the course's videos in their unfinished session. Returns the same payload as `start_reading`. | Reader |
+| `start_reading(p_course_id)` | Reuses the person's unfinished reading session or starts one, and picks up to 3 random checkpoint questions for it the first time. Returns `{ session_id, questions, watched_videos }`: the questions **without answers**, each with `answered`, and in `watched_videos` the ids of videos already opened. | Course card, Reader |
+| `mark_video_watched(p_session_id, p_material_id)` | Records that the person opened one of the course's videos in their unfinished session; the reader calls it when a video tab opens. Returns the same payload as `start_reading`. | Reader |
 | `answer_reading_question(p_session_id, p_question_id, p_selected_index)` | `{ correct, explanation }`. Records a correct answer. Doesn't reveal the right option. | Reader |
-| `finish_reading(p_session_id)` | Marks the reading finished, once every checkpoint is answered, every video has been watched to the end and, if the course has a PDF, `read_seconds` have passed since `started_at` (5 s grace). Video-only courses have no minimum time. Returns `{ certificate_id }` (reading-only courses get one). | Reader |
+| `finish_reading(p_session_id)` | Marks the reading finished, once every checkpoint is answered, every video has been opened and, if the course has a PDF, `read_seconds` have passed since `started_at` (5 s grace). Video-only courses have no minimum time. Returns `{ certificate_id }` (reading-only courses get one). | Reader |
 | `start_attempt(p_course_id)` | Needs a finished reading and an attempt left. Resumes the in-progress attempt, or starts one. The set is every active mandatory main-test question, topped up with random optional ones to `max(5, round(mandatory ÷ 0.6))`, in random order. Returns `{ attempt_id, attempts_left, questions }`, the questions **without answers** (`attempt_id` is null when the course has no questions). | Quiz |
 | `submit_attempt(p_attempt_id, p_answers)` | `p_answers` maps each attempt question id to the chosen option index, and every question needs a valid answer. Grades, completes the attempt and returns the score, pass/fail, counts, `attempts_left`, `certificate_id` and the questions with correct answers and explanations. | Quiz |
 | `required_courses()` | `(user_id, course_id)` pairs everyone must complete: required direct and group assignments combined (optional ones don't count), active unarchived courses only. Admins get everyone; others get only their own rows. | Courses, Dashboard, Profile |

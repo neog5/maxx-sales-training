@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatDuration, reachedEnd } from "@/lib/course-materials";
+import { formatDuration } from "@/lib/course-materials";
 
 const SPEEDS = [1, 1.25, 1.5, 2];
 
-// Plays one course video with the browser's own player. Learners may skip ahead or back;
-// onWatched fires once playback reaches the end, by playing or by skipping there.
-export default function VideoReader({ url, title, watched, onWatched }) {
+// Plays one course video with the browser's own player, with speed buttons. Learners may skip
+// freely; the video counts as done as soon as it's opened (ReadingGateClient records that).
+export default function VideoReader({ url, title }) {
   const videoRef = useRef(null);
-  const reportedRef = useRef(false);
   const [speed, setSpeed] = useState(1);
   const [position, setPosition] = useState({ current: 0, duration: 0 });
   const [failed, setFailed] = useState(false);
@@ -18,10 +17,6 @@ export default function VideoReader({ url, title, watched, onWatched }) {
     const video = videoRef.current;
     if (!video) return;
     setPosition({ current: video.currentTime, duration: video.duration || 0 });
-    if (!reportedRef.current && reachedEnd(video.currentTime, video.duration)) {
-      reportedRef.current = true;
-      onWatched?.();
-    }
   }
 
   // The page is server-rendered, so the browser can load the video before React attaches its
@@ -58,7 +53,7 @@ export default function VideoReader({ url, title, watched, onWatched }) {
           <div className="pdf-document-icon" aria-hidden="true">▶</div>
           <div className="pdf-document-copy">
             <strong title={title}>{title}</strong>
-            <span>{watched ? "Watched" : duration ? `${formatDuration(current) || "0:00"} / ${formatDuration(duration)}` : "Loading video…"}</span>
+            <span>{duration ? `${formatDuration(current) || "0:00"} / ${formatDuration(duration)}` : "Loading video…"}</span>
           </div>
         </div>
         <div className="pdf-toolbar-actions">

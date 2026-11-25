@@ -14,22 +14,22 @@ import ReadingProgressCard from "./ReadingProgressCard";
 import VideoReader from "./VideoReader";
 
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-// 75 → "1 min 15 s"; under a minute → "40 s".
 // What the learner has to do, shown above the reader.
 function readingHint(materials) {
   const videoCount = materials.filter(isVideo).length;
   const deckCount = materials.length - videoCount;
   if (!videoCount) return deckCount > 1 ? "Open and read every deck" : "Scroll down to read the whole document";
-  if (!deckCount) return videoCount > 1 ? "Watch every video to the end · you can skip ahead" : "Watch the video to the end · you can skip ahead";
-  return "Read every deck and watch every video to the end";
+  if (!deckCount) return videoCount > 1 ? "Open and watch every video" : "Watch the video below";
+  return "Read every deck and open every video";
 }
+// 75 → "1 min 15 s"; under a minute → "40 s".
 const formatTimeLeft = (seconds) => (seconds >= 60 ? `${Math.floor(seconds / 60)} min ${seconds % 60} s` : `${seconds} s`);
 
 // The database picks the checkpoint questions, checks each answer and decides when the reading
 // is finished (migrations 011 and 014), so the browser never sees the correct answers.
 // Materials are PDF decks and videos. Videos have no checkpoints and no minimum time: each
-// one counts once the learner reaches its end. The minimum reading time applies only when
-// the course has a PDF.
+// one counts as soon as it's opened (the database records it, so a reload keeps it). The
+// minimum reading time applies only when the course has a PDF.
 export default function ReadingGateClient({ course, materials }) {
   const [supabase] = useState(createClient);
   const router = useRouter();
@@ -43,8 +43,8 @@ export default function ReadingGateClient({ course, materials }) {
   const [furthestPage, setFurthestPage] = useState(1);
   const [deckIndex, setDeckIndex] = useState(0);
   const [openedDecks, setOpenedDecks] = useState([0]);
-  // Ids of the videos watched to the end, as recorded by the database.
-  const [watchedVideos, setWatchedVideos] = useState([]);
+  // Ids of the videos opened, as recorded by the database.
+  const [openedVideos, setOpenedVideos] = useState([]);
   const [selectedAnswer, setSelectedAnswer] = useState(undefined);
   // The database's verdict on the selected answer: { correct, explanation }, or null.
   const [feedback, setFeedback] = useState(null);
@@ -61,8 +61,10 @@ export default function ReadingGateClient({ course, materials }) {
   const deck = materials[deckIndex];
   const multiDeck = materials.length > 1;
   const unopenedDecks = materials.filter((material, index) => !isVideo(material) && !openedDecks.includes(index)).length;
-  const unwatchedVideos = videos.filter((video) => !watchedVideos.includes(video.id)).length;
+  const unopenedVideos = videos.filter((video) => !openedVideos.includes(video.id)).length;
   const timeUp = elapsed >= total;
+  // Reading left to do apart from opening videos: time, checkpoints and decks.
+  const readingLeft = !timeUp || readingQuestions.length > answeredIds.length || unopenedDecks > 0;
   const remainingQuestions = readingQuestions.length - answeredIds.length;
   const orderedQuestions = useMemo(() => [...readingQuestions].sort((a, b) => a.page_number - b.page_number), [readingQuestions]);
   // The next checkpoint is the earliest unanswered one in the deck being read.
@@ -70,9 +72,21 @@ export default function ReadingGateClient({ course, materials }) {
   // The checkpoint stays open until answered, even if the reader scrolls back.
   const activeQuestion = unanswered && furthestPage >= unanswered.page_number ? unanswered : null;
   const paused = Boolean(activeQuestion);
-  const done = timeUp && remainingQuestions === 0 && unopenedDecks === 0 && unwatchedVideos === 0;
+  const done = timeUp && remainingQuestions === 0 && unopenedDecks === 0 && unopenedVideos === 0;
   const timeProgress = total ? Math.min(100, Math.round((elapsed / total) * 100)) : 100;
   const questionProgress = questionsLoading ? 0 : readingQuestions.length ? Math.round((answeredIds.length / readingQuestions.length) * 100) : 100;
+
+  // Saves that a video was opened (mark_video_watched, migration 014). A failure can be
+  // retried by refreshing the page.
+  async function recordVideoOpened(session, material) {
+    const { data, error } = await supabase.rpc("mark_video_watched", { p_session_id: session, p_material_id: material.id });
+    if (error) {
+      setSaveError("We couldn’t save that you opened this video. Refresh the page to try again.");
+      return;
+    }
+    setSaveError("");
+    setOpenedVideos(data.watched_videos || []);
+  }
 
   // Once per mount: a ref, unlike state, survives React Strict Mode's second effect run.
   useEffect(() => {
@@ -83,10 +97,15 @@ export default function ReadingGateClient({ course, materials }) {
         setSessionId(data.session_id);
         setReadingQuestions(data.questions.map((question) => shuffleOptions(question)));
         setAnsweredIds(data.questions.filter((question) => question.answered).map((question) => question.id));
-        setWatchedVideos(data.watched_videos || []);
+        const opened = data.watched_videos || [];
+        setOpenedVideos(opened);
+        // The first material is open from the start, so a video there counts right away.
+        if (isVideo(materials[0]) && !opened.includes(materials[0].id)) recordVideoOpened(data.session_id, materials[0]);
       })
       .catch(() => setProgressError("We couldn’t start your reading session. Refresh the page to try again."))
       .finally(() => setQuestionsLoading(false));
+    // Runs once per mount; recordVideoOpened only uses values fixed for this page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, course.id]);
 
   useEffect(() => {
@@ -100,19 +119,7 @@ export default function ReadingGateClient({ course, materials }) {
     setDeckIndex(index);
     setFurthestPage(1);
     setOpenedDecks((opened) => (opened.includes(index) ? opened : [...opened, index]));
-  }
-
-  // Saves that the open video was watched to the end. A failure can be retried by playing
-  // the end again or refreshing.
-  async function markWatched(material) {
-    if (!sessionId || watchedVideos.includes(material.id)) return;
-    const { data, error } = await supabase.rpc("mark_video_watched", { p_session_id: sessionId, p_material_id: material.id });
-    if (error) {
-      setSaveError("We couldn’t save that you watched this video. Play the last few seconds again, or refresh the page.");
-      return;
-    }
-    setSaveError("");
-    setWatchedVideos(data.watched_videos || []);
+    if (isVideo(materials[index]) && sessionId && !openedVideos.includes(materials[index].id)) recordVideoOpened(sessionId, materials[index]);
   }
 
   async function proceed() {
@@ -122,7 +129,7 @@ export default function ReadingGateClient({ course, materials }) {
     const { data, error } = await supabase.rpc("finish_reading", { p_session_id: sessionId });
     if (error) {
       setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time isn’t complete yet. Keep reading, then try again."
-        : /watch every video/i.test(error.message) ? "Watch every video to the end, then try again."
+        : /watch every video/i.test(error.message) ? "Open every video, then try again."
         : "We couldn’t save your reading progress. Please try again.");
       setCompleting(false);
       return;
@@ -166,12 +173,18 @@ export default function ReadingGateClient({ course, materials }) {
     if (!timeUp) return `Keep reading · ${formatTimeLeft(total - elapsed)} left`;
     if (remainingQuestions > 0) return `Answer ${plural(remainingQuestions, "more reading question")}`;
     if (unopenedDecks > 0) return `Open ${plural(unopenedDecks, "more deck")}`;
-    return `Watch ${plural(unwatchedVideos, "more video")} to the end`;
+    return `Open ${plural(unopenedVideos, "more video")}`;
   }
 
-  const footerMessage = progressError || saveError || (done
-    ? "Reading complete"
-    : `Finish the reading to ${viewOnly ? "get your certificate" : "unlock the assessment"}.`);
+  // What's still left, in words: reading (time, checkpoints, decks), videos to open, or both.
+  function pendingMessage() {
+    const goal = viewOnly ? "get your certificate" : "unlock the assessment";
+    if (readingLeft && unopenedVideos > 0) return `Finish the reading and open every video to ${goal}.`;
+    if (unopenedVideos > 0) return `Open ${videos.length === 1 ? "the video" : plural(unopenedVideos, "more video")} to ${goal}.`;
+    return `Finish the reading to ${goal}.`;
+  }
+
+  const footerMessage = progressError || saveError || (done ? "Reading complete" : pendingMessage());
 
   return (
     <main className="reading-shell tp-fade-in">
@@ -203,7 +216,7 @@ export default function ReadingGateClient({ course, materials }) {
                   title={activeQuestion ? "Answer the reading question first" : material.title}
                   onClick={() => openDeck(index)}
                 >
-                  <span className="deck-tab__number">{(isVideo(material) ? watchedVideos.includes(material.id) : openedDecks.includes(index) && index !== deckIndex) ? "✓" : index + 1}</span>
+                  <span className="deck-tab__number">{(isVideo(material) ? openedVideos.includes(material.id) : openedDecks.includes(index)) && index !== deckIndex ? "✓" : index + 1}</span>
                   <span className="deck-tab__title">{material.title}</span>
                 </button>
               ))}
@@ -211,7 +224,7 @@ export default function ReadingGateClient({ course, materials }) {
           )}
           <div className="tp-card reader-frame">
             {isVideo(deck)
-              ? <VideoReader key={deck.id} url={deck.video_url} title={deck.title} watched={watchedVideos.includes(deck.id)} onWatched={() => markWatched(deck)} />
+              ? <VideoReader key={deck.id} url={deck.video_url} title={deck.title} />
               : <PdfReader key={deck?.id || "none"} url={deck?.pdf_url} title={deck?.title || course.title} onPageChange={(page) => setFurthestPage((furthest) => Math.max(furthest, page))} />}
           </div>
           {multiDeck && deckIndex < materials.length - 1 && (
@@ -231,7 +244,7 @@ export default function ReadingGateClient({ course, materials }) {
             answeredCount={answeredIds.length}
             questionCount={readingQuestions.length}
             decks={multiDeck && materials.length > videos.length ? { opened: materials.length - videos.length - unopenedDecks, total: materials.length - videos.length } : null}
-            videos={videos.length ? { watched: videos.length - unwatchedVideos, total: videos.length } : null}
+            videos={videos.length ? { opened: videos.length - unopenedVideos, total: videos.length } : null}
           />
           <CheckpointCard
             loading={questionsLoading}

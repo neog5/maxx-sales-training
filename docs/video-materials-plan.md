@@ -10,13 +10,13 @@ Courses can use videos as reading material alongside PDF decks or instead of the
 |---|---|
 | Hosting (now) | **Supabase Storage** (Pro plan), in a new **private** `course-videos` bucket. Videos are plain MP4 files played with the browser's own player. Learners get short-lived signed links, and the storage rules reuse the same admin and course-visibility checks as the rest of the app. No second provider, extra keys or CORS setup are needed. |
 | Hosting (later) | **Cloudflare Stream** if we need quality that adapts to the connection or automatic captions. The app keeps the video source behind one helper, so a move only affects uploads and playback links. |
-| Ruled out | **Cloudflare R2**: worked, but it's a second provider now that Supabase is paid. **Microsoft 365 / Stream on SharePoint**: viewers must be signed in to our M365 tenant, and there's no player API to tell when a video has been watched to the end. **YouTube unlisted**: anyone with the link can watch. **Google Drive**: no player API. |
+| Ruled out | **Cloudflare R2**: worked, but it's a second provider now that Supabase is paid. **Microsoft 365 / Stream on SharePoint**: viewers must be signed in to our M365 tenant, and there's no player API for the app to work with. **YouTube unlisted**: anyone with the link can watch. **Google Drive**: no player API. |
 | Course makeup | A course can have any mix of materials: PDFs only, videos only, or both, in the admin-set order. |
 | Checkpoints | **None for videos.** Reading checkpoint questions stay PDF-only. Admins can't add a reading question to a video, and the database blocks it. Main test questions are unaffected: they belong to the course, not to a material. |
 | Skipping | **Allowed**, both forward and back, so learners don't have to rewatch sections. |
-| Minimum time | **None for videos.** A video counts as watched once the learner reaches the end, whether by playing or skipping. PDFs keep their minimum reading time. A course mixing PDFs and videos needs the PDFs' time plus every video watched. |
+| Minimum time | **None for videos.** A video counts as done as soon as it's opened (changed 25 Nov 2026; it used to need reaching the end). PDFs keep their minimum reading time. A course mixing PDFs and videos needs the PDFs' time plus every video opened. |
 | Captions | **Not built yet.** Possible later: an admin attaches a `.vtt` file, or captions come automatically with Stream. |
-| Certificates | Every video reached to the end, plus the existing PDF rules (checkpoints answered and minimum time met) if the course has PDFs. Tested courses still need the main test passed. |
+| Certificates | Every video opened, plus the existing PDF rules (checkpoints answered and minimum time met) if the course has PDFs. Tested courses still need the main test passed. |
 | AI question suggestions | **Not available for videos for now**, including main test questions. See below. |
 
 ## Upload rules for MP4s
@@ -50,9 +50,8 @@ The suggestions feature currently sends the PDF to OpenRouter and asks for quest
 3. **Upload and playback.**
    - Admins upload straight from the browser to Supabase Storage with a resumable upload. The file never goes through our server.
    - The reading page creates a signed playback link valid for a few hours. The bucket's read rule only allows it for learners who can see the course.
-4. **Server-side completion.** The reading session records each video the learner reaches the end of. `finish_reading` requires every video to be reached to the end. The minimum-time check counts only PDF materials, so a video-only course has no time requirement.
+4. **Server-side completion.** The reading session records each video the learner opens. `finish_reading` requires every video to be opened. The minimum-time check counts only PDF materials, so a video-only course has no time requirement.
 5. **Learner player.** Build a `VideoReader` next to `PdfReader`, using the browser's `<video>` player. It:
-   - reports the furthest second reached, and when the learner reaches the end
    - offers speeds up to 2×
 6. **Admin.** The materials list gets "Add video" next to "Add PDF". The upload reads the duration in the browser before saving and shows a progress bar. The question editor's material picker lists PDFs only.
 7. **Cleanup.** Deleting a video material deletes its video file, as decks do now.
