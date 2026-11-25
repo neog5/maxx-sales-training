@@ -7,7 +7,7 @@ export default function AdminPage({ profile, children }) {
     <div>
       <TopNav profile={profile} />
       <div className="admin-nav tp-fade-in">
-        <AdminTabs role={profile.role} />
+        <AdminTabs />
       </div>
       {children}
     </div>

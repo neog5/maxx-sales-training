@@ -14,9 +14,9 @@ How each part of the portal behaves and where its code lives. For what users see
 
 ## Course list (`/courses`)
 
-`app/courses/page.js` loads the active, unarchived courses, the person's completed attempts, reading sessions, certificates and `required_courses()`.
+`app/courses/page.js` loads the active, unarchived courses the database lets the person open (`can_open`, migration 015), the person's completed attempts, reading sessions, certificates and `required_courses()`.
 
-- **Required courses** are those in `required_courses()` for the person. Everything else visible is under **Other courses**, marked optional.
+- **Required courses** are those in `required_courses()` for the person. Everything else they can open (optional assignments and courses open to everyone) is under **Other courses**, marked optional. Courses they haven't been given never reach the page: the database hides them.
 - `CourseCatalog.jsx` shows the tiles and filters them in the browser by code, title and description (every typed word must match).
 - **Tile badge** (`app/courses/CourseCard.jsx`), first match wins: *Completed* (passed, or reading-only with certificate; also a big green tick), *Not passed yet*, *In progress* (has a reading session), *Not started*. The cover strip uses the same status colour: grey, orange, red or green.
 - The tile's checklist shows *Read the course* → *Pass the assessment* → *Get your certificate*, ticked as each is done. Reading-only courses skip the assessment.
@@ -71,7 +71,7 @@ The database picks, stores and grades every attempt (migration 011); the browser
 
 ## Compliance (`lib/compliance.js`)
 
-- A person's **required courses** are their direct assignments plus their groups' assignments, counting only active, unarchived courses.
+- A person's **required courses** are their required direct assignments plus their groups' required assignments, counting only active, unarchived courses. Optional assignments only make a course visible.
 - A required course is **done** when the person has a passed attempt **or** a certificate for it (certificates cover reading-only courses).
 - **Status**: *Nothing assigned* (no required courses), *Compliant* (all done), *Not compliant* (anything outstanding).
 - Expiry is ignored. Archiving or hiding a course removes it from everyone's requirements immediately.
@@ -89,8 +89,8 @@ The People page uses a different, simpler measure (`lib/attempt-stats.js`): *On 
 
 ### Course Overview (`/admin/courses/[id]`)
 
-- **Course details**: title, description, passing score, reading time, reading only, *Visible to learners*.
-- **Who must complete this course**: assign training groups, or individual people (search or paste emails).
+- **Course details**: title, description, passing score, reading time, reading only.
+- **Who can see this course** (`CourseAccessPanel.jsx`, `CourseAccessChoice.jsx`, `lib/course-access.js`): three choices that save straight away. *Only the groups and people you give it to* (`is_active`, `audience = 'assigned'`), *Everyone with an account* (`audience = 'everyone'`, asks to confirm), *Nobody yet (draft)* (`is_active = false`). Below it, **Given to** lists training groups and individual people (search or paste emails), each Required or Optional (`AssignmentControls.jsx`). New courses start as *Only the groups and people you give it to*.
 - **Reading materials** (`CourseMaterialsClient.jsx`): add PDFs or an MP4 video (up to 2 GB, resumable upload with a progress bar), rename, reorder with ↑ ↓, remove (which also deletes the file, and a deck's reading questions). Videos can't have reading questions, and AI suggestions only use PDF decks; a video-only course shows a note on its Questions tab.
 - **Archive / Restore**: archiving hides the course from learners, stops new reading and attempts, removes it from compliance, and keeps every record. Everything on an archived course is read-only.
 - **Delete** (super admin only): only when there are no training records. You must type the course code. Stored PDFs and question images are removed too.
@@ -117,12 +117,12 @@ UI: `SuggestionLauncher.jsx` and `SuggestionPanel.jsx`. Server: `app/api/admin/q
 
 ## Admin: people and groups
 
-- **Training groups** (`/admin/training-groups`, `GroupsClient.jsx`): create, rename, delete groups; add or remove members (search or paste emails); assign courses to the whole group. *View compliance* opens the Dashboard filtered to that group. Managers can't see this page.
-- **Dashboard** (`/admin`, `ComplianceDashboardClient.jsx`): a card for everyone plus one per training group (admins), then a table of each person's completed/assigned courses and status. Filter by search, group or watchlist, and status. `?group=` and `?status=` preselect them. **Export CSV** downloads the filtered rows: Name, Role, Groups (admins only), Completed, Assigned, Status.
-- **Watchlists** (`WatchlistBar.jsx`): private lists of people that managers and admins make to follow a team. They only filter the Dashboard.
-- **People** (`/admin/people`): everyone with search, role and status filters and sorting, attempts, average score and pass rate. Archived people show only under the *Archived* status. Admins also get **Invites** (`InvitePanel.jsx`): paste email addresses, optionally pick a training group, and withdraw invites nobody has used. The database emails each invite if Resend and `portal_url` are set up.
+- **Training groups** (`/admin/training-groups`, `GroupsClient.jsx`): create, rename, delete groups; add or remove members (search or paste emails); give courses to the whole group, each Required or Optional. *View compliance* opens the Dashboard filtered to that group.
+- **Dashboard** (`/admin`, `ComplianceDashboardClient.jsx`): a card for everyone plus one per training group, then a table of each person's completed/assigned courses and status. Filter by search, group or watchlist, and status. `?group=` and `?status=` preselect them. **Export CSV** downloads the filtered rows: Name, Role, Groups, Completed, Assigned, Status.
+- **Watchlists** (`WatchlistBar.jsx`): private lists of people that admins make to follow a team. They only filter the Dashboard.
+- **People** (`/admin/people`): everyone with search, role and status filters and sorting, attempts, average score and pass rate. Archived people show only under the *Archived* status. **Invites** (`InvitePanel.jsx`): paste email addresses, optionally pick a training group, and withdraw invites nobody has used. The database emails each invite if Resend and `portal_url` are set up.
 - **Insights** (`/admin/insights`): totals, the 6 people with the lowest pass rate, accuracy by question type (mandatory, image-based…), and the full attempt log with links to each attempt review.
-- **Profile** (`/profile/[id]`): role editor (admins), **Archive person / Restore person** (`ArchiveEditor.jsx`; admins for learners and managers, super admins for admins), required training with reasons and assignment controls, training groups, locked assessments with *Allow 3 more attempts*, certificates, stats and every attempt. **Attempt review** (`/profile/[id]/attempts/[attemptId]`) shows the frozen questions with the person's answers.
+- **Profile** (`/profile/[id]`): role editor (admins), **Archive person / Restore person** (`ArchiveEditor.jsx`; admins for learners, super admins for admins), required and optional courses with reasons, Required/Optional and Remove for direct assignments, training groups, locked assessments with *Allow 3 more attempts*, certificates, stats and every attempt. **Attempt review** (`/profile/[id]/attempts/[attemptId]`) shows the frozen questions with the person's answers.
 
 ## Admin email alerts
 

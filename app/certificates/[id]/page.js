@@ -11,7 +11,7 @@ export default async function CertificatePage({ params }) {
   const { id } = await params;
   const { supabase, profile } = await requireViewer();
 
-  // Row-level security limits this to the viewer's own certificates, or anyone's for managers and admins.
+  // Row-level security limits this to the viewer's own certificates, or anyone's for admins.
   const certificate = mustFind(
     await supabase
       .from("certificates")

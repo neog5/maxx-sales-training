@@ -617,7 +617,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .audit-list__row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--divider); font-size: 14.5px; }
 .audit-list__row:last-child { border-bottom: 0; }
 .audit-list__row small { flex-shrink: 0; color: var(--faint); font-size: 13px; }
-.role-badge--manager { color: var(--success); background: var(--success-dim); }
 .role-badge--super_admin { color: #FFFFFF; background: var(--surface); }
 @media (max-width: 900px) {
   .course-admin__grid { grid-template-columns: 1fr; }
@@ -774,10 +773,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .watchlists__editor-head form, .watchlists__editor-head > div { display: flex; gap: 6px; }
 .watchlists__editor-head .tp-input { width: 220px; }
 .watchlists__editor .course-admin__hint { margin: 8px 0 0; }
-.compliance-table__head.is-compact, .compliance-table__row.is-compact { grid-template-columns: minmax(180px, 1.6fr) .9fr 1.3fr; }
 @media (max-width: 760px) {
-  .compliance-table__head.is-compact, .compliance-table__row.is-compact { grid-template-columns: minmax(140px, 1.3fr) .7fr 1fr; }
-  .compliance-table__head.is-compact > :nth-child(2), .compliance-table__row.is-compact > :nth-child(2) { display: flex; }
   .watchlists__create .tp-input, .watchlists__editor-head .tp-input { width: 100%; }
   .watchlists__editor-head form { flex: 1; }
 }

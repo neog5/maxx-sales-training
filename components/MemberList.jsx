@@ -8,7 +8,8 @@ import { routes } from "@/lib/routes";
 const PAGE_SIZE = 25;
 
 // Searchable, paged list of people for groups that can hold hundreds of members.
-export default function MemberList({ people, onRemove, busy = false, emptyText = "No one yet" }) {
+// `actions(person)` adds controls before the Remove button.
+export default function MemberList({ people, onRemove, actions, busy = false, emptyText = "No one yet" }) {
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
 
@@ -35,7 +36,12 @@ export default function MemberList({ people, onRemove, busy = false, emptyText =
               <Link className="profile-link" href={routes.profile(person.id)}>{displayName(person)}</Link>
               {person.email && <small>{person.email}</small>}
             </span>
-            {onRemove && <button type="button" className="tp-btn tp-btn-ghost member-list__remove" aria-label={`Remove ${displayName(person)}`} disabled={busy} onClick={() => onRemove(person)}>Remove</button>}
+            {(actions || onRemove) && (
+              <span className="access-row__actions">
+                {actions?.(person)}
+                {onRemove && <button type="button" className="tp-btn tp-btn-ghost member-list__remove" aria-label={`Remove ${displayName(person)}`} disabled={busy} onClick={() => onRemove(person)}>Remove</button>}
+              </span>
+            )}
           </div>
         ))}
         {filtered.length === 0 && <div className="chip-list__empty member-list__empty">No members match.</div>}

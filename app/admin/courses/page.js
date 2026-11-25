@@ -1,6 +1,7 @@
 import Link from "next/link";
 import LocalDate from "@/components/LocalDate";
 import { requireViewer } from "@/lib/auth";
+import { courseAccess } from "@/lib/course-access";
 import { fetchAll, must } from "@/lib/db";
 import { isAdmin } from "@/lib/roles";
 import { routes } from "@/lib/routes";
@@ -17,7 +18,7 @@ function fetchCourseIds(supabase, table, what, filter = (query) => query) {
   return fetchAll(() => filter(supabase.from(table).select("course_id")).order("id"), what);
 }
 
-function CourseStatus({ course }) {
+function CourseStatus({ course, assignmentCount }) {
   if (course.archived_at) {
     return (
       <span className="course-status course-status--archived">
@@ -26,16 +27,19 @@ function CourseStatus({ course }) {
       </span>
     );
   }
-  return course.is_active
-    ? <span className="course-status course-status--live">Live</span>
-    : <span className="course-status course-status--hidden">Hidden</span>;
+  const access = courseAccess(course);
+  if (access === "hidden") return <span className="course-status course-status--hidden">Draft<small>Only admins</small></span>;
+  if (access === "everyone") return <span className="course-status course-status--everyone">Everyone<small>Every learner</small></span>;
+  return assignmentCount
+    ? <span className="course-status course-status--live">Chosen groups<small>Only those it’s given to</small></span>
+    : <span className="course-status course-status--hidden">Nobody yet<small>Not given to anyone</small></span>;
 }
 
 function CourseRows({ rows, counts, empty }) {
   return (
     <div className="tp-card course-admin-table">
       <div className="course-admin-table__head">
-        <div>Course</div><div>Status</div><div>Questions</div><div>Assigned to</div><div>Attempts</div><div></div>
+        <div>Course</div><div>Who can see it</div><div>Questions</div><div>Given to</div><div>Attempts</div><div></div>
       </div>
       {rows.map((course) => (
         <div className="course-admin-table__row" key={course.id}>
@@ -43,7 +47,7 @@ function CourseRows({ rows, counts, empty }) {
             <Link className="profile-link" href={routes.adminCourse(course.id)}>{course.title}</Link>
             <small className="tp-mono">{course.code}</small>
           </div>
-          <div><CourseStatus course={course} /></div>
+          <div><CourseStatus course={course} assignmentCount={counts.assignments.get(course.id) || 0} /></div>
           <div className="tp-mono">{course.view_only ? <small>Reading only</small> : counts.questions.get(course.id) || 0}</div>
           <div className="tp-mono">{counts.assignments.get(course.id) || 0}</div>
           <div className="tp-mono">{counts.attempts.get(course.id) || 0}</div>
@@ -61,7 +65,7 @@ export default async function CoursesAdminPage() {
   const [courses, attempts, questions, assignments] = await Promise.all([
     supabase
       .from("courses")
-      .select("id, code, title, is_active, view_only, created_at, archived_at, archiver:profiles!courses_archived_by_fkey(full_name)")
+      .select("id, code, title, is_active, audience, view_only, created_at, archived_at, archiver:profiles!courses_archived_by_fkey(full_name)")
       .order("code")
       .then((result) => must(result, "courses")),
     fetchCourseIds(supabase, "quiz_attempts", "completed attempts", (query) => query.eq("status", "completed")),

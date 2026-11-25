@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import CourseAccessChoice from "@/components/CourseAccessChoice";
 import Notice from "@/components/Notice";
+import { confirmAccessChange, courseAccessFields } from "@/lib/course-access";
 import { COURSE_PDF_BUCKET, MAX_PDF_BYTES, deckFileError, megabytes, titleFromFileName, uploadCourseDeck } from "@/lib/course-materials";
 import { friendlyDbError } from "@/lib/db";
 import {
@@ -16,7 +18,7 @@ import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 import { removeStoredFiles } from "@/lib/storage";
 
-const initialCourse = { code: "", title: "", description: "", pass_threshold: 80, read_seconds: 60, is_active: true, view_only: false };
+const initialCourse = { code: "", title: "", description: "", pass_threshold: 80, read_seconds: 60, access: "assigned", view_only: false };
 
 function CountField({ label, kind, value, onChange }) {
   const limits = GENERATION_LIMITS[kind];
@@ -86,6 +88,7 @@ export default function CourseFormClient() {
       setError(fileError);
       return;
     }
+    if (!confirmAccessChange("assigned", course.access)) return;
     if (suggest) {
       const countError = generationCountError({ reading: Number(counts.reading), main: Number(counts.main) }, { forNewCourse: true });
       if (countError) {
@@ -102,8 +105,10 @@ export default function CourseFormClient() {
       const { decks, paths } = await uploadDecks(code);
       uploadedPaths = paths;
 
+      const { access, ...fields } = course;
       const { data: created, error: insertError } = await supabase.from("courses").insert({
-        ...course,
+        ...fields,
+        ...courseAccessFields(access),
         code,
         title: course.title.trim(),
         description: course.description.trim() || null,
@@ -163,7 +168,11 @@ export default function CourseFormClient() {
           <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={course.pass_threshold} disabled={course.view_only} onChange={(event) => update("pass_threshold", event.target.value)} required /></label>
           <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={course.read_seconds} onChange={(event) => update("read_seconds", event.target.value)} required /></label>
         </div>
-        <label className="check-row check-row--last"><input type="checkbox" checked={course.is_active} onChange={(event) => update("is_active", event.target.checked)} /> Make this course available to learners</label>
+        <fieldset className="access-fieldset">
+          <legend className="tp-label form-label">Who can see this course</legend>
+          <CourseAccessChoice value={course.access} onChange={(value) => update("access", value)} disabled={saving} />
+          {course.access === "assigned" && <div className="form-hint">After creating it, choose the groups and people on the course page. Until then, only admins can see it.</div>}
+        </fieldset>
         <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit" disabled={saving}>{saving ? "Creating…" : course.view_only ? "Create course" : suggest ? "Create course and generate questions" : "Create course and add questions"}</button></div>
         <Notice tone="error" className="form-notice">{error}</Notice>
       </form>

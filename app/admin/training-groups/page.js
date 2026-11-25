@@ -14,7 +14,7 @@ export default async function TrainingGroupsPage({ searchParams }) {
     fetchAll(() => supabase.from("group_members").select("group_id, user_id, added_at").order("group_id").order("user_id"), "training group members"),
     fetchPeople(supabase),
     supabase.from("courses").select("id, code, title").is("archived_at", null).order("code").then((result) => must(result, "courses")),
-    fetchAll(() => supabase.from("course_assignments").select("id, course_id, group_id").not("group_id", "is", null).order("id"), "course assignments"),
+    fetchAll(() => supabase.from("course_assignments").select("id, course_id, group_id, required").not("group_id", "is", null).order("id"), "course assignments"),
   ]);
 
   return (

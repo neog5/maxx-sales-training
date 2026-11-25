@@ -8,7 +8,7 @@ import { requireViewer } from "@/lib/auth";
 import { fetchAll } from "@/lib/db";
 import { byName, displayName } from "@/lib/people";
 import { fetchPeople } from "@/lib/queries";
-import { canViewReports } from "@/lib/roles";
+import { isAdmin } from "@/lib/roles";
 import { routes } from "@/lib/routes";
 import AdminPage from "../AdminPage";
 
@@ -29,7 +29,7 @@ function MetricCard({ label, value, accent = false }) {
 }
 
 export default async function InsightsPage() {
-  const { supabase, profile } = await requireViewer(canViewReports);
+  const { supabase, profile } = await requireViewer(isAdmin);
 
   const [attempts, people, attemptQuestions] = await Promise.all([
     fetchAll(

@@ -22,9 +22,9 @@ For a **new** Supabase project, run these files in the SQL Editor, in this order
 |---|---|
 | `supabase/setup.sql` | Tables, constraints, indexes, row-level security, database functions, the sign-up trigger and the storage buckets |
 | `supabase/requested-changes.sql` | Question images, mandatory questions and question-level attempt snapshots (a no-op on a fresh `setup.sql`, but run it anyway) |
-| `supabase/migrations/001_compliance_safety.sql` | Four roles, course archiving, the audit log and record protection |
+| `supabase/migrations/001_compliance_safety.sql` | Roles, course archiving, the audit log and record protection |
 | `supabase/migrations/002_groups_and_assignments.sql` | Training groups and course assignments (also creates the groups *Maxx Employees*, *Normal Distributors* and *Titan Distributors*) |
-| `supabase/migrations/003_view_groups.sql` | Private watchlists, emails on profiles, manager-safe `required_courses()` |
+| `supabase/migrations/003_view_groups.sql` | Private watchlists, emails on profiles, `required_courses()` |
 | `supabase/migrations/004_certificates.sql` | Course completion certificates |
 | `supabase/migrations/005_certificate_expiry.sql` | Certificates valid for 2 years |
 | `supabase/migrations/006_course_materials.sql` | Several PDFs ("decks") per course |
@@ -36,6 +36,8 @@ For a **new** Supabase project, run these files in the SQL Editor, in this order
 | `supabase/migrations/012_invites_and_user_archive.sql` | Invite-only sign-up; archiving people (they lose access, their records stay) |
 | `supabase/migrations/013_private_course_pdfs.sql` | Course PDFs need a sign-in; the app opens them through signed links |
 | `supabase/migrations/014_course_videos.sql` | Videos as reading materials (private `course-videos` bucket, watched-to-the-end tracking). Raise the project's global upload limit to 2 GB first: Supabase dashboard → Storage → Settings, which needs the Owner or Administrator role |
+| `supabase/migrations/015_course_audience.sql` | Who can see a course: hidden unless given to someone, or opened to everyone; optional assignments |
+| `supabase/migrations/016_remove_manager_role.sql` | Removes the manager role (learner, admin and super admin remain) |
 | `supabase/seed.sql` | Optional: one fictional sample course, `DEMO-101` |
 
 Skip the `*.undo.sql` files; they reverse a migration. For an **existing** database, run only the migrations it doesn't have yet. Never rerun `setup.sql` against a database that has data. See [Database changes](operations.md#database-changes).

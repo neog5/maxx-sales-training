@@ -15,8 +15,10 @@ function groupByCourse(rows) {
 export default async function CoursesPage() {
   const { supabase, user, profile } = await requireViewer();
   const rows = async (query, what) => must(await query, what) || [];
-  const [courses, attempts, readingSessions, requiredRows, certificates] = await Promise.all([
-    rows(supabase.from("courses").select("id, code, title, description, view_only").eq("is_active", true).is("archived_at", null).order("code"), "courses"),
+  const [visibleCourses, attempts, readingSessions, requiredRows, certificates] = await Promise.all([
+    // can_open (migration 015) leaves out courses someone sees only because of their own
+    // history; the database already hides every course not given to them.
+    rows(supabase.from("courses").select("id, code, title, description, view_only, can_open").eq("is_active", true).is("archived_at", null).order("code"), "courses"),
     // Newest first, so the first passed attempt in a course's history is the latest pass.
     rows(
       supabase
@@ -28,11 +30,12 @@ export default async function CoursesPage() {
       "your attempts"
     ),
     rows(supabase.from("reading_sessions").select("course_id, checkpoint_passed").eq("user_id", user.id), "your reading progress"),
-    // Managers and admins can read everyone's rows, so filter to this person.
+    // Admins can read everyone's rows, so filter to this person.
     rows(supabase.rpc("required_courses").eq("user_id", user.id), "your required courses"),
     rows(supabase.from("certificates").select("id, user_id, course_id").eq("user_id", user.id), "your certificates"),
   ]);
 
+  const courses = visibleCourses.filter((course) => course.can_open);
   const certificateIdByCourse = new Map(certificates.map((certificate) => [certificate.course_id, certificate.id]));
   const attemptsByCourse = groupByCourse(attempts);
   const sessionsByCourse = groupByCourse(readingSessions);

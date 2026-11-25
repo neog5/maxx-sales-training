@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { initial } from "@/lib/people";
-import { ROLE_LABELS, canViewReports, isAdmin } from "@/lib/roles";
+import { ROLE_LABELS, isAdmin } from "@/lib/roles";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 
@@ -66,10 +66,10 @@ export default function TopNav({ profile }) {
         </Link>
 
         <div className="site-nav__actions">
-          {canViewReports(profile?.role) && (
+          {isAdmin(profile?.role) && (
             <nav className="site-nav__primary" aria-label="Primary navigation">
               <Link href={routes.courses} className={`site-nav__link ${pathname.startsWith(routes.courses) ? "is-active" : ""}`}>Courses</Link>
-              <Link href={routes.admin} className={`site-nav__link ${pathname.startsWith(routes.admin) ? "is-active" : ""}`}>{isAdmin(profile?.role) ? "Admin" : "Team"}</Link>
+              <Link href={routes.admin} className={`site-nav__link ${pathname.startsWith(routes.admin) ? "is-active" : ""}`}>Admin</Link>
             </nav>
           )}
           <div className="site-nav__account" ref={accountRef}>

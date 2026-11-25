@@ -100,7 +100,8 @@ Existing certificates are drawn fresh from the template each time they're opened
 | Someone is out of attempts | Their profile → *Locked assessments* → **Allow 3 more attempts** (admins) |
 | Retire a course | Course Overview → **Archive**. Records are kept; it leaves everyone's requirements. |
 | Delete a course created by mistake | Super admin, course Overview → **Delete** (only if nobody has started it) |
-| Make a manager | Their profile → role → Manager → **Save role** |
+| Make someone an admin | Their profile → role → Admin → **Save role** |
+| Show a course to one distributor group only | Course Overview → *Only the groups and people you give it to* → add the group under **Given to** (Required or Optional) |
 | Someone changed their name | They can't edit it in the app yet; update `profiles.full_name` in the SQL Editor. Existing certificates keep the old name. |
 | Remove a person | Not possible in the app. In Supabase it only works if they have no training records. Otherwise leave the account; removing them from groups and assignments takes them out of compliance. |
 | See who changed group memberships or roles | `select * from audit_log where entity_type in ('group','group_member','profile') order by created_at desc;` |

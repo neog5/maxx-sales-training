@@ -10,7 +10,7 @@ How the portal protects data, and what's still open.
 - **Triggers** stamp who did things (archiving, group changes, assignments), keep the audit log append-only, prevent role escalation, set reading start times and issue certificates.
 - **Foreign keys** with `ON DELETE RESTRICT` stop anyone deleting courses or people that have training records.
 - **Secrets**: the OpenRouter key exists only on the server (the Worker). The Resend key exists only in Supabase Vault. No service-role key is used by the app.
-- **Tests**: `npm run test:db` checks all of this as real learner, manager, admin and super admin users.
+- **Tests**: `npm run test:db` checks all of this as real learner, admin and super admin users.
 
 ## What the database enforces
 
@@ -23,10 +23,11 @@ How the portal protects data, and what's still open.
 - **Archived courses.** No new reading or attempts.
 - **Roles.** Only admins change roles; only super admins grant or remove super admin.
 - **Audit log.** Append-only, admins only.
-- **Privacy.** Watchlists are private to their creator; managers can't see training groups or change anything.
+- **Who can see a course** (migration 015). A course is hidden unless an admin gives it to a group or person, or opens it to everyone. Learners can't list, open, read the decks or files of, or start a course they haven't been given, so competing distributor groups never see each other's courses.
+- **Privacy.** Watchlists are private to their creator.
 - **Invite-only sign-up.** `handle_new_user` refuses any new account whose email isn't in `invites`, so it also covers sign-ups sent straight to Supabase. Only admins add or withdraw invites. Direct database sessions (the SQL Editor) are trusted, which is how the first invite gets in.
 - **Archived people.** A restrictive policy on every table refuses anyone whose profile is archived, the role checks treat them as having no role, and the reading and assessment functions refuse them. Their records stay. Their Supabase sign-in still works, but everything behind it is closed; they land on `/deactivated`.
-- **Course PDFs and videos need a sign-in.** The `course-pdfs` and `course-videos` buckets are private (videos: migration 014). Signed-in, unarchived people can read the files, and the app gives out signed links that expire (8 hours for reading, 1 hour for the admin *Open* button, 15 minutes for AI suggestions).
+- **Course PDFs and videos need a sign-in.** The `course-pdfs` and `course-videos` buckets are private (videos: migration 014). Only people who can open a course that uses a file can read it (migration 015), and the app gives out signed links that expire (8 hours for reading, 1 hour for the admin *Open* button, 15 minutes for AI suggestions).
 
 ## Still open
 

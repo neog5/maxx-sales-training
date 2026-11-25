@@ -10,7 +10,7 @@ import { isRequirableCourse, passedCoursesByUser } from "@/lib/compliance";
 import { fetchAll, must, mustFind } from "@/lib/db";
 import { displayName, initial } from "@/lib/people";
 import { fetchAssignmentsForUser } from "@/lib/queries";
-import { ROLE_LABELS, assignableRoles, canViewReports, isAdmin, isSuperAdmin } from "@/lib/roles";
+import { ROLE_LABELS, assignableRoles, isAdmin, isSuperAdmin } from "@/lib/roles";
 import { routes } from "@/lib/routes";
 import Notice from "@/components/Notice";
 import ArchiveEditor from "./ArchiveEditor";
@@ -90,7 +90,7 @@ export default async function ProfilePage({ params }) {
   const isSelf = person.id === viewer.id;
   const hasAttempts = attempts.length > 0;
   const archived = Boolean(person.archived_at);
-  // Admins archive learners and managers; only super admins archive admins. Nobody archives themselves.
+  // Admins archive learners; only super admins archive admins. Nobody archives themselves.
   const canArchive = !isSelf && isAdmin(viewer.role) && (!isAdmin(person.role) || isSuperAdmin(viewer.role));
   const archiver = person.archived_by
     ? must(await supabase.from("profiles").select("full_name").eq("id", person.archived_by).maybeSingle(), "who archived this person")
@@ -100,7 +100,7 @@ export default async function ProfilePage({ params }) {
     <div>
       <TopNav profile={viewer} />
       <main className="tp-page tp-fade-in">
-        {canViewReports(viewer.role) && <Link href={routes.people} className="tp-btn tp-btn-ghost back-link">← Back to people</Link>}
+        {isAdmin(viewer.role) && <Link href={routes.people} className="tp-btn tp-btn-ghost back-link">← Back to people</Link>}
         <div className="page-heading profile-heading">
           <h1 className="tp-display">{isSelf ? "Your training record" : name}</h1>
         </div>

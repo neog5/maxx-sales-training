@@ -7,7 +7,7 @@ How the training portal is tested: what runs automatically, and the manual test 
 | Command | What it checks | Needs |
 |---|---|---|
 | `npm test` | Logic tests: compliance status, attempt limit, role permissions, certificates, question-suggestion validation, CSV export | Nothing |
-| `npm run test:db` | Database access rules, reading checks and grading, run as real signed-in learner / manager / admin / super admin users | `SUPABASE_DB_URL` in `.env.local` |
+| `npm run test:db` | Database access rules, reading checks and grading, run as real signed-in learner / admin / super admin users | `SUPABASE_DB_URL` in `.env.local` |
 | `npm run build` | The app compiles | `.env.local` |
 | `npm run check` | `npm run lint` + `npm test` + `npm run build` | `.env.local` |
 
@@ -15,12 +15,12 @@ How the training portal is tested: what runs automatically, and the manual test 
 
 - New sign-ups become learners, with their email copied to the profile.
 - Only admins change roles; only super admins grant or remove super admin.
-- Learners see only themselves; managers read everyone's records but can't edit anything.
+- Learners see only themselves and can't edit anything; admins read everyone's records. The old manager role can't be given.
 - Archiving stamps the real actor (it can't be forged), blocks new reading sessions and quiz attempts, and is written to the audit log.
 - Admins can't delete courses; super admins can, but only courses with no training records. People with records can't be deleted.
 - The audit log is append-only and readable only by admins.
 - Training groups and assignments are admin-only; each assignment targets exactly one group or person; the actor is stamped.
-- Managers can't see training groups or how courses are assigned, but get accurate required courses through `required_courses()`.
+- `required_courses()` gives admins everyone's required courses, expanded through groups, and learners only their own.
 - Watchlists are private to their creator; nobody else, not even a super admin, can see or change them.
 - Reading checkpoints come without answers, are checked by the database, and keep the same set when the reading is reopened. The reading can't finish until every checkpoint is right and the minimum time has passed. Learners can't create, backdate or finish reading sessions themselves.
 - Assessments need a finished reading and come without answers. The database grades them: a wrong mandatory question fails, and every question needs a valid answer. Nobody can read an unsubmitted attempt's questions, edit an attempt, or submit someone else's. Passing issues the certificate, dated by the server.
@@ -28,7 +28,8 @@ How the training portal is tested: what runs automatically, and the manual test 
 - Reading-only courses issue one certificate, only after the reading time.
 - Invites are admin-only; signing up uses the invite and joins its training group; used invites can't be withdrawn. (Refusing an uninvited sign-up is manual case A8: the test user can't act as Supabase Auth.)
 - Archived people see nothing but their own profile row, can't read or take courses, aren't required to complete anything, and hold no role; only admins archive, only super admins archive admins, nobody archives themselves; restoring gives it all back.
-- The course PDF bucket is private: signed-in people can read the files, archived people can't.
+- Course files are private: only people who can open the course can read its PDF or video; archived people can't.
+- Who can see a course: new courses are hidden from everyone but admins and can't be opened; giving one to a group as optional shows it to the members without making it required; switching it to required counts it and is logged; learners can't change who sees a course or give it to themselves; taking it away leaves only the title for someone with history; *everyone* shows it to all unless it's a draft.
 
 To test a migration **before** it's on the database, apply it inside the test transaction; it's rolled back with everything else:
 
@@ -40,7 +41,7 @@ This briefly locks the tables the migration changes, so the dev site may pause f
 
 ## Manual test cases
 
-Run against the dev site or `npm run dev`. You need four accounts, one per role: **super admin**, **admin**, **manager**, **learner**. Set roles from each person's profile page (signed in as the super admin).
+Run against the dev site or `npm run dev`. You need four accounts: **super admin**, **admin**, and two **learners** in different training groups (for example Titan Distributors and Normal Distributors). Set roles from each person's profile page (signed in as the super admin).
 
 Result key: ✅ pass · ❌ fail · ⏭ not run.
 
@@ -50,9 +51,8 @@ Result key: ✅ pass · ❌ fail · ⏭ not run.
 |---|---|---|---|
 | A1 | New user | Sign up with a new email | Lands on Courses; profile menu shows "Learner" |
 | A2 | Learner | Open `/admin` | Redirected to Courses; no Admin link in the top bar |
-| A3 | Manager | Open the top-bar "Team" link | Tabs: Dashboard, People, Insights only |
 | A4 | Admin | Open Admin | Tabs: Dashboard, People, Training groups, Courses, Insights |
-| A5 | Admin | Open a learner's profile → change role to Manager | Saves; "Super admin" isn't offered |
+| A5 | Admin | Open a learner's profile → role options | Learner and Admin only; "Super admin" and "Manager" aren't offered |
 | A6 | Super admin | Open an admin's profile → role options | "Super admin" is offered |
 | A7 | Any | Open your own profile | No role editor for yourself |
 | A8 | Visitor | Create an account with an email nobody invited | Refused: "This email address hasn't been invited yet" |
@@ -72,7 +72,10 @@ Result key: ✅ pass · ❌ fail · ⏭ not run.
 | B2 | Admin | Same with 3 reading / 5 main | Course created; lands on the course's Questions tab and suggestions start |
 | B3 | Admin | Questions tab → "Generate" with 0 reading / 2 main | Allowed; 2 suggestions appear (no True/False required) |
 | B4 | Admin | Questions tab → set both counts to 0 | Generate button is disabled |
-| B5 | Admin | Overview → edit title, passing score, "Visible to learners" → Save | Saved; History shows "Updated title, passing score, visibility" |
+| B5 | Admin | Overview → edit title and passing score → Save | Saved; History shows "Updated title, passing score" |
+| B5a | Admin | Add a course | "Who can see this course" starts on *Only the groups and people you give it to*; the Courses list shows it as "Nobody yet" |
+| B5b | Admin | Course Overview → *Everyone with an account* | Asks to confirm; Courses list shows "Everyone"; History shows "Updated who can see it" |
+| B5c | Admin | Course Overview → *Nobody yet (draft)* | Courses list shows "Draft"; learners it's given to no longer see it |
 | B6 | Admin | Overview → Archive course → confirm | Course moves to "Archived courses" with "by <you>" and date; History shows "Archived the course" |
 | B7 | Admin | Open the archived course | Details, assignments and Questions are read-only; Restore is offered |
 | B8 | Learner | Open the archived course's read/quiz URL directly | "This course has been archived" page; past results still on profile |
@@ -92,10 +95,11 @@ Result key: ✅ pass · ❌ fail · ⏭ not run.
 | C4 | Admin | "Or paste a list of emails" → paste 2 real emails + 1 fake | The 2 are selected; the fake is reported as not found |
 | C5 | Admin | Search for a word that matches many people → "Select all N" | All matches selected |
 | C6 | Admin | Remove one member | Removed from the list |
-| C7 | Admin | Assign 2 courses to the group | Both chips show; the group card on the Dashboard counts them |
-| C8 | Admin | Course Overview → assign a training group and one individual person | Both show under "Who must complete this course" |
+| C7 | Admin | Add 2 courses to the group, one Required and one Optional | Both listed with their setting; the group card on the Dashboard counts only the required one |
+| C8 | Admin | Course Overview → add a training group and one individual person | Both show under "Given to" with a Required / Optional menu |
 | C9 | Admin | Profile of a member → Required training | Lists the group's courses (labelled "Test group") and the individual one (labelled "Assigned individually") |
-| C10 | Admin | Profile → "Assign extra courses to this person" | Course added as an individual assignment |
+| C10 | Admin | Profile → "Add new ones as: Optional" → give a course | Listed under "Optional courses"; switching it to Required moves it to the required list |
+| C10a | Titan learner / Normal learner | Courses page, after giving a hidden course to Titan Distributors only | The Titan learner sees it; the Normal learner doesn't, and its read URL says it isn't available |
 | C11 | Admin | Delete "Test group" | Gone; its members no longer need its courses |
 
 ### D. Dashboard and watchlists
@@ -107,19 +111,17 @@ Result key: ✅ pass · ❌ fail · ⏭ not run.
 | D3 | Admin | Status buttons: Not compliant / Compliant / Nothing assigned | Table filters correctly |
 | D4 | Admin | Search by name, then by email | Both find the person |
 | D5 | Admin | Export CSV | File downloads with Name, Role, Groups, Completed, Assigned, Status for the filtered rows |
-| D6 | Manager | Dashboard | Only the "Everyone" card; no training groups anywhere; no Groups column |
-| D7 | Manager | ☆ Watchlists → "+ Create a watchlist…" → name "My team" | Pill appears, selected; editor opens below |
-| D8 | Manager | Editor → add people (search and paste) | Pill count updates; table filters to them |
-| D9 | Manager | Click the pill again | Back to everyone |
-| D10 | Manager | ✎ → rename, then Delete | Renamed, then removed |
-| D11 | Admin | Look at the Dashboard after D7 | The manager's watchlist is not visible |
-| D12 | Manager | Open a learner's profile | Required courses and status shown; no training-group names; no editing |
+| D7 | Admin | ☆ Watchlists → "+ Create a watchlist…" → name "My team" | Pill appears, selected; editor opens below |
+| D8 | Admin | Editor → add people (search and paste) | Pill count updates; table filters to them |
+| D9 | Admin | Click the pill again | Back to everyone |
+| D10 | Admin | ✎ → rename, then Delete | Renamed, then removed |
+| D11 | Super admin | Look at the Dashboard after D7 | The admin's watchlist is not visible |
 
 ### E. Learner experience
 
 | ID | As | Steps | Expected |
 |---|---|---|---|
-| E1 | Learner | Courses page | "Required courses" lists assigned courses; other live courses under "Other available courses" |
+| E1 | Learner | Courses page | "Required courses" lists required courses; optional ones and courses open to everyone under "Other courses"; nothing else |
 | E2 | Learner | Start a required course → read → pass checkpoints → pass the quiz | Course shows Passed; Dashboard shows them compliant once all required courses are passed |
 | E3 | Learner | Own profile | Required training with ✓ for passed courses; own training groups listed |
 | E4 | Learner | Open a course's reading | The PDF loads (through a signed link) |

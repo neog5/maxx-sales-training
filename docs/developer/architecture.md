@@ -33,7 +33,7 @@ Browser ──► middleware.js (Edge)       refreshes the Supabase session cook
 1. **`middleware.js`** runs on `/courses`, `/admin`, `/profile`, `/certificates` and `/login`. It refreshes the session and redirects signed-out users to `/login` (and signed-in users away from it). It doesn't look at roles. `/` and `/api/*` aren't covered. It is Edge middleware on purpose; see [Deployment](deployment.md#why-middlewarejs-and-not-proxyjs).
 2. **Server components** load data with the server client (`lib/supabase/server.js`), as the signed-in user. Guards in `lib/auth.js`:
    - `requireViewer(allowed?)` sends people without a profile to `/login` and people whose role isn't allowed to `/courses`.
-   - `requireSelfOrReports(personId)` lets a person see their own profile, and managers and admins see anyone's.
+   - `requireSelfOrReports(personId)` lets a person see their own profile, and admins see anyone's.
    - `requireApiViewer(allowed)` is the API version (401 or 403).
 3. **Client components** make changes directly with the browser client (`lib/supabase/client.js`). Errors are turned into readable text by `friendlyDbError` (`lib/db.js`). Training records (reading, attempts) are the exception: they go only through database functions such as `start_attempt` and `submit_attempt`.
 4. **The database** enforces who may read and write what, stamps who did things, issues certificates, counts attempts, writes the audit log and sends alert emails. See [Data model](data-model.md).
@@ -47,8 +47,7 @@ Defined in `lib/roles.js` (labels and helpers) and in the database (`profiles.ro
 | Role | Helper flags | Can |
 |---|---|---|
 | `learner` | none | Take their courses; see their own results and certificates. Default for every sign-up. |
-| `manager` | `canViewReports` | Learner, plus read-only Dashboard, People, Insights and everyone's profiles; private watchlists |
-| `admin` | `canViewReports`, `isAdmin` | Manager, plus courses, decks, questions, training groups, assignments, archiving, approving more attempts, changing roles (except super admin) |
+| `admin` | `isAdmin` | Learner, plus the Dashboard, People, Insights, everyone's profiles, private watchlists, courses, decks, questions, who can see each course, training groups, assignments, archiving, approving more attempts, changing roles (except super admin) |
 | `super_admin` | all of the above, `isSuperAdmin` | Admin, plus deleting courses with no training records, and granting or removing super admin |
 
 Every role can be assigned courses and counts toward compliance. Nobody can change their own role in the app, and admins can't change a super admin's role. The database enforces the role rules with the `prevent_profile_privilege_escalation` trigger.
@@ -73,7 +72,7 @@ app/
     training-groups/                training groups, members, group assignments
     courses/                        course list
     courses/new/                    create a course
-    courses/[id]/                   course Overview: details, assignments, decks, archive/delete, history
+    courses/[id]/                   course Overview: details, who can see it and assignments, decks, archive/delete, history
     courses/[id]/questions/         course question bank and AI suggestions
     questions/                      question editor components (+ legacy redirect route)
     useAdminMutation.js             admin form save/notice helper
@@ -103,7 +102,8 @@ Most rules live in small, pure, unit-tested modules. If you're changing behaviou
 
 | Module | Holds |
 |---|---|
-| `roles.js` | Role names, labels, `isAdmin`, `canViewReports`, `assignableRoles` |
+| `roles.js` | Role names, labels, `isAdmin`, `isSuperAdmin`, `assignableRoles` |
+| `course-access.js` | The three "who can see this course" choices and how they map to `is_active` and `audience` |
 | `auth.js` | Page and API guards (`requireViewer`, `requireSelfOrReports`, `requireApiViewer`) |
 | `assessment.js` | Option shuffling, the results-screen shape of a graded attempt (`attemptResult`; grading itself is in the database), answer summaries and question-type performance, the 60/40 question mix (`MANDATORY_SHARE`, `MIN_ASSESSMENT_QUESTIONS`) |
 | `attempts.js` | The attempt limit as the UI sees it (`MAX_ATTEMPTS = 3`, `attemptAllowance`). Mirrors the database's `attempts_remaining()`. |

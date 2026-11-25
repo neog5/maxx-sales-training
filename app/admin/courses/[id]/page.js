@@ -17,7 +17,7 @@ export default async function CourseAdminPage({ params }) {
 
   const [assignments, groups, people, history, materials, readingQuestions] = await Promise.all([
     fetchAll(
-      () => supabase.from("course_assignments").select("id, group_id, user_id, assigned_at").eq("course_id", id).order("assigned_at").order("id"),
+      () => supabase.from("course_assignments").select("id, group_id, user_id, required, assigned_at").eq("course_id", id).order("assigned_at").order("id"),
       "course assignments"
     ),
     supabase.from("groups").select("id, name, description").order("name").then((result) => must(result, "training groups")),

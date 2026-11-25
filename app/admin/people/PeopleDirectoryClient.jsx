@@ -19,7 +19,7 @@ const SORTS = {
 };
 
 // `people` includes archived people; they show only under the "Archived" status filter.
-// `invites` is the list of unused invites for admins, or null for managers.
+// `invites` is the list of unused invites.
 export default function PeopleDirectoryClient({ people: everyone, initialStatus = "all", invites = null, groups = [] }) {
   const people = useMemo(() => everyone.filter((person) => !person.archived_at), [everyone]);
   const archivedPeople = useMemo(() => everyone.filter((person) => person.archived_at), [everyone]);

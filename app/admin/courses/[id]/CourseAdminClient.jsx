@@ -3,21 +3,17 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import LocalDate from "@/components/LocalDate";
-import MemberList from "@/components/MemberList";
-import MultiPicker from "@/components/MultiPicker";
 import { describeAuditEntry } from "@/lib/audit";
 import { COURSE_PDF_BUCKET, COURSE_VIDEO_BUCKET, storedMaterialFile } from "@/lib/course-materials";
-import { byName, displayName } from "@/lib/people";
-import { groupItems, personItems } from "@/lib/picker-items";
+import { displayName } from "@/lib/people";
 import { QUESTION_IMAGE_BUCKET } from "@/lib/question-images";
 import { isSuperAdmin } from "@/lib/roles";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 import useAdminMutation from "../../useAdminMutation";
+import CourseAccessPanel from "./CourseAccessPanel";
 import CourseMaterialsClient from "./CourseMaterialsClient";
 import { removeStoredFiles } from "@/lib/storage";
-
-const ASSIGNMENT_NOUNS = { group_id: ["training group", "training groups"], user_id: ["person", "people"] };
 
 function detailsFrom(course) {
   return {
@@ -25,7 +21,6 @@ function detailsFrom(course) {
     description: course.description || "",
     pass_threshold: course.pass_threshold,
     read_seconds: course.read_seconds,
-    is_active: course.is_active,
     view_only: course.view_only,
   };
 }
@@ -50,18 +45,11 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
   const archived = Boolean(course.archived_at);
   const [details, setDetails] = useState(() => detailsFrom(course));
 
-  const groupNames = useMemo(() => new Map(groups.map((group) => [group.id, group.name])), [groups]);
-  const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
-  const personOptions = useMemo(() => personItems(people), [people]);
-  const groupOptions = useMemo(() => groupItems(groups), [groups]);
-  const names = {
-    groups: groupNames,
+  const names = useMemo(() => ({
+    groups: new Map(groups.map((group) => [group.id, group.name])),
     people: new Map(people.map((person) => [person.id, displayName(person)])),
     courses: new Map([[course.id, course.title]]),
-  };
-  const assignedGroups = assignments.filter((assignment) => assignment.group_id);
-  const assignedPeople = assignments.filter((assignment) => assignment.user_id);
-  const assignedPeopleList = assignedPeople.map((assignment) => peopleById.get(assignment.user_id)).filter(Boolean).sort(byName);
+  }), [groups, people, course.id, course.title]);
 
   // Runs a change and, when it worked, re-renders the page with fresh server data.
   async function change(label, action, messages) {
@@ -85,19 +73,8 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
       description: details.description.trim() || null,
       pass_threshold: Number(details.pass_threshold),
       read_seconds: Number(details.read_seconds),
-      is_active: details.is_active,
       view_only: details.view_only,
     }).eq("id", course.id), { success: "Course details saved." });
-  }
-
-  function addAssignments(field, ids) {
-    const [one, many] = ASSIGNMENT_NOUNS[field];
-    return change("assign", () => supabase.from("course_assignments").insert(ids.map((id) => ({ course_id: course.id, [field]: id }))),
-      { success: `Assigned to ${ids.length} ${ids.length === 1 ? one : many}.` });
-  }
-
-  function removeAssignment(assignment) {
-    return change("assign", () => supabase.from("course_assignments").delete().eq("id", assignment.id));
   }
 
   function setArchived(nextArchived) {
@@ -140,49 +117,15 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
               <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={details.pass_threshold} disabled={details.view_only} onChange={(event) => updateDetail("pass_threshold", event.target.value)} required /></label>
               <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={details.read_seconds} onChange={(event) => updateDetail("read_seconds", event.target.value)} required /></label>
             </div>
-            <label className="check-row">
+            <label className="check-row check-row--last">
               <input type="checkbox" checked={details.view_only} onChange={(event) => updateDetail("view_only", event.target.checked)} />
               Reading only: no test, the certificate is issued when the reading is finished
-            </label>
-            <label className="check-row check-row--last">
-              <input type="checkbox" checked={details.is_active} onChange={(event) => updateDetail("is_active", event.target.checked)} />
-              Visible to learners
             </label>
             <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit">{busy === "details" ? "Saving…" : "Save details"}</button></div>
           </fieldset>
         </form>
 
-        <section className="tp-card tp-form-card">
-          <div className="tp-label form-section-label--tight">Who must complete this course</div>
-          <p className="course-admin__hint">Everyone in an assigned training group must complete it. Add a single person for one-off requirements.</p>
-
-          <div className="course-admin__subhead">Training groups</div>
-          <div className="chip-list">
-            {assignedGroups.map((assignment) => (
-              <span className="chip" key={assignment.id}>
-                {groupNames.get(assignment.group_id) || "Group"}
-                {!archived && <button type="button" aria-label={`Remove ${groupNames.get(assignment.group_id)}`} disabled={Boolean(busy)} onClick={() => removeAssignment(assignment)}>×</button>}
-              </span>
-            ))}
-            {assignedGroups.length === 0 && <span className="chip-list__empty">No training groups assigned</span>}
-          </div>
-          {!archived && (
-            <MultiPicker items={groupOptions} excludeIds={assignedGroups.map((assignment) => assignment.group_id)} onAdd={(ids) => addAssignments("group_id", ids)}
-              placeholder="Assign training groups…" addLabel="Assign" noun="training group" busy={busy === "assign"} />
-          )}
-
-          <div className="course-admin__subhead">Individual people</div>
-          {!archived && (
-            <MultiPicker items={personOptions} excludeIds={assignedPeople.map((assignment) => assignment.user_id)} onAdd={(ids) => addAssignments("user_id", ids)}
-              placeholder="Assign people by name or email…" addLabel="Assign" noun="person" busy={busy === "assign"} pasteEmails />
-          )}
-          <MemberList
-            people={assignedPeopleList}
-            onRemove={archived ? undefined : (person) => removeAssignment(assignedPeople.find((assignment) => assignment.user_id === person.id))}
-            busy={Boolean(busy)}
-            emptyText="No individual assignments"
-          />
-        </section>
+        <CourseAccessPanel course={course} assignments={assignments} groups={groups} people={people} archived={archived} busy={busy} change={change} supabase={supabase} />
       </div>
 
       <CourseMaterialsClient course={course} materials={materials} readingCounts={readingCounts} readOnly={archived} />

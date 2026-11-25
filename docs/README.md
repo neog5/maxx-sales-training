@@ -2,7 +2,7 @@
 
 ## For people using the portal
 
-- [User guide](user-guide/README.md): [learners](user-guide/learners.md), [managers](user-guide/managers.md) and [admins](user-guide/admins.md)
+- [User guide](user-guide/README.md): [learners](user-guide/learners.md) and [admins](user-guide/admins.md)
 
 ## For developers
 

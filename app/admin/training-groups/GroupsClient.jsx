@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { AddAsSelect, REQUIRED_HINT, RequiredSelect, requiredMessage } from "@/components/AssignmentControls";
 import MemberList from "@/components/MemberList";
 import MultiPicker from "@/components/MultiPicker";
 import { byName } from "@/lib/people";
@@ -21,7 +22,7 @@ function plural(count, one, many) {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-// Training groups decide who must complete which courses. Admins manage their members
+// Training groups decide who can see and must complete which courses. Admins manage their members
 // and the courses assigned to each group here. The page loads everything once; changes
 // update this local copy, so nothing else needs re-rendering.
 export default function GroupsClient({ initialGroups, initialMemberships, people, courses = [], initialAssignments = [], initialGroupId }) {
@@ -34,6 +35,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   const [selectedId, setSelectedId] = useState(initialGroups.some((group) => group.id === initialGroupId) ? initialGroupId : initialGroups[0]?.id);
   const [newGroup, setNewGroup] = useState("");
   const [edit, setEdit] = useState(null);
+  const [addAs, setAddAs] = useState("required");
 
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const coursesById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
@@ -76,7 +78,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   }
 
   async function deleteGroup() {
-    const warning = `Delete the training group “${selected.name}”? Its members stay in the portal, but courses assigned through this group will no longer be required for them.`;
+    const warning = `Delete the training group “${selected.name}”? Its members stay in the portal, but courses given through this group will no longer be required for them, or visible to them.`;
     if (!window.confirm(warning)) return;
     const deletedId = selectedId;
     if (!await run("delete", () => supabase.from("groups").delete().eq("id", deletedId), { success: "Deleted." })) return;
@@ -102,12 +104,19 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   }
 
   async function assignCourses(courseIds) {
+    const required = addAs === "required";
     const created = await run("courses", () => supabase
       .from("course_assignments")
-      .insert(courseIds.map((courseId) => ({ course_id: courseId, group_id: selectedId })))
-      .select("id, course_id, group_id"));
+      .insert(courseIds.map((courseId) => ({ course_id: courseId, group_id: selectedId, required })))
+      .select("id, course_id, group_id, required"));
     if (created) setAssignments((current) => [...current, ...created]);
     return created;
+  }
+
+  async function setRequired(assignment, required) {
+    const saved = await run("courses", () => supabase.from("course_assignments").update({ required }).eq("id", assignment.id).select("id"),
+      { success: requiredMessage(required) });
+    if (saved) setAssignments((current) => current.map((row) => (row.id === assignment.id ? { ...row, required } : row)));
   }
 
   async function unassignCourse(assignmentId) {
@@ -119,7 +128,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
     <main className="tp-page tp-fade-in">
       <div className="page-heading">
         <h1 className="tp-display">Training groups</h1>
-        <p>Training groups decide what people must complete. Put people in a group, such as Titan Distributors or a region, then assign courses to the whole group. A person can belong to several training groups.</p>
+        <p>Training groups decide which courses people can see and which they must complete. Put people in a group, such as Titan Distributors or a region, then give courses to the whole group. A person can belong to several training groups.</p>
       </div>
 
       {notices}
@@ -168,20 +177,29 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
             <MultiPicker items={personOptions} excludeIds={memberIds} onAdd={addMembers} placeholder="Add people by name or email…" noun="person" busy={busy} pasteEmails />
             <MemberList people={members} onRemove={removeMember} busy={busy} emptyText="No members yet" />
 
-            <div className="course-admin__subhead">Required courses ({groupAssignments.length})</div>
-            <div className="chip-list">
-              {groupAssignments.map((assignment) => {
-                const course = coursesById.get(assignment.course_id);
-                return (
-                  <span className="chip" key={assignment.id}>
-                    <Link href={routes.adminCourse(course.id)}><span className="tp-mono">{course.code}</span> · {course.title}</Link>
-                    <button type="button" aria-label={`Unassign ${course.title}`} disabled={busy} onClick={() => unassignCourse(assignment.id)}>×</button>
-                  </span>
-                );
-              })}
-              {groupAssignments.length === 0 && <span className="chip-list__empty">No courses assigned</span>}
-            </div>
-            <MultiPicker items={courseOptions} excludeIds={groupAssignments.map((assignment) => assignment.course_id)} onAdd={assignCourses} placeholder="Assign courses by title or code…" addLabel="Assign" noun="course" busy={busy} />
+            <div className="course-admin__subhead">Courses ({groupAssignments.length})</div>
+            <p className="course-admin__hint">Members can see only the courses given to this group (or to them), plus courses open to everyone. {REQUIRED_HINT}</p>
+            {groupAssignments.length > 0 ? (
+              <div className="member-list__rows access-rows">
+                {groupAssignments.map((assignment) => {
+                  const course = coursesById.get(assignment.course_id);
+                  return (
+                    <div className="member-list__row" key={assignment.id}>
+                      <span>
+                        <Link className="profile-link" href={routes.adminCourse(course.id)}>{course.title}</Link>
+                        <small className="tp-mono">{course.code}</small>
+                      </span>
+                      <span className="access-row__actions">
+                        <RequiredSelect assignment={assignment} label={course.title} onChange={setRequired} disabled={busy} />
+                        <button type="button" className="tp-btn tp-btn-ghost member-list__remove" aria-label={`Remove ${course.title}`} disabled={busy} onClick={() => unassignCourse(assignment.id)}>Remove</button>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <div className="chip-list__empty member-list__empty">No courses given to this group</div>}
+            <AddAsSelect value={addAs} onChange={setAddAs} />
+            <MultiPicker items={courseOptions} excludeIds={groupAssignments.map((assignment) => assignment.course_id)} onAdd={assignCourses} placeholder="Add courses by title or code…" addLabel="Add" noun="course" busy={busy} />
           </section>
         ) : (
           <section className="tp-card admin-insight-empty">Create a training group to get started.</section>
