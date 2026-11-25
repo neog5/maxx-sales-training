@@ -163,10 +163,10 @@ export default function CourseFormClient() {
             <CountField label="Main-test recommendations" kind="main" value={counts.main} onChange={updateCount} />
           </div>
         )}
-        <label className="check-row"><input type="checkbox" checked={course.view_only} onChange={(event) => update("view_only", event.target.checked)} /> Reading only: no test, the certificate is issued when the reading is finished</label>
+        <label className="check-row"><input type="checkbox" checked={course.view_only} onChange={(event) => update("view_only", event.target.checked)} /> No assessment: the certificate is issued once the learner finishes the course material</label>
         <div className="tp-form-grid tp-form-grid--equal">
           <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={course.pass_threshold} disabled={course.view_only} onChange={(event) => update("pass_threshold", event.target.value)} required /></label>
-          <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={course.read_seconds} onChange={(event) => update("read_seconds", event.target.value)} required /></label>
+          <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time for PDF decks (seconds)</div><input className="tp-input" type="number" min="0" value={course.read_seconds} onChange={(event) => update("read_seconds", event.target.value)} required /></label>
         </div>
         <fieldset className="access-fieldset">
           <legend className="tp-label form-label">Who can see this course</legend>

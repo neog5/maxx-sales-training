@@ -1,6 +1,6 @@
 # "Reading" wording audit (videos)
 
-Status: **noted, not changed** (25 Nov 2026). To be taken up in a separate chat.
+Status: **fixed** (25 Nov 2026). The decisions are at the end. The tables below are the original audit; line numbers are as they were before the fix.
 
 ## The issue
 
@@ -26,7 +26,7 @@ Line numbers are as of commit `344847b`.
 | `ReadingGateClient.jsx:105` | "We couldn't start your reading session…" | |
 | `ReadingGateClient.jsx:133` | "We couldn't save your reading progress…" | |
 | `ReadingGateClient.jsx:173` | "Keep reading · N s left" | Only shows when there's a PDF, so fine |
-| `ReadingGateClient.jsx:233` | "Next video/deck: …" | Already kind-aware |
+| `ReadingGateClient.jsx` (below the reader) | "← Previous", "2 of 5", "Next: <title> →", "Last one" | Added 25 Nov 2026, replaces "Next video/deck: …". Neutral wording, works for decks and videos |
 | `app/courses/[id]/read/ReadingProgressCard.jsx:33` | "Reading time" row | Only shows with a PDF, so fine |
 | `ReadingProgressCard.jsx:34` | "Reading questions" row | PDF-only by design, so fine |
 | `app/courses/[id]/read/CheckpointCard.jsx:23`, `:26`, `:90` | "Continue reading", "Reading question · …", "All reading questions answered" | PDF checkpoints only, so fine |
@@ -70,10 +70,12 @@ These aren't shown to anyone. Renaming them means a migration, plus app and test
 
 If any of these are renamed, the route is the one people could notice, in bookmarks and links in emails.
 
-## Decisions for tomorrow
+## Decisions (25 Nov 2026)
 
-1. **Step name.** What replaces "Reading" as the first step? Options: "Learn", "Course material", "Study", or a name that changes with the content ("Reading" / "Video" / "Reading and video").
-2. **"Reading only" course type.** What should it be called? For example "No test", "Certificate on completion" or "Learn only".
-3. **Minimum time for video-only courses.** The field is ignored when a course has no PDF. Should it be hidden, greyed out with a note, or should video-only courses get a minimum time again?
-4. **Route.** Should `/courses/[id]/read` be renamed, with the old path redirecting?
-5. **Database messages.** Should the three messages above be reworded in a migration, or only mapped to friendlier text in the app?
+1. **Step name: "Course material".** Course tiles say "Go through the course material" and "Continue course". The finished state is "Course material complete", and "Read again" is now "Review material". Wording that only ever applies to PDFs stays: "Keep reading", "Reading time", reading questions, and the hints shown above a PDF.
+2. **"Reading only" is now "No assessment"**, for learners, admins, the history log and the guides.
+3. **Minimum time.** The field is now labelled "Minimum reading time for PDF decks (seconds)". It stays visible; the admin guide says it's ignored for video-only courses.
+4. **Route.** `/courses/[id]/read` is unchanged.
+5. **Database messages.** Mapped in the app, no migration. "Finish the reading…" from `start_attempt` now shows "Finish the course material before starting the assessment." The other two were already replaced by app text.
+
+Internal names (section 4) are unchanged.

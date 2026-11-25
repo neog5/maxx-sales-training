@@ -57,9 +57,9 @@ The **Courses** list shows each course's setting in the **Who can see it** colum
    - **Course code**, a short unique code such as `KNEE-101`;
    - **Title** and **Description**;
    - **Training PDFs**: one or more, up to 50 MB each, read in the order you add them;
-   - **Reading only**: tick this for courses with no test, where finishing the reading earns the certificate;
+   - **No assessment**: tick this for courses with no test, where finishing the course material earns the certificate;
    - **Passing score** (default 80%);
-   - **Minimum reading time** in seconds (default 60);
+   - **Minimum reading time for PDF decks** in seconds (default 60; ignored if the course only has videos);
    - **Who can see this course** (see [above](#who-can-see-a-course); leave it on *Only the groups and people you give it to* unless the course is safe for everyone).
 3. For a tested course with a PDF, choose how many questions to have AI suggest: 3–10 reading questions and 5–30 test questions. Suggestions need the first PDF to be **5 MB or smaller**; compress it if it isn't.
 4. Click **Create course…**. You land on the course's **Questions** tab, and suggestions start automatically.
@@ -69,9 +69,9 @@ The **Courses** list shows each course's setting in the **Who can see it** colum
 
 Open a course from **Courses** to manage it:
 
-- **Course details**: change the title, description, passing score, reading time and reading only.
+- **Course details**: change the title, description, passing score, minimum reading time and no assessment.
 - **Who can see this course**: pick one of the three settings; it saves straight away. Under **Given to**, add training groups or individual people (search, or paste a list of emails). **Add new ones as** chooses whether they're added as Required or Optional, and each one has its own Required / Optional menu you can change later.
-- **Reading materials**: add PDFs or videos, rename them, change their order with ↑ ↓, or remove one. Removing a deck deletes its reading questions; past results are kept.
+- **Course material**: add PDFs or videos, rename them, change their order with ↑ ↓, or remove one. Removing a deck deletes its reading questions; past results are kept.
   - **Videos** must be MP4, up to 2 GB; 720p keeps them small and smooth on phones (HandBrake's "Web" presets work well). The upload shows its progress and survives short connection drops; keep the page open until it finishes.
   - Learners can skip ahead and play at up to 2×. A video counts as done as soon as they open it. Videos have no reading questions and no minimum time; the course's minimum reading time only applies when it also has a PDF.
   - A course can be videos only. AI suggestions use PDFs, so write a video-only course's test questions by hand.

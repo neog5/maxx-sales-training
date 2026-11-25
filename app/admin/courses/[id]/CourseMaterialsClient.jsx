@@ -135,7 +135,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
 
   return (
     <section className="tp-card tp-form-card course-decks">
-      <div className="tp-label form-section-label--tight">Reading materials</div>
+      <div className="tp-label form-section-label--tight">Course material</div>
       <p className="course-admin__hint">Learners open every deck and every video before the assessment. Videos have no reading questions or minimum time. AI suggestions need PDF decks under {FREE_PDF_PARSER_LIMIT_TEXT}.</p>
       {notices}
 

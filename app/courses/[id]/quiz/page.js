@@ -21,7 +21,7 @@ export default async function QuizPage({ params }) {
       .eq("checkpoint_passed", true)
       .limit(1)
       .maybeSingle()
-      .then((result) => must(result, "your reading progress")),
+      .then((result) => must(result, "your course progress")),
     supabase
       .from("quiz_attempts")
       .select("passed, submitted_at")

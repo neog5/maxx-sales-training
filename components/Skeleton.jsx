@@ -250,7 +250,7 @@ export function ReadingSkeleton() {
         <BackLink />
         <header className="reading-header">
           <div><h1 className="tp-display"><T w="min(420px, 70vw)" h={26} /></h1></div>
-          <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> <T w={84} h={13} /></div>
+          <div className="reading-header__step"><span>1</span> Course material <b>→</b> <span>2</span> <T w={84} h={13} /></div>
         </header>
         <div className="reading-workspace">
           <section>

@@ -42,8 +42,14 @@
 .deck-tab:disabled { cursor: not-allowed; opacity: .55; }
 .deck-tab.is-active { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent) inset; }
 .deck-tab__number { width: 22px; height: 22px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 6px; background: var(--accent-dim); color: var(--accent); font: 600 13px/1 "Inter", sans-serif; font-variant-numeric: tabular-nums; }
+.deck-tab__number.is-done { background: var(--success); color: #fff; }
 .deck-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deck-next { display: flex; justify-content: flex-end; margin-top: 10px; }
+.reading-workspace > section { min-width: 0; scroll-margin-top: 84px; }
+.deck-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.deck-nav__count { color: var(--faint); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.deck-nav__next { min-width: 0; max-width: 360px; display: inline-flex; align-items: center; gap: 6px; }
+.deck-nav__next-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-nav__last { color: var(--faint); font-size: 14px; }
 .checkpoint-count { margin-bottom: 12px; color: var(--faint); font-size: 14px; }
 .checkpoint-badge { margin-bottom: 12px; }
 .checkpoint-question { margin-bottom: 16px; font-size: 18px; font-weight: 600; line-height: 1.5; }
@@ -123,6 +129,7 @@
   .pdf-pages { padding: 14px 12px 28px; gap: 14px; }
 }
 @media (max-width: 430px) {
+  .deck-nav__count { display: none; }
   .pdf-open-link { width: 32px; padding: 0; justify-content: center; font-size: 0; }
   .pdf-open-link span { font-size: 15px; }
 }

@@ -48,7 +48,7 @@ function CourseRows({ rows, counts, empty }) {
             <small className="tp-mono">{course.code}</small>
           </div>
           <div><CourseStatus course={course} assignmentCount={counts.assignments.get(course.id) || 0} /></div>
-          <div className="tp-mono">{course.view_only ? <small>Reading only</small> : counts.questions.get(course.id) || 0}</div>
+          <div className="tp-mono">{course.view_only ? <small>No assessment</small> : counts.questions.get(course.id) || 0}</div>
           <div className="tp-mono">{counts.assignments.get(course.id) || 0}</div>
           <div className="tp-mono">{counts.attempts.get(course.id) || 0}</div>
           <div><Link href={routes.adminCourse(course.id)} className="tp-btn tp-btn-ghost people-view-link">Manage</Link></div>

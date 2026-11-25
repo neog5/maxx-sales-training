@@ -115,11 +115,11 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
             <label className="tp-form-field"><div className="tp-label form-label">Description</div><textarea className="tp-input" rows={3} value={details.description} onChange={(event) => updateDetail("description", event.target.value)} /></label>
             <div className="tp-form-grid tp-form-grid--equal">
               <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={details.pass_threshold} disabled={details.view_only} onChange={(event) => updateDetail("pass_threshold", event.target.value)} required /></label>
-              <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time (seconds)</div><input className="tp-input" type="number" min="0" value={details.read_seconds} onChange={(event) => updateDetail("read_seconds", event.target.value)} required /></label>
+              <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time for PDF decks (seconds)</div><input className="tp-input" type="number" min="0" value={details.read_seconds} onChange={(event) => updateDetail("read_seconds", event.target.value)} required /></label>
             </div>
             <label className="check-row check-row--last">
               <input type="checkbox" checked={details.view_only} onChange={(event) => updateDetail("view_only", event.target.checked)} />
-              Reading only: no test, the certificate is issued when the reading is finished
+              No assessment: the certificate is issued once the learner finishes the course material
             </label>
             <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit">{busy === "details" ? "Saving…" : "Save details"}</button></div>
           </fieldset>
@@ -136,7 +136,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
           <span>
             {archived
               ? "Restoring makes the course available again, and its assignments count toward compliance again."
-              : "Hides the course from learners and removes it from compliance checks. Every reading session, attempt and answer is kept."}
+              : "Hides the course from learners and removes it from compliance checks. Every learner’s progress, attempt and answer is kept."}
           </span>
         </div>
         <button type="button" className="tp-btn tp-btn-ghost" disabled={Boolean(busy)} onClick={() => setArchived(!archived)}>
@@ -151,7 +151,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
             <span>
               {recordCount > 0
                 ? "This course has training records, so it can’t be deleted. Archive it instead."
-                : "Permanently removes the course, its questions, its assignments and its PDF decks. The deletion is recorded in the audit log."}
+                : "Permanently removes the course, its questions, its assignments and its course material (PDF decks and videos). The deletion is recorded in the audit log."}
             </span>
           </div>
           <button type="button" className="tp-btn tp-btn-danger" disabled={recordCount > 0 || Boolean(busy)} onClick={deleteCourse}>

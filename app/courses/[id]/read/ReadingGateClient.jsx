@@ -34,6 +34,7 @@ export default function ReadingGateClient({ course, materials }) {
   const [supabase] = useState(createClient);
   const router = useRouter();
   const startedRef = useRef(false);
+  const sectionRef = useRef(null);
   const [elapsed, setElapsed] = useState(0);
   const [sessionId, setSessionId] = useState(null);
   const [readingQuestions, setReadingQuestions] = useState([]);
@@ -102,7 +103,7 @@ export default function ReadingGateClient({ course, materials }) {
         // The first material is open from the start, so a video there counts right away.
         if (isVideo(materials[0]) && !opened.includes(materials[0].id)) recordVideoOpened(data.session_id, materials[0]);
       })
-      .catch(() => setProgressError("We couldn’t start your reading session. Refresh the page to try again."))
+      .catch(() => setProgressError("We couldn’t start your session. Refresh the page to try again."))
       .finally(() => setQuestionsLoading(false));
     // Runs once per mount; recordVideoOpened only uses values fixed for this page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,15 +123,21 @@ export default function ReadingGateClient({ course, materials }) {
     if (isVideo(materials[index]) && sessionId && !openedVideos.includes(materials[index].id)) recordVideoOpened(sessionId, materials[index]);
   }
 
+  // Previous / Next sit below the reader, so bring the new material's top back into view.
+  function goTo(index) {
+    openDeck(index);
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function proceed() {
     if (!sessionId || completing) return;
     setCompleting(true);
     setSaveError("");
     const { data, error } = await supabase.rpc("finish_reading", { p_session_id: sessionId });
     if (error) {
-      setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time isn’t complete yet. Keep reading, then try again."
+      setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time for the decks isn’t complete yet. Keep reading, then try again."
         : /watch every video/i.test(error.message) ? "Open every video, then try again."
-        : "We couldn’t save your reading progress. Please try again.");
+        : "We couldn’t save your progress. Please try again.");
       setCompleting(false);
       return;
     }
@@ -176,15 +183,15 @@ export default function ReadingGateClient({ course, materials }) {
     return `Open ${plural(unopenedVideos, "more video")}`;
   }
 
-  // What's still left, in words: reading (time, checkpoints, decks), videos to open, or both.
+  // What's still left, in words: deck work (time, checkpoints, decks), videos to open, or both.
   function pendingMessage() {
     const goal = viewOnly ? "get your certificate" : "unlock the assessment";
-    if (readingLeft && unopenedVideos > 0) return `Finish the reading and open every video to ${goal}.`;
+    if (readingLeft && unopenedVideos > 0) return `Finish the decks and open every video to ${goal}.`;
     if (unopenedVideos > 0) return `Open ${videos.length === 1 ? "the video" : plural(unopenedVideos, "more video")} to ${goal}.`;
-    return `Finish the reading to ${goal}.`;
+    return `Finish the course material to ${goal}.`;
   }
 
-  const footerMessage = progressError || saveError || (done ? "Reading complete" : pendingMessage());
+  const footerMessage = progressError || saveError || (done ? "Course material complete" : pendingMessage());
 
   return (
     <main className="reading-shell tp-fade-in">
@@ -193,11 +200,11 @@ export default function ReadingGateClient({ course, materials }) {
         <div>
           <h1 className="tp-display">{course.title}</h1>
         </div>
-        <div className="reading-header__step"><span>1</span> Reading <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>
+        <div className="reading-header__step"><span>1</span> Course material <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>
       </header>
 
       <div className="reading-workspace">
-        <section>
+        <section ref={sectionRef}>
           <div className="reader-heading">
             <span className="reader-heading__hint">
               {readingHint(materials)}
@@ -205,7 +212,7 @@ export default function ReadingGateClient({ course, materials }) {
             </span>
           </div>
           {multiDeck && (
-            <div className="deck-tabs" role="group" aria-label="Course decks">
+            <div className="deck-tabs" role="group" aria-label="Course materials">
               {materials.map((material, index) => (
                 <button
                   key={material.id}
@@ -216,7 +223,9 @@ export default function ReadingGateClient({ course, materials }) {
                   title={activeQuestion ? "Answer the reading question first" : material.title}
                   onClick={() => openDeck(index)}
                 >
-                  <span className="deck-tab__number">{(isVideo(material) ? openedVideos.includes(material.id) : openedDecks.includes(index)) && index !== deckIndex ? "✓" : index + 1}</span>
+                  {(isVideo(material) ? openedVideos.includes(material.id) : openedDecks.includes(index)) && index !== deckIndex
+                    ? <span className="deck-tab__number is-done" aria-label="Done">✓</span>
+                    : <span className="deck-tab__number">{index + 1}</span>}
                   <span className="deck-tab__title">{material.title}</span>
                 </button>
               ))}
@@ -227,18 +236,26 @@ export default function ReadingGateClient({ course, materials }) {
               ? <VideoReader key={deck.id} url={deck.video_url} title={deck.title} />
               : <PdfReader key={deck?.id || "none"} url={deck?.pdf_url} title={deck?.title || course.title} onPageChange={(page) => setFurthestPage((furthest) => Math.max(furthest, page))} />}
           </div>
-          {multiDeck && deckIndex < materials.length - 1 && (
-            <div className="deck-next">
-              <button type="button" className="tp-btn tp-btn-ghost" disabled={Boolean(activeQuestion)} onClick={() => openDeck(deckIndex + 1)}>
-                Next{isVideo(materials[deckIndex + 1]) ? " video" : " deck"}: {materials[deckIndex + 1].title} →
+          {multiDeck && (
+            <nav className="deck-nav" aria-label="Move between course materials">
+              <button type="button" className="tp-btn tp-btn-ghost" disabled={deckIndex === 0 || Boolean(activeQuestion)} onClick={() => goTo(deckIndex - 1)}>
+                ← Previous
               </button>
-            </div>
+              <span className="deck-nav__count">{deckIndex + 1} of {materials.length}</span>
+              {deckIndex < materials.length - 1
+                ? (
+                  <button type="button" className="tp-btn tp-btn-primary deck-nav__next" disabled={Boolean(activeQuestion)} title={materials[deckIndex + 1].title} onClick={() => goTo(deckIndex + 1)}>
+                    <span className="deck-nav__next-title">Next: {materials[deckIndex + 1].title}</span> →
+                  </button>
+                )
+                : <span className="deck-nav__last">Last one</span>}
+            </nav>
           )}
         </section>
 
         <aside className="reading-question-panel">
           <ReadingProgressCard
-            status={done ? "Reading complete" : paused ? "Answer the question" : "Reading"}
+            status={done ? "Complete" : paused ? "Answer the question" : "In progress"}
             timeProgress={hasPdf ? timeProgress : null}
             questionProgress={questionProgress}
             answeredCount={answeredIds.length}
@@ -263,7 +280,7 @@ export default function ReadingGateClient({ course, materials }) {
 
       <div className="reading-footer">
         {done && !progressError && !saveError
-          ? <span className="reading-footer__done"><BigTick size={40} label="Reading complete" /> {footerMessage}</span>
+          ? <span className="reading-footer__done"><BigTick size={40} label="Course material complete" /> {footerMessage}</span>
           : <span>{footerMessage}</span>}
         <button type="button" className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>
           {footerLabel()}

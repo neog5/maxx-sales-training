@@ -16,7 +16,7 @@ function LockedNotice({ course }) {
     <div className="assessment-page assessment-locked tp-fade-in">
       <div className="tp-display assessment-locked__title">Assessment locked</div>
       <p className="assessment-locked__copy">
-        You have used all {MAX_ATTEMPTS} attempts for {course.title}. Ask your admin to give you more attempts. In the meantime, you can read the course again.
+        You have used all {MAX_ATTEMPTS} attempts for {course.title}. Ask your admin to give you more attempts. In the meantime, you can review the course material again.
       </p>
       <BackToCourses />
     </div>
@@ -52,7 +52,10 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
       if (error && OUT_OF_ATTEMPTS.test(error.message)) {
         setAttemptsLeft(0);
       } else {
-        setLoadError(error ? "We couldn’t load the assessment questions. Refresh the page to try again." : "");
+        setLoadError(!error ? ""
+          // The database says "Finish the reading…"; the app calls that step the course material.
+          : /finish the reading/i.test(error.message) ? "Finish the course material before starting the assessment."
+          : "We couldn’t load the assessment questions. Refresh the page to try again.");
         setAttemptId(data?.attempt_id || null);
         setQuestions((data?.questions || []).map((question) => shuffleOptions(question)));
       }

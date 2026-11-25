@@ -34,23 +34,23 @@ function nextAction({ course, enrolled, readingComplete, complete, attempted, ce
   if (complete) return certificateId ? { href: routes.certificate(certificateId), label: "View certificate" } : null;
   if (!enrolled) return { href: routes.read(course.id), label: "Start course" };
   if (!course.view_only && readingComplete) return { href: routes.quiz(course.id), label: attempted ? "Retake assessment" : "Take assessment" };
-  return { href: routes.read(course.id), label: "Continue reading" };
+  return { href: routes.read(course.id), label: "Continue course" };
 }
 
 // A course tile on the courses page. `history` is this person's completed attempts, newest first.
 export default function CourseCard({ course, enrolled, readingComplete, history, certificateId }) {
   const viewOnly = course.view_only;
   const lastPass = history.find((attempt) => attempt.passed);
-  // A reading-only course has no test: reading it issues the certificate.
+  // A course with no assessment issues the certificate once its material is finished.
   const complete = viewOnly ? Boolean(certificateId) : Boolean(lastPass);
   const attempted = history.length > 0 && !viewOnly && !complete;
   const readingDone = readingComplete || complete;
   const action = nextAction({ course, enrolled, readingComplete: readingDone, complete, attempted, certificateId });
 
   const steps = viewOnly
-    ? [{ title: "Read the course", done: readingDone }]
+    ? [{ title: "Go through the course material", done: readingDone }]
     : [
-      { title: "Read the course", done: readingDone },
+      { title: "Go through the course material", done: readingDone },
       { title: lastPass ? `Pass the assessment · ${lastPass.score}%` : "Pass the assessment", done: complete },
     ];
   const nextIndex = steps.findIndex((step) => !step.done);
@@ -69,7 +69,7 @@ export default function CourseCard({ course, enrolled, readingComplete, history,
       </div>
       <div className="course-card__meta">
         <CourseBadge complete={complete} attempted={attempted} enrolled={enrolled} />
-        {viewOnly && <span className="course-card__kind">Reading only</span>}
+        {viewOnly && <span className="course-card__kind">No assessment</span>}
       </div>
       {course.description && <p className="course-card__description">{course.description}</p>}
 
@@ -86,7 +86,7 @@ export default function CourseCard({ course, enrolled, readingComplete, history,
             {action.label} <span aria-hidden="true">→</span>
           </Link>
         )}
-        {complete && <Link href={routes.read(course.id)} className="course-card__reread">Read again</Link>}
+        {complete && <Link href={routes.read(course.id)} className="course-card__reread">Review material</Link>}
       </div>
     </article>
   );
