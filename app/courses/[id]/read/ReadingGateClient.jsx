@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import BackToCourses from "@/components/BackToCourses";
 import BigTick from "@/components/BigTick";
 import { shuffleOptions } from "@/lib/assessment";
+import { formatMinutes } from "@/lib/format";
 import { isVideo } from "@/lib/course-materials";
 import { startReading } from "@/lib/queries";
 import { routes } from "@/lib/routes";
@@ -22,23 +23,25 @@ function readingHint(materials) {
   if (!deckCount) return videoCount > 1 ? "Open and watch every video" : "Watch the video below";
   return "Read every deck and open every video";
 }
-// 75 → "1 min 15 s"; under a minute → "40 s".
-const formatTimeLeft = (seconds) => (seconds >= 60 ? `${Math.floor(seconds / 60)} min ${seconds % 60} s` : `${seconds} s`);
 
 // The database picks the checkpoint questions, checks each answer and decides when the reading
-// is finished (migrations 011 and 014), so the browser never sees the correct answers.
+// is finished (migrations 011, 014 and 018), so the browser never sees the correct answers.
 // Materials are PDF decks and videos. Videos have no checkpoints and no minimum time: each
-// one counts as soon as it's opened (the database records it, so a reload keeps it). The
-// minimum reading time applies only when the course has a PDF.
-export default function ReadingGateClient({ course, materials }) {
+// one counts as soon as it's opened (the database records it, so a reload keeps it).
+// Each PDF deck has its own minimum reading time (course.read_seconds), counted while that deck
+// is open. The clock keeps running while a reading question is waiting for an answer.
+// `review` is set once the learner has finished the material: the page is then for looking
+// back at it, with no new session, timer or questions.
+export default function ReadingGateClient({ course, materials, review = false, certificateId = null }) {
   const [supabase] = useState(createClient);
   const router = useRouter();
   const startedRef = useRef(false);
   const sectionRef = useRef(null);
-  const [elapsed, setElapsed] = useState(0);
+  // Seconds spent on each PDF deck, by material id.
+  const [deckSeconds, setDeckSeconds] = useState({});
   const [sessionId, setSessionId] = useState(null);
   const [readingQuestions, setReadingQuestions] = useState([]);
-  const [questionsLoading, setQuestionsLoading] = useState(true);
+  const [questionsLoading, setQuestionsLoading] = useState(!review);
   const [answeredIds, setAnsweredIds] = useState([]);
   // Furthest page reached in the open deck; checkpoints open when the reader gets to them.
   const [furthestPage, setFurthestPage] = useState(1);
@@ -55,26 +58,30 @@ export default function ReadingGateClient({ course, materials }) {
   // Saving can be retried, unlike failing to load the session or checkpoints.
   const [saveError, setSaveError] = useState("");
 
+  const perDeck = course.read_seconds;
   const videos = materials.filter(isVideo);
-  const hasPdf = materials.some((material) => !isVideo(material));
-  const total = hasPdf ? course.read_seconds : 0;
+  const pdfDecks = materials.map((material, index) => ({ material, index })).filter(({ material }) => !isVideo(material));
   const viewOnly = course.view_only;
   const deck = materials[deckIndex];
+  const onPdf = Boolean(deck) && !isVideo(deck);
   const multiDeck = materials.length > 1;
-  const unopenedDecks = materials.filter((material, index) => !isVideo(material) && !openedDecks.includes(index)).length;
+  const multiPdf = pdfDecks.length > 1;
+  const timeOn = (material) => Math.min(deckSeconds[material.id] || 0, perDeck);
+  // A deck is read once it has been opened and has had its minimum time.
+  const decksRead = pdfDecks.filter(({ material, index }) => openedDecks.includes(index) && timeOn(material) >= perDeck).length;
+  const decksLeft = pdfDecks.length - decksRead;
+  const deckTimeLeft = onPdf ? perDeck - timeOn(deck) : 0;
+  const timing = !review && deckTimeLeft > 0;
   const unopenedVideos = videos.filter((video) => !openedVideos.includes(video.id)).length;
-  const timeUp = elapsed >= total;
-  // Reading left to do apart from opening videos: time, checkpoints and decks.
-  const readingLeft = !timeUp || readingQuestions.length > answeredIds.length || unopenedDecks > 0;
   const remainingQuestions = readingQuestions.length - answeredIds.length;
+  // Reading left to do apart from opening videos: deck time, checkpoints and unread decks.
+  const readingLeft = decksLeft > 0 || remainingQuestions > 0;
   const orderedQuestions = useMemo(() => [...readingQuestions].sort((a, b) => a.page_number - b.page_number), [readingQuestions]);
   // The next checkpoint is the earliest unanswered one in the deck being read.
   const unanswered = orderedQuestions.find((question) => question.material_id === deck?.id && !answeredIds.includes(question.id));
   // The checkpoint stays open until answered, even if the reader scrolls back.
   const activeQuestion = unanswered && furthestPage >= unanswered.page_number ? unanswered : null;
-  const paused = Boolean(activeQuestion);
-  const done = timeUp && remainingQuestions === 0 && unopenedDecks === 0 && unopenedVideos === 0;
-  const timeProgress = total ? Math.min(100, Math.round((elapsed / total) * 100)) : 100;
+  const done = decksLeft === 0 && remainingQuestions === 0 && unopenedVideos === 0;
   const questionProgress = questionsLoading ? 0 : readingQuestions.length ? Math.round((answeredIds.length / readingQuestions.length) * 100) : 100;
 
   // Saves that a video was opened (mark_video_watched, migration 014). A failure can be
@@ -91,7 +98,7 @@ export default function ReadingGateClient({ course, materials }) {
 
   // Once per mount: a ref, unlike state, survives React Strict Mode's second effect run.
   useEffect(() => {
-    if (startedRef.current) return;
+    if (review || startedRef.current) return;
     startedRef.current = true;
     startReading(supabase, course.id)
       .then((data) => {
@@ -107,20 +114,22 @@ export default function ReadingGateClient({ course, materials }) {
       .finally(() => setQuestionsLoading(false));
     // Runs once per mount; recordVideoOpened only uses values fixed for this page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, course.id]);
+  }, [supabase, course.id, review]);
 
+  // Counts time on the open deck until it has had its minimum.
+  const timedDeckId = timing ? deck.id : null;
   useEffect(() => {
-    if (paused || timeUp) return;
-    const timer = setInterval(() => setElapsed((value) => Math.min(value + 1, total)), 1000);
+    if (!timedDeckId) return;
+    const timer = setInterval(() => setDeckSeconds((seconds) => ({ ...seconds, [timedDeckId]: Math.min((seconds[timedDeckId] || 0) + 1, perDeck) })), 1000);
     return () => clearInterval(timer);
-  }, [paused, timeUp, total]);
+  }, [timedDeckId, perDeck]);
 
   function openDeck(index) {
     if (index === deckIndex || activeQuestion) return;
     setDeckIndex(index);
     setFurthestPage(1);
     setOpenedDecks((opened) => (opened.includes(index) ? opened : [...opened, index]));
-    if (isVideo(materials[index]) && sessionId && !openedVideos.includes(materials[index].id)) recordVideoOpened(sessionId, materials[index]);
+    if (!review && isVideo(materials[index]) && sessionId && !openedVideos.includes(materials[index].id)) recordVideoOpened(sessionId, materials[index]);
   }
 
   // Previous / Next sit below the reader, so bring the new material's top back into view.
@@ -173,13 +182,15 @@ export default function ReadingGateClient({ course, materials }) {
     return `${multiDeck ? `deck ${deckNumber}, ` : ""}page ${question.page_number}`;
   }
 
+  const timeLeftLabel = timing ? `${formatMinutes(deckTimeLeft)} left${multiPdf ? " on this deck" : ""}` : "";
+
   function footerLabel() {
     if (completing) return "Saving progress…";
     if (done) return viewOnly ? "Finish and get certificate →" : "Start assessment →";
-    if (paused) return "Answer the reading question to continue";
-    if (!timeUp) return `Keep reading · ${formatTimeLeft(total - elapsed)} left`;
+    if (activeQuestion) return "Answer the reading question to continue";
+    if (timing) return `Keep reading · ${timeLeftLabel}`;
     if (remainingQuestions > 0) return `Answer ${plural(remainingQuestions, "more reading question")}`;
-    if (unopenedDecks > 0) return `Open ${plural(unopenedDecks, "more deck")}`;
+    if (decksLeft > 0) return `Read ${plural(decksLeft, "more deck")} · ${formatMinutes(perDeck)} each`;
     return `Open ${plural(unopenedVideos, "more video")}`;
   }
 
@@ -193,6 +204,26 @@ export default function ReadingGateClient({ course, materials }) {
 
   const footerMessage = progressError || saveError || (done ? "Course material complete" : pendingMessage());
 
+  const checkpointCard = (
+    <CheckpointCard
+      loading={questionsLoading}
+      questionCount={readingQuestions.length}
+      answeredCount={answeredIds.length}
+      activeQuestion={activeQuestion}
+      location={activeQuestion ? questionLocation(activeQuestion) : ""}
+      selectedAnswer={selectedAnswer}
+      feedback={feedback}
+      checking={checking}
+      onSelect={setSelectedAnswer}
+      onAction={handleAnswerAction}
+    />
+  );
+
+  // Where a finished course's review page leads: the certificate, or the assessment.
+  const reviewNext = certificateId
+    ? { href: routes.certificate(certificateId), label: "View certificate →" }
+    : !viewOnly ? { href: routes.quiz(course.id), label: "Go to assessment →" } : { href: routes.courses, label: "Back to courses" };
+
   return (
     <main className="reading-shell tp-fade-in">
       <BackToCourses />
@@ -200,15 +231,15 @@ export default function ReadingGateClient({ course, materials }) {
         <div>
           <h1 className="tp-display">{course.title}</h1>
         </div>
-        <div className="reading-header__step"><span>1</span> Course material <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>
+        {!review && <div className="reading-header__step"><span>1</span> Course material <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>}
       </header>
 
-      <div className="reading-workspace">
+      <div className={`reading-workspace${review ? " is-review" : ""}`}>
         <section ref={sectionRef}>
           <div className="reader-heading">
             <span className="reader-heading__hint">
-              {readingHint(materials)}
-              {readingQuestions.length > 0 && " · questions appear as you read"}
+              {review ? "You’ve finished this course material. Look back over it any time." : readingHint(materials)}
+              {!review && readingQuestions.length > 0 && " · questions appear as you read"}
             </span>
           </div>
           {multiDeck && (
@@ -223,7 +254,7 @@ export default function ReadingGateClient({ course, materials }) {
                   title={activeQuestion ? "Answer the reading question first" : material.title}
                   onClick={() => openDeck(index)}
                 >
-                  {(isVideo(material) ? openedVideos.includes(material.id) : openedDecks.includes(index)) && index !== deckIndex
+                  {!review && index !== deckIndex && (isVideo(material) ? openedVideos.includes(material.id) : openedDecks.includes(index) && timeOn(material) >= perDeck)
                     ? <span className="deck-tab__number is-done" aria-label="Done">✓</span>
                     : <span className="deck-tab__number">{index + 1}</span>}
                   <span className="deck-tab__title">{material.title}</span>
@@ -234,7 +265,16 @@ export default function ReadingGateClient({ course, materials }) {
           <div className="tp-card reader-frame">
             {isVideo(deck)
               ? <VideoReader key={deck.id} url={deck.video_url} title={deck.title} />
-              : <PdfReader key={deck?.id || "none"} url={deck?.pdf_url} title={deck?.title || course.title} onPageChange={(page) => setFurthestPage((furthest) => Math.max(furthest, page))} />}
+              : (
+                <PdfReader
+                  key={deck?.id || "none"}
+                  url={deck?.pdf_url}
+                  title={deck?.title || course.title}
+                  onPageChange={(page) => setFurthestPage((furthest) => Math.max(furthest, page))}
+                  fullscreenStatus={activeQuestion ? "Reading question" : timeLeftLabel}
+                  fullscreenPanel={activeQuestion ? checkpointCard : null}
+                />
+              )}
           </div>
           {multiDeck && (
             <nav className="deck-nav" aria-label="Move between course materials">
@@ -253,38 +293,39 @@ export default function ReadingGateClient({ course, materials }) {
           )}
         </section>
 
-        <aside className="reading-question-panel">
-          <ReadingProgressCard
-            status={done ? "Complete" : paused ? "Answer the question" : "In progress"}
-            timeProgress={hasPdf ? timeProgress : null}
-            questionProgress={questionProgress}
-            answeredCount={answeredIds.length}
-            questionCount={readingQuestions.length}
-            decks={multiDeck && materials.length > videos.length ? { opened: materials.length - videos.length - unopenedDecks, total: materials.length - videos.length } : null}
-            videos={videos.length ? { opened: videos.length - unopenedVideos, total: videos.length } : null}
-          />
-          <CheckpointCard
-            loading={questionsLoading}
-            questionCount={readingQuestions.length}
-            answeredCount={answeredIds.length}
-            activeQuestion={activeQuestion}
-            location={activeQuestion ? questionLocation(activeQuestion) : ""}
-            selectedAnswer={selectedAnswer}
-            feedback={feedback}
-            checking={checking}
-            onSelect={setSelectedAnswer}
-            onAction={handleAnswerAction}
-          />
-        </aside>
+        {!review && (
+          <aside className="reading-question-panel">
+            <ReadingProgressCard
+              status={done ? "Complete" : activeQuestion ? "Answer the question" : "In progress"}
+              time={onPdf && perDeck > 0 ? { label: multiPdf ? "Reading time · this deck" : "Reading time", left: deckTimeLeft, percent: Math.round((timeOn(deck) / perDeck) * 100) } : null}
+              timePercent={pdfDecks.length && perDeck > 0 ? Math.round(pdfDecks.reduce((sum, { material }) => sum + timeOn(material) / perDeck, 0) / pdfDecks.length * 100) : null}
+              questionProgress={questionProgress}
+              answeredCount={answeredIds.length}
+              questionCount={readingQuestions.length}
+              decks={multiPdf ? { read: decksRead, total: pdfDecks.length } : null}
+              videos={videos.length ? { opened: videos.length - unopenedVideos, total: videos.length } : null}
+            />
+            {checkpointCard}
+          </aside>
+        )}
       </div>
 
       <div className="reading-footer">
-        {done && !progressError && !saveError
-          ? <span className="reading-footer__done"><BigTick size={40} label="Course material complete" /> {footerMessage}</span>
-          : <span>{footerMessage}</span>}
-        <button type="button" className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>
-          {footerLabel()}
-        </button>
+        {review ? (
+          <>
+            <span className="reading-footer__done"><BigTick size={40} label="Course material complete" /> Course material complete</span>
+            <button type="button" className="tp-btn tp-btn-primary" onClick={() => router.push(reviewNext.href)}>{reviewNext.label}</button>
+          </>
+        ) : (
+          <>
+            {done && !progressError && !saveError
+              ? <span className="reading-footer__done"><BigTick size={40} label="Course material complete" /> {footerMessage}</span>
+              : <span>{footerMessage}</span>}
+            <button type="button" className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>
+              {footerLabel()}
+            </button>
+          </>
+        )}
       </div>
     </main>
   );

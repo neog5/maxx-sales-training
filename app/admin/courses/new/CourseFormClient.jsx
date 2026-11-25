@@ -18,7 +18,7 @@ import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 import { removeStoredFiles } from "@/lib/storage";
 
-const initialCourse = { code: "", title: "", description: "", pass_threshold: 80, read_seconds: 60, access: "assigned", view_only: false };
+const initialCourse = { code: "", title: "", description: "", pass_threshold: 80, read_minutes: 1, access: "assigned", view_only: false };
 
 function CountField({ label, kind, value, onChange }) {
   const limits = GENERATION_LIMITS[kind];
@@ -105,7 +105,7 @@ export default function CourseFormClient() {
       const { decks, paths } = await uploadDecks(code);
       uploadedPaths = paths;
 
-      const { access, ...fields } = course;
+      const { access, read_minutes: readMinutes, ...fields } = course;
       const { data: created, error: insertError } = await supabase.from("courses").insert({
         ...fields,
         ...courseAccessFields(access),
@@ -113,7 +113,7 @@ export default function CourseFormClient() {
         title: course.title.trim(),
         description: course.description.trim() || null,
         pass_threshold: Number(course.pass_threshold),
-        read_seconds: Number(course.read_seconds),
+        read_seconds: Math.round(Number(readMinutes) * 60),
       }).select("id").single();
       if (insertError) throw insertError;
       createdId = created.id;
@@ -166,7 +166,7 @@ export default function CourseFormClient() {
         <label className="check-row"><input type="checkbox" checked={course.view_only} onChange={(event) => update("view_only", event.target.checked)} /> No assessment: the certificate is issued once the learner finishes the course material</label>
         <div className="tp-form-grid tp-form-grid--equal">
           <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={course.pass_threshold} disabled={course.view_only} onChange={(event) => update("pass_threshold", event.target.value)} required /></label>
-          <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time for PDF decks (seconds)</div><input className="tp-input" type="number" min="0" value={course.read_seconds} onChange={(event) => update("read_seconds", event.target.value)} required /></label>
+          <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time per PDF deck (minutes)</div><input className="tp-input" type="number" min="0" step="0.5" value={course.read_minutes} onChange={(event) => update("read_minutes", event.target.value)} required /></label>
         </div>
         <fieldset className="access-fieldset">
           <legend className="tp-label form-label">Who can see this course</legend>

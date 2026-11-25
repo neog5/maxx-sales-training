@@ -1,3 +1,5 @@
+import { formatMinutes } from "@/lib/format";
+
 function ProgressRow({ label, value, percent }) {
   return (
     <div className="reading-progress-row">
@@ -9,13 +11,14 @@ function ProgressRow({ label, value, percent }) {
 
 const percentOf = ({ done, total }) => Math.round((done / total) * 100);
 
-// Reading time (when the course has a PDF; timeProgress is null otherwise), checkpoints (when
-// the course has any), decks opened (multi-deck courses) and videos opened.
-export default function ReadingProgressCard({ status, timeProgress, questionProgress, answeredCount, questionCount, decks, videos }) {
-  const deckRow = decks && { done: decks.opened, total: decks.total };
+// Reading time on the open PDF deck (`time`, null when a video is open or there's no minimum),
+// checkpoints (when the course has any), decks read (courses with several PDFs) and videos
+// opened. `timePercent` is the time spent across every deck, for the overall figure.
+export default function ReadingProgressCard({ status, time, timePercent, questionProgress, answeredCount, questionCount, decks, videos }) {
+  const deckRow = decks && { done: decks.read, total: decks.total };
   const videoRow = videos && { done: videos.opened, total: videos.total };
   const parts = [
-    ...(timeProgress === null ? [] : [timeProgress]),
+    ...(timePercent === null ? [] : [timePercent]),
     ...(questionCount ? [questionProgress] : []),
     ...(deckRow ? [percentOf(deckRow)] : []),
     ...(videoRow ? [percentOf(videoRow)] : []),
@@ -30,9 +33,9 @@ export default function ReadingProgressCard({ status, timeProgress, questionProg
         </div>
         <span className="reading-status-card__percent">{overall}%</span>
       </div>
-      {timeProgress !== null && <ProgressRow label="Reading time" value={`${timeProgress}%`} percent={timeProgress} />}
+      {time && <ProgressRow label={time.label} value={time.left > 0 ? `${formatMinutes(time.left)} left` : "Done"} percent={time.percent} />}
       {questionCount > 0 && <ProgressRow label="Reading questions" value={`${answeredCount} of ${questionCount}`} percent={questionProgress} />}
-      {deckRow && <ProgressRow label="Decks opened" value={`${deckRow.done} of ${deckRow.total}`} percent={percentOf(deckRow)} />}
+      {deckRow && <ProgressRow label="Decks read" value={`${deckRow.done} of ${deckRow.total}`} percent={percentOf(deckRow)} />}
       {videoRow && <ProgressRow label="Videos opened" value={`${videoRow.done} of ${videoRow.total}`} percent={percentOf(videoRow)} />}
     </div>
   );

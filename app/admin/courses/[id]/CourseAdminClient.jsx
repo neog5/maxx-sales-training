@@ -20,7 +20,7 @@ function detailsFrom(course) {
     title: course.title,
     description: course.description || "",
     pass_threshold: course.pass_threshold,
-    read_seconds: course.read_seconds,
+    read_minutes: course.read_seconds / 60,
     view_only: course.view_only,
   };
 }
@@ -72,7 +72,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
       title: details.title.trim(),
       description: details.description.trim() || null,
       pass_threshold: Number(details.pass_threshold),
-      read_seconds: Number(details.read_seconds),
+      read_seconds: Math.round(Number(details.read_minutes) * 60),
       view_only: details.view_only,
     }).eq("id", course.id), { success: "Course details saved." });
   }
@@ -115,7 +115,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
             <label className="tp-form-field"><div className="tp-label form-label">Description</div><textarea className="tp-input" rows={3} value={details.description} onChange={(event) => updateDetail("description", event.target.value)} /></label>
             <div className="tp-form-grid tp-form-grid--equal">
               <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={details.pass_threshold} disabled={details.view_only} onChange={(event) => updateDetail("pass_threshold", event.target.value)} required /></label>
-              <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time for PDF decks (seconds)</div><input className="tp-input" type="number" min="0" value={details.read_seconds} onChange={(event) => updateDetail("read_seconds", event.target.value)} required /></label>
+              <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time per PDF deck (minutes)</div><input className="tp-input" type="number" min="0" step="0.5" value={details.read_minutes} onChange={(event) => updateDetail("read_minutes", event.target.value)} required /></label>
             </div>
             <label className="check-row check-row--last">
               <input type="checkbox" checked={details.view_only} onChange={(event) => updateDetail("view_only", event.target.checked)} />

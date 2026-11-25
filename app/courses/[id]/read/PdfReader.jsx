@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import Skeleton from "@/components/Skeleton";
 import { loadPdfjs } from "@/components/pdfjs";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.25;
+const noSubscribe = () => () => {};
 
 function ToolbarButton({ children, className = "", ...props }) {
   return <button type="button" className={`pdf-toolbar-button ${className}`} {...props}>{children}</button>;
 }
 
-export default function PdfReader({ url, title, onPageChange }) {
+// In full screen the rest of the reading page is hidden, so the page passes `fullscreenPanel`
+// (the open reading question) to show beside the pages, and `fullscreenStatus` (time left).
+export default function PdfReader({ url, title, onPageChange, fullscreenPanel = null, fullscreenStatus = "" }) {
   const scrollRef = useRef(null);
   const pagesRef = useRef(null);
   const renderRunRef = useRef(0);
@@ -25,7 +28,42 @@ export default function PdfReader({ url, title, onPageChange }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const shellRef = useRef(null);
+  const canFullscreen = useSyncExternalStore(
+    noSubscribe,
+    () => Boolean(document.fullscreenEnabled || document.webkitFullscreenEnabled),
+    () => false,
+  );
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const pageCount = pdfDocument?.numPages || 0;
+  const sidePanel = isFullscreen && fullscreenPanel ? fullscreenPanel : null;
+  const hasSidePanel = Boolean(sidePanel);
+
+  // Fullscreen uses the browser's own API (Esc also exits). iPhone Safari has no element
+  // fullscreen, so the button is hidden there and "Open PDF" remains the way to go big.
+  useEffect(() => {
+    function syncFullscreen() {
+      const element = document.fullscreenElement || document.webkitFullscreenElement;
+      setIsFullscreen(Boolean(element) && element === shellRef.current);
+    }
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    document.addEventListener("webkitfullscreenchange", syncFullscreen);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+      document.removeEventListener("webkitfullscreenchange", syncFullscreen);
+    };
+  }, []);
+
+  function toggleFullscreen() {
+    const shell = shellRef.current;
+    if (!shell) return;
+    if (isFullscreen) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    } else {
+      const request = shell.requestFullscreen || shell.webkitRequestFullscreen;
+      Promise.resolve(request?.call(shell)).catch(() => {});
+    }
+  }
 
   useEffect(() => {
     if (!url) return;
@@ -117,7 +155,8 @@ export default function PdfReader({ url, title, onPageChange }) {
     return () => {
       if (renderRunRef.current === run) renderRunRef.current += 1;
     };
-  }, [pdfDocument, zoom]);
+    // Full screen and the question panel change the reader's width, so pages are re-rendered to fit.
+  }, [pdfDocument, zoom, isFullscreen, hasSidePanel]);
 
   function selectPage(pageNumber) {
     if (pageNumber === currentPageRef.current) return;
@@ -194,13 +233,16 @@ export default function PdfReader({ url, title, onPageChange }) {
   }
 
   return (
-    <div className="pdf-viewer-shell">
+    <div ref={shellRef} className={`pdf-viewer-shell${isFullscreen ? " is-fullscreen" : ""}`}>
       <div className="pdf-toolbar">
         <div className="pdf-document-meta">
           <div className="pdf-document-icon" aria-hidden="true">PDF</div>
           <div className="pdf-document-copy">
             <strong title={title}>{title}</strong>
-            <span>{pageCount ? `${pageCount} page${pageCount === 1 ? "" : "s"}` : "Preparing document…"}</span>
+            <span>
+              {pageCount ? `${pageCount} page${pageCount === 1 ? "" : "s"}` : "Preparing document…"}
+              {isFullscreen && fullscreenStatus && <b className="pdf-fullscreen-status"> · {fullscreenStatus}</b>}
+            </span>
           </div>
         </div>
 
@@ -216,12 +258,18 @@ export default function PdfReader({ url, title, onPageChange }) {
             <ToolbarButton className="pdf-zoom-value" aria-label="Fit page to width" title="Fit to width" disabled={status !== "ready" || zoom === 1} onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</ToolbarButton>
             <ToolbarButton aria-label="Zoom in" title="Zoom in" disabled={status !== "ready" || zoom >= MAX_ZOOM} onClick={() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP))}>+</ToolbarButton>
           </div>
+          {canFullscreen && (
+            <button type="button" className="pdf-open-link pdf-fullscreen-button" onClick={toggleFullscreen} aria-pressed={isFullscreen} title={isFullscreen ? "Exit full screen (Esc)" : "View full screen"}>
+              {isFullscreen ? "Exit full screen" : "Full screen"} <span aria-hidden="true">{isFullscreen ? "⤡" : "⤢"}</span>
+            </button>
+          )}
           <a className="pdf-open-link" href={url} target="_blank" rel="noreferrer" title="Open the original PDF in a new tab">Open PDF <span aria-hidden="true">↗</span></a>
         </div>
       </div>
 
       <div className="pdf-progress-track" aria-hidden="true"><span style={{ width: pageCount ? `${(currentPage / pageCount) * 100}%` : "0%" }} /></div>
 
+      <div className="pdf-stage">
       <div
         ref={scrollRef}
         className={`pdf-scroll-region ${zoom > 1 ? "is-pannable" : ""} ${isPanning ? "is-panning" : ""}`}
@@ -248,6 +296,8 @@ export default function PdfReader({ url, title, onPageChange }) {
           </div>
         )}
         <div ref={pagesRef} className={status === "ready" ? "pdf-pages is-ready" : "pdf-pages"} />
+      </div>
+      {sidePanel && <div className="pdf-fullscreen-panel">{sidePanel}</div>}
       </div>
     </div>
   );

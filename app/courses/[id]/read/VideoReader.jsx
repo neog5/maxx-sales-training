@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatDuration } from "@/lib/course-materials";
 
-const SPEEDS = [1, 1.25, 1.5, 2];
+const SPEEDS = [0.5, 1, 1.25, 1.5, 2];
 
 // Plays one course video with the browser's own player, with speed buttons. Learners may skip
 // freely; the video counts as done as soon as it's opened (ReadingGateClient records that).
