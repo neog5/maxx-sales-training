@@ -4,16 +4,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import LocalDate from "@/components/LocalDate";
 import { describeAuditEntry } from "@/lib/audit";
-import { COURSE_PDF_BUCKET, COURSE_VIDEO_BUCKET, storedMaterialFile } from "@/lib/course-materials";
 import { displayName } from "@/lib/people";
-import { QUESTION_IMAGE_BUCKET } from "@/lib/question-images";
-import { isSuperAdmin } from "@/lib/roles";
-import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/client";
 import useAdminMutation from "../../useAdminMutation";
 import CourseAccessPanel from "./CourseAccessPanel";
 import CourseMaterialsClient from "./CourseMaterialsClient";
-import { removeStoredFiles } from "@/lib/storage";
 
 function detailsFrom(course) {
   return {
@@ -25,20 +20,9 @@ function detailsFrom(course) {
   };
 }
 
-// Deletes a deleted course's deck PDFs, videos and question images. Best effort: the course is
-// already gone, so a failure only leaves unused files behind.
-async function removeCourseFiles(supabase, course, materials) {
-  const files = materials.map(storedMaterialFile).filter(Boolean);
-  for (const bucket of [COURSE_PDF_BUCKET, COURSE_VIDEO_BUCKET]) {
-    await removeStoredFiles(supabase, bucket, files.filter((file) => file.bucket === bucket).map((file) => file.path));
-  }
-  const { data: images } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).list(course.id, { limit: 1000 });
-  await removeStoredFiles(supabase, QUESTION_IMAGE_BUCKET, (images || []).map((file) => `${course.id}/${file.name}`));
-}
-
-// A course's details, assignments, decks and history. The assignments, decks, header and
+// A course's details, assignments, decks and history (Archive and Delete are in CourseActions). The assignments, decks, header and
 // history all come from the server, so each change re-renders the page from there.
-export default function CourseAdminClient({ course, viewerRole, recordCount, materials, readingCounts, assignments, groups, people, history }) {
+export default function CourseAdminClient({ course, materials, readingCounts, assignments, groups, people, history }) {
   const supabase = createClient();
   const router = useRouter();
   const { run, busy, fail, notices } = useAdminMutation();
@@ -77,32 +61,6 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
     }).eq("id", course.id), { success: "Course details saved." });
   }
 
-  function setArchived(nextArchived) {
-    const prompt = nextArchived
-      ? `Archive ${course.code}? Learners will no longer see it or be required to complete it. All training records are kept, and you can restore it later.`
-      : `Restore ${course.code} from the archive?`;
-    if (!window.confirm(prompt)) return;
-    change("archive", () => supabase.from("courses").update({ archived_at: nextArchived ? new Date().toISOString() : null }).eq("id", course.id),
-      { success: nextArchived ? "Course archived." : "Course restored." });
-  }
-
-  async function deleteCourse() {
-    const typed = window.prompt(`This permanently deletes ${course.code}, its questions and its assignments. Type the course code to confirm.`);
-    if (typed === null) return;
-    if (typed.trim().toUpperCase() !== course.code.toUpperCase()) {
-      fail("The course code didn’t match, so nothing was deleted.");
-      return;
-    }
-    const deleted = await run("delete", async () => {
-      const result = await supabase.from("courses").delete().eq("id", course.id).select("id");
-      if (!result.error && !result.data?.length) throw new Error("Only a super admin can delete courses.");
-      return result;
-    }, { inUse: "This course has training records, so it can only be archived." });
-    if (!deleted) return;
-    await removeCourseFiles(supabase, course, materials);
-    router.push(routes.adminCourses);
-  }
-
   return (
     <div className="course-admin">
       {notices}
@@ -119,7 +77,7 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
             </div>
             <label className="check-row check-row--last">
               <input type="checkbox" checked={details.view_only} onChange={(event) => updateDetail("view_only", event.target.checked)} />
-              No assessment: the certificate is issued once the learner finishes the course material
+              No assessment: certificate when the material is done
             </label>
             <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit">{busy === "details" ? "Saving…" : "Save details"}</button></div>
           </fieldset>
@@ -129,36 +87,6 @@ export default function CourseAdminClient({ course, viewerRole, recordCount, mat
       </div>
 
       <CourseMaterialsClient course={course} materials={materials} readingCounts={readingCounts} readOnly={archived} />
-
-      <section className="tp-card course-admin__danger">
-        <div>
-          <strong>{archived ? "Restore course" : "Archive course"}</strong>
-          <span>
-            {archived
-              ? "Restoring makes the course available again, and its assignments count toward compliance again."
-              : "Hides the course from learners and removes it from compliance checks. Every learner’s progress, attempt and answer is kept."}
-          </span>
-        </div>
-        <button type="button" className="tp-btn tp-btn-ghost" disabled={Boolean(busy)} onClick={() => setArchived(!archived)}>
-          {busy === "archive" ? "Saving…" : archived ? "Restore course" : "Archive course"}
-        </button>
-      </section>
-
-      {isSuperAdmin(viewerRole) && (
-        <section className="tp-card course-admin__danger is-delete">
-          <div>
-            <strong>Delete course</strong>
-            <span>
-              {recordCount > 0
-                ? "This course has training records, so it can’t be deleted. Archive it instead."
-                : "Permanently removes the course, its questions, its assignments and its course material (PDF decks and videos). The deletion is recorded in the audit log."}
-            </span>
-          </div>
-          <button type="button" className="tp-btn tp-btn-danger" disabled={recordCount > 0 || Boolean(busy)} onClick={deleteCourse}>
-            {busy === "delete" ? "Deleting…" : "Delete course"}
-          </button>
-        </section>
-      )}
 
       <section className="profile-report-section">
         <div className="section-heading-row"><div><div className="tp-label">History</div></div></div>

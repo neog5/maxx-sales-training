@@ -254,7 +254,6 @@ export function ReadingSkeleton() {
         </header>
         <div className="reading-workspace">
           <section>
-            <div className="reader-heading"><span /><span className="reader-heading__hint"><T w={230} /></span></div>
             <div className="tp-card reader-frame">
               <div className="pdf-viewer-shell">
                 <div className="pdf-toolbar" />
@@ -416,11 +415,7 @@ export function ComplianceDashboardSkeleton() {
             </div>
           ))}
         </section>
-        <div className="watchlists">
-          <div className="watchlists__row"><span className="watchlists__label"><T w={90} /></span><Bar w={230} h={30} r={999} /></div>
-        </div>
         <section className="tp-card directory-toolbar compliance-toolbar">
-          <Bar h={INPUT} r={10} />
           <Bar h={INPUT} r={10} />
           <div className="status-filter">{[48, 120, 100, 104].map((w) => <span className="skeleton-filter-option" key={w}><T w={w} h={11} /></span>)}</div>
         </section>

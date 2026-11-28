@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AddAsSelect, REQUIRED_HINT, RequiredSelect, requiredMessage } from "@/components/AssignmentControls";
+import { useMemo } from "react";
+import { REQUIRED_HINT, RequiredSelect, requiredMessage } from "@/components/AssignmentControls";
 import CourseAccessChoice from "@/components/CourseAccessChoice";
 import MemberList from "@/components/MemberList";
 import MultiPicker from "@/components/MultiPicker";
@@ -11,17 +11,12 @@ import { groupItems, personItems } from "@/lib/picker-items";
 
 const NOUNS = { group_id: ["training group", "training groups"], user_id: ["person", "people"] };
 
-function AccessNote({ access, count }) {
-  if (access === "hidden") return <p className="access-note is-hidden">This course is a draft, so nobody below can see it yet. Choose one of the other options when it’s ready.</p>;
-  if (access === "everyone") return <p className="access-note is-everyone">Every learner can already see this course. Add groups or people here only to make it required for them.</p>;
-  if (count === 0) return <p className="access-note is-hidden">Not given to anyone yet, so only admins can see it.</p>;
-  return null;
-}
-
 // Who can see the course, and which groups and people it's given to (required or optional).
+// A course open to everyone is required or optional for everyone (migration 019), so the
+// groups-and-people list is folded away while that's chosen: it only matters again if the
+// course goes back to "only the groups and people you give it to".
 export default function CourseAccessPanel({ course, assignments, groups, people, archived, busy, change, supabase }) {
   const access = courseAccess(course);
-  const [addAs, setAddAs] = useState("required");
   const groupNames = useMemo(() => new Map(groups.map((group) => [group.id, group.name])), [groups]);
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const personOptions = useMemo(() => personItems(people), [people]);
@@ -37,9 +32,13 @@ export default function CourseAccessPanel({ course, assignments, groups, people,
     change("access", () => supabase.from("courses").update(courseAccessFields(next)).eq("id", course.id), { success: "Saved who can see this course." });
   }
 
-  function add(field, ids) {
+  function setEveryoneRequired(required) {
+    change("access", () => supabase.from("courses").update(courseAccessFields("everyone", required)).eq("id", course.id),
+      { success: required ? "Now required for everyone." : "Now optional for everyone." });
+  }
+
+  function add(field, ids, required) {
     const [one, many] = NOUNS[field];
-    const required = addAs === "required";
     return change("assign", () => supabase.from("course_assignments").insert(ids.map((id) => ({ course_id: course.id, [field]: id, required }))),
       { success: `Given to ${ids.length} ${ids.length === 1 ? one : many} as ${required ? "required" : "optional"}.` });
   }
@@ -53,15 +52,9 @@ export default function CourseAccessPanel({ course, assignments, groups, people,
     return change("assign", () => supabase.from("course_assignments").delete().eq("id", assignment.id));
   }
 
-  return (
-    <section className="tp-card tp-form-card">
-      <div className="tp-label form-section-label--tight">Who can see this course</div>
-      <CourseAccessChoice value={access} onChange={setAccess} disabled={locked} />
-
-      <div className="course-admin__subhead access-heading">Given to</div>
-      <AccessNote access={access} count={assignments.length} />
+  const givenTo = (
+    <>
       <p className="course-admin__hint">{REQUIRED_HINT}</p>
-      {!archived && <AddAsSelect value={addAs} onChange={setAddAs} />}
 
       <div className="course-admin__subhead">Training groups</div>
       {assignedGroups.length > 0 ? (
@@ -81,14 +74,14 @@ export default function CourseAccessPanel({ course, assignments, groups, people,
         </div>
       ) : <div className="chip-list__empty member-list__empty">No training groups</div>}
       {!archived && (
-        <MultiPicker items={groupOptions} excludeIds={assignedGroups.map((assignment) => assignment.group_id)} onAdd={(ids) => add("group_id", ids)}
-          placeholder="Add training groups…" addLabel="Add" noun="training group" busy={busy === "assign"} />
+        <MultiPicker items={groupOptions} excludeIds={assignedGroups.map((assignment) => assignment.group_id)} onAdd={(ids, required) => add("group_id", ids, required)}
+          placeholder="Find training groups…" noun="training group" busy={busy === "assign"} chooseRequired />
       )}
 
       <div className="course-admin__subhead">Individual people</div>
       {!archived && (
-        <MultiPicker items={personOptions} excludeIds={assignedPeople.map((assignment) => assignment.user_id)} onAdd={(ids) => add("user_id", ids)}
-          placeholder="Add people by name or email…" addLabel="Add" noun="person" busy={busy === "assign"} pasteEmails />
+        <MultiPicker items={personOptions} excludeIds={assignedPeople.map((assignment) => assignment.user_id)} onAdd={(ids, required) => add("user_id", ids, required)}
+          placeholder="Find people by name or email…" noun="person" busy={busy === "assign"} pasteEmails chooseRequired />
       )}
       <MemberList
         people={assignedPeopleList}
@@ -97,6 +90,41 @@ export default function CourseAccessPanel({ course, assignments, groups, people,
         busy={locked}
         emptyText="No individual people"
       />
+    </>
+  );
+
+  return (
+    <section className="tp-card tp-form-card">
+      <div className="tp-label form-section-label--tight">Who can see this course</div>
+      <CourseAccessChoice value={access} onChange={setAccess} disabled={locked} />
+
+      {access === "everyone" ? (
+        <>
+          <div className="course-admin__subhead access-heading">For everyone, this course is</div>
+          <div className="access-everyone" role="radiogroup" aria-label="Required or optional for everyone">
+            {[[true, "Required", "Everyone must complete it."], [false, "Optional", "Everyone can take it."]].map(([value, label, hint]) => (
+              <label key={label} className={`access-everyone__option${Boolean(course.everyone_required) === value ? " is-selected" : ""}`}>
+                <input type="radio" name="everyone-required" checked={Boolean(course.everyone_required) === value} disabled={locked} onChange={() => setEveryoneRequired(value)} />
+                <span><strong>{label}</strong><small>{hint}</small></span>
+              </label>
+            ))}
+          </div>
+          {assignments.length > 0 && (
+            <details className="access-earlier">
+              <summary>Also given to {assignments.length} {assignments.length === 1 ? "group or person" : "groups and people"}</summary>
+              <p className="course-admin__hint">Anyone marked Required here still has to complete it.</p>
+              {givenTo}
+            </details>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="course-admin__subhead access-heading">Given to</div>
+          {access === "hidden" && <p className="access-note is-hidden">Draft: nobody below can see it yet.</p>}
+          {access === "assigned" && assignments.length === 0 && <p className="access-note is-hidden">Not given to anyone yet.</p>}
+          {givenTo}
+        </>
+      )}
     </section>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AddAsSelect, REQUIRED_HINT, RequiredSelect } from "@/components/AssignmentControls";
+import { REQUIRED_HINT, RequiredSelect } from "@/components/AssignmentControls";
 import MultiPicker from "@/components/MultiPicker";
 import Notice from "@/components/Notice";
 import useMutation from "@/hooks/useMutation";
@@ -17,8 +17,10 @@ import { createClient } from "@/lib/supabase/client";
 // shown only to admins and to the person themself (`showGroups`); admins can edit them.
 // Reading-only courses have no test, so they are completed rather than passed.
 const doneLabel = (course) => (course.view_only ? "Completed" : "Passed");
+// For a course that isn't done: tried and failed, or not tried yet.
+const notDoneLabel = (course, attempted) => (attempted.has(course.id) ? "Not passed yet" : "Not started");
 
-export default function RequiredTraining({ personId, canEdit, showGroups, groups, initialGroupIds, courses, requiredCourseIds, initialAssignments, passedCourseIds }) {
+export default function RequiredTraining({ personId, canEdit, showGroups, groups, initialGroupIds, courses, requiredCourseIds, initialAssignments, passedCourseIds, attemptedCourseIds = [] }) {
   const supabase = createClient();
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -27,6 +29,7 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
 
   const groupNames = new Map(groups.map((group) => [group.id, group.name]));
   const passed = new Set(passedCourseIds);
+  const attempted = new Set(attemptedCourseIds);
   const requiredIds = new Set(requiredCourseIds);
   // initialAssignments already holds only this person's own and their groups' assignments.
   const reasonsFor = (courseId) => initialAssignments.filter((assignment) => assignment.course_id === courseId);
@@ -45,7 +48,16 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
   const directCourseIds = directAssignments.map((assignment) => assignment.course_id);
   const groupOptions = useMemo(() => groupItems(groups), [groups]);
   const courseOptions = useMemo(() => courseItems(courses), [courses]);
-  const [addAs, setAddAs] = useState("required");
+  // Courses they already have (directly, through a group, or required for everyone) aren't
+  // offered again; change a direct one with its Required/Optional control instead.
+  const alreadyGiven = [...new Set([...directCourseIds, ...required.map((course) => course.id), ...optional.map((course) => course.id)])];
+
+  // Why they have a course: their training groups, "Given individually", or "Everyone".
+  function reasonText(course) {
+    const reasons = course.reasons.map((reason) => (reason.group_id ? groupNames.get(reason.group_id) : "Given individually"));
+    if (course.audience === "everyone" && course.everyone_required && requiredIds.has(course.id)) reasons.push("Required for everyone");
+    return reasons.length ? ` · ${reasons.join(", ")}` : "";
+  }
 
   // Saves, then re-reads the page's server data; stays busy until that refresh lands.
   async function mutate(label, action) {
@@ -105,54 +117,53 @@ export default function RequiredTraining({ personId, canEdit, showGroups, groups
           </>
         )}
 
-        <div className={showGroups ? "course-admin__subhead" : "course-admin__subhead course-admin__subhead--first"}>Courses</div>
+        <div className={showGroups ? "course-admin__subhead" : "course-admin__subhead course-admin__subhead--first"}>Required courses</div>
         <div className="required-course-list">
           {required.map((course) => (
             <div className="required-course" key={course.id}>
-              <span className={`required-course__mark ${course.passed ? "is-passed" : ""}`} aria-label={course.passed ? doneLabel(course) : "Not yet completed"}>{course.passed ? "✓" : ""}</span>
+              <span className={`required-course__mark ${course.passed ? "is-passed" : ""}`} aria-label={course.passed ? doneLabel(course) : notDoneLabel(course, attempted)}>{course.passed ? "✓" : ""}</span>
               <span className="required-course__name">
                 <strong>{course.title}</strong>
                 <small>
                   <span className="tp-mono">{course.code}</span>
-                  {showGroups && course.reasons.length > 0 && ` · ${course.reasons.map((reason) => (reason.group_id ? groupNames.get(reason.group_id) : "Assigned individually")).join(", ")}`}
+                  {showGroups && reasonText(course)}
                 </small>
               </span>
-              <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : "Not done yet"}</span>
+              <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : notDoneLabel(course, attempted)}</span>
               {canEdit && directByCourse.has(course.id) && directControls(directByCourse.get(course.id), course)}
             </div>
           ))}
           {required.length === 0 && <span className="chip-list__empty">Nothing required yet.</span>}
         </div>
 
-        {(optional.length > 0 || canEdit) && (
+        {optional.length > 0 && (
           <>
             <div className="course-admin__subhead">Optional courses</div>
             <div className="required-course-list">
               {optional.map((course) => (
                 <div className="required-course" key={course.id}>
-                  <span className={`required-course__mark ${course.passed ? "is-passed" : ""}`} aria-label={course.passed ? doneLabel(course) : "Not yet completed"}>{course.passed ? "✓" : ""}</span>
+                  <span className={`required-course__mark ${course.passed ? "is-passed" : ""}`} aria-label={course.passed ? doneLabel(course) : notDoneLabel(course, attempted)}>{course.passed ? "✓" : ""}</span>
                   <span className="required-course__name">
                     <strong>{course.title}</strong>
                     <small>
                       <span className="tp-mono">{course.code}</span>
-                      {showGroups && course.reasons.length > 0 && ` · ${course.reasons.map((reason) => (reason.group_id ? groupNames.get(reason.group_id) : "Given individually")).join(", ")}`}
+                      {showGroups && reasonText(course)}
                     </small>
                   </span>
-                  <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : "Not taken"}</span>
+                  <span className={course.passed ? "required-course__status is-passed" : "required-course__status"}>{course.passed ? doneLabel(course) : notDoneLabel(course, attempted)}</span>
                   {canEdit && directByCourse.has(course.id) && directControls(directByCourse.get(course.id), course)}
                 </div>
               ))}
-              {optional.length === 0 && <span className="chip-list__empty">No optional courses given to them.</span>}
             </div>
           </>
         )}
 
         {canEdit && (
           <>
-            <p className="course-admin__hint required-training__hint">Give courses to this person on top of their training groups. {REQUIRED_HINT}</p>
-            <AddAsSelect value={addAs} onChange={setAddAs} />
-            <MultiPicker items={courseOptions} excludeIds={directCourseIds} placeholder="Give courses to this person…" addLabel="Add" noun="course" busy={busy}
-              onAdd={(ids) => mutate("assign-courses", () => supabase.from("course_assignments").insert(ids.map((courseId) => ({ course_id: courseId, user_id: personId, required: addAs === "required" }))))} />
+            <div className="course-admin__subhead">Give a course</div>
+            <p className="course-admin__hint required-training__hint">{REQUIRED_HINT}</p>
+            <MultiPicker items={courseOptions} excludeIds={alreadyGiven} placeholder="Find courses by title or code…" noun="course" busy={busy} chooseRequired
+              onAdd={(ids, isRequired) => mutate("assign-courses", () => supabase.from("course_assignments").insert(ids.map((courseId) => ({ course_id: courseId, user_id: personId, required: isRequired }))))} />
           </>
         )}
         <Notice tone="error" className="required-training__error">{error}</Notice>

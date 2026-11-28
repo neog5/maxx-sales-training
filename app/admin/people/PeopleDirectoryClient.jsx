@@ -7,16 +7,30 @@ import PersonIdentity from "@/components/PersonIdentity";
 import SearchField from "@/components/SearchField";
 import { ATTENTION_LABELS, ATTENTION_STATUSES } from "@/lib/attempt-stats";
 import { byName } from "@/lib/people";
-import { ROLES, ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS, VISIBLE_ROLES, visibleRole } from "@/lib/roles";
 import { routes } from "@/lib/routes";
 import InvitePanel from "./InvitePanel";
 
+// Each column's natural order; clicking the same header again reverses it.
 const SORTS = {
   attention: (a, b) => ATTENTION_STATUSES.indexOf(a.attentionStatus) - ATTENTION_STATUSES.indexOf(b.attentionStatus) || byName(a, b),
   name: byName,
-  recent: (a, b) => (Date.parse(b.lastActiveAt || 0) || 0) - (Date.parse(a.lastActiveAt || 0) || 0),
-  score: (a, b) => (b.averageScore ?? -1) - (a.averageScore ?? -1),
+  role: (a, b) => (ROLE_LABELS[a.role] || "").localeCompare(ROLE_LABELS[b.role] || "") || byName(a, b),
+  attempts: (a, b) => b.attemptCount - a.attemptCount || byName(a, b),
+  score: (a, b) => (b.averageScore ?? -1) - (a.averageScore ?? -1) || byName(a, b),
+  recent: (a, b) => (Date.parse(b.lastActiveAt || 0) || 0) - (Date.parse(a.lastActiveAt || 0) || 0) || byName(a, b),
 };
+
+function SortHeader({ label, sortKey, sort, onSort }) {
+  const active = sort.key === sortKey;
+  return (
+    <div aria-sort={active ? (sort.reversed ? "descending" : "ascending") : undefined}>
+      <button type="button" className={`sort-header${active ? " is-active" : ""}`} onClick={() => onSort(sortKey)} title={`Sort by ${label.toLowerCase()}`}>
+        {label}<span aria-hidden="true">{active ? (sort.reversed ? " ↑" : " ↓") : ""}</span>
+      </button>
+    </div>
+  );
+}
 
 // `people` includes archived people; they show only under the "Archived" status filter.
 // `invites` is the list of unused invites.
@@ -26,7 +40,8 @@ export default function PeopleDirectoryClient({ people: everyone, initialStatus 
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
   const [status, setStatus] = useState(initialStatus);
-  const [sort, setSort] = useState("attention");
+  const [sort, setSort] = useState({ key: "attention", reversed: false });
+  const sortBy = (key) => setSort((current) => ({ key, reversed: current.key === key ? !current.reversed : false }));
 
   const filteredPeople = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -36,10 +51,10 @@ export default function PeopleDirectoryClient({ people: everyone, initialStatus 
         const matchesQuery = !normalizedQuery
           || `${person.full_name || ""} ${person.email || ""}`.toLocaleLowerCase().includes(normalizedQuery);
         return matchesQuery
-          && (role === "all" || person.role === role)
+          && (role === "all" || visibleRole(person.role) === role)
           && (status === "all" || status === "archived" || person.attentionStatus === status);
       })
-      .sort(SORTS[sort]);
+      .sort((a, b) => (sort.reversed ? -1 : 1) * SORTS[sort.key](a, b));
   }, [people, archivedPeople, query, role, status, sort]);
 
   const attentionCount = people.filter((person) => person.attentionStatus === "needs-attention").length;
@@ -49,7 +64,7 @@ export default function PeopleDirectoryClient({ people: everyone, initialStatus 
     setQuery("");
     setRole("all");
     setStatus("all");
-    setSort("attention");
+    setSort({ key: "attention", reversed: false });
   }
 
   return (
@@ -73,24 +88,15 @@ export default function PeopleDirectoryClient({ people: everyone, initialStatus 
           <span className="tp-sr-only">Filter by role</span>
           <select className="tp-input" value={role} onChange={(event) => setRole(event.target.value)}>
             <option value="all">All roles</option>
-            {ROLES.map((value) => <option key={value} value={value}>{ROLE_LABELS[value]}</option>)}
+            {VISIBLE_ROLES.map((value) => <option key={value} value={value}>{ROLE_LABELS[value]}</option>)}
           </select>
         </label>
         <label>
           <span className="tp-sr-only">Filter by training status</span>
           <select className="tp-input" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="all">All statuses</option>
+            <option value="all">All active people</option>
             {ATTENTION_STATUSES.map((value) => <option key={value} value={value}>{ATTENTION_LABELS[value]}</option>)}
             <option value="archived">Archived ({archivedPeople.length})</option>
-          </select>
-        </label>
-        <label>
-          <span className="tp-sr-only">Sort people</span>
-          <select className="tp-input" value={sort} onChange={(event) => setSort(event.target.value)}>
-            <option value="attention">Attention first</option>
-            <option value="name">Name</option>
-            <option value="recent">Recent activity</option>
-            <option value="score">Average score</option>
           </select>
         </label>
       </section>
@@ -101,19 +107,25 @@ export default function PeopleDirectoryClient({ people: everyone, initialStatus 
 
       <section className="tp-card people-table">
         <div className="people-table__head">
-          <div>Person</div><div>Role</div><div>Training status</div><div>Attempts</div><div>Performance</div><div>Last active</div><div></div>
+          <SortHeader label="Person" sortKey="name" sort={sort} onSort={sortBy} />
+          <SortHeader label="Role" sortKey="role" sort={sort} onSort={sortBy} />
+          <SortHeader label="Training status" sortKey="attention" sort={sort} onSort={sortBy} />
+          <SortHeader label="Attempts" sortKey="attempts" sort={sort} onSort={sortBy} />
+          <SortHeader label="Performance" sortKey="score" sort={sort} onSort={sortBy} />
+          <SortHeader label="Last active" sortKey="recent" sort={sort} onSort={sortBy} />
+          <div></div>
         </div>
         <div className="tp-scroll people-table__body">
           {filteredPeople.map((person) => (
             <article className="people-table__row" key={person.id}>
               <PersonIdentity person={person}>
-                {person.attemptCount === 0 ? "No completed training" : `${person.attemptCount} completed ${person.attemptCount === 1 ? "attempt" : "attempts"}`}
+                {person.email}
               </PersonIdentity>
-              <div><span className={`tp-badge role-badge role-badge--${person.role}`}>{ROLE_LABELS[person.role] || person.role}</span></div>
+              <div><span className={`tp-badge role-badge role-badge--${visibleRole(person.role)}`}>{ROLE_LABELS[person.role] || person.role}</span></div>
               <div>
                 {person.archived_at ? <span className="tp-badge">Archived <LocalDate value={person.archived_at} /></span> : <span
                   className={`training-status training-status--${person.attentionStatus}`}
-                  title={person.attentionStatus === "not-started" ? "No completed attempts" : "Based on the latest completed attempt"}
+                  title={person.attentionStatus === "not-started" ? "No completed attempts on required courses" : "Based on the latest completed attempt on a required course"}
                 >
                   <span aria-hidden="true"></span>{ATTENTION_LABELS[person.attentionStatus]}
                 </span>}

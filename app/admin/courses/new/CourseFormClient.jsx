@@ -60,7 +60,7 @@ export default function CourseFormClient() {
       for (const file of pdfs) {
         const { path, pdfUrl } = await uploadCourseDeck(supabase, code, file);
         paths.push(path);
-        decks.push({ position: decks.length + 1, title: pdfs.length === 1 ? course.title.trim() : titleFromFileName(file.name), pdf_url: pdfUrl });
+        decks.push({ position: decks.length + 1, title: titleFromFileName(file.name), pdf_url: pdfUrl });
       }
     } catch (uploadError) {
       await removeStoredFiles(supabase, COURSE_PDF_BUCKET, paths);
@@ -88,6 +88,8 @@ export default function CourseFormClient() {
       setError(fileError);
       return;
     }
+    // A course can be created empty (material added later), but that's usually a mistake.
+    if (!pdfs.length && !window.confirm("Create it without any course material? You can add it later.")) return;
     if (!confirmAccessChange("assigned", course.access)) return;
     if (suggest) {
       const countError = generationCountError({ reading: Number(counts.reading), main: Number(counts.main) }, { forNewCourse: true });
@@ -135,7 +137,7 @@ export default function CourseFormClient() {
     <main className="tp-form-page tp-fade-in">
       <div className="tp-form-heading">
         <h1 className="tp-display">Add a course</h1>
-        <p>Upload the PDF and you’ll review suggested questions on the next screen.</p>
+        <p>You can add videos and change anything later.</p>
       </div>
 
       <form className="tp-card tp-form-card" onSubmit={createCourse}>
@@ -145,7 +147,7 @@ export default function CourseFormClient() {
         </div>
         <label className="tp-form-field"><div className="tp-label form-label">Description</div><textarea className="tp-input" rows={3} value={course.description} placeholder="What learners will learn in this course." onChange={(event) => update("description", event.target.value)} /></label>
         <label className="tp-form-field">
-          <div className="tp-label form-label">Training PDFs</div>
+          <div className="tp-label form-label">PDF decks</div>
           <input className="tp-input" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => setPdfs(Array.from(event.target.files || []))} />
           <div className="form-hint">
             Optional. Up to {megabytes(MAX_PDF_BYTES)} MB each; pick several for a multi-deck course. Suggestions use the first PDF, which must be under {FREE_PDF_PARSER_LIMIT_TEXT}. Add videos on the course page after creating it.
@@ -159,11 +161,11 @@ export default function CourseFormClient() {
         </label>
         {suggest && (
           <div className="tp-form-grid tp-form-grid--equal">
-            <CountField label="Reading recommendations" kind="reading" value={counts.reading} onChange={updateCount} />
-            <CountField label="Main-test recommendations" kind="main" value={counts.main} onChange={updateCount} />
+            <CountField label="Reading checkpoints to suggest" kind="reading" value={counts.reading} onChange={updateCount} />
+            <CountField label="Assessment questions to suggest" kind="main" value={counts.main} onChange={updateCount} />
           </div>
         )}
-        <label className="check-row"><input type="checkbox" checked={course.view_only} onChange={(event) => update("view_only", event.target.checked)} /> No assessment: the certificate is issued once the learner finishes the course material</label>
+        <label className="check-row"><input type="checkbox" checked={course.view_only} onChange={(event) => update("view_only", event.target.checked)} /> No assessment: certificate when the material is done</label>
         <div className="tp-form-grid tp-form-grid--equal">
           <label className="tp-form-field"><div className="tp-label form-label">Passing score (%)</div><input className="tp-input" type="number" min="0" max="100" value={course.pass_threshold} disabled={course.view_only} onChange={(event) => update("pass_threshold", event.target.value)} required /></label>
           <label className="tp-form-field"><div className="tp-label form-label">Minimum reading time per PDF deck (minutes)</div><input className="tp-input" type="number" min="0" step="0.5" value={course.read_minutes} onChange={(event) => update("read_minutes", event.target.value)} required /></label>
@@ -171,7 +173,7 @@ export default function CourseFormClient() {
         <fieldset className="access-fieldset">
           <legend className="tp-label form-label">Who can see this course</legend>
           <CourseAccessChoice value={course.access} onChange={(value) => update("access", value)} disabled={saving} />
-          {course.access === "assigned" && <div className="form-hint">After creating it, choose the groups and people on the course page. Until then, only admins can see it.</div>}
+          {course.access === "assigned" && <div className="form-hint">Choose groups and people after creating it.</div>}
         </fieldset>
         <div className="tp-form-actions"><button className="tp-btn tp-btn-primary" type="submit" disabled={saving}>{saving ? "Creating…" : course.view_only ? "Create course" : suggest ? "Create course and generate questions" : "Create course and add questions"}</button></div>
         <Notice tone="error" className="form-notice">{error}</Notice>

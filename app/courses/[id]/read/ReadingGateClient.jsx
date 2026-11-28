@@ -16,19 +16,13 @@ import VideoReader from "./VideoReader";
 
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 // What the learner has to do, shown above the reader.
-function readingHint(materials) {
-  const videoCount = materials.filter(isVideo).length;
-  const deckCount = materials.length - videoCount;
-  if (!videoCount) return deckCount > 1 ? "Open and read every deck" : "Scroll down to read the whole document";
-  if (!deckCount) return videoCount > 1 ? "Open and watch every video" : "Watch the video below";
-  return "Read every deck and open every video";
-}
 
 // The database picks the checkpoint questions, checks each answer and decides when the reading
 // is finished (migrations 011, 014 and 018), so the browser never sees the correct answers.
 // Materials are PDF decks and videos. Videos have no checkpoints and no minimum time: each
 // one counts as soon as it's opened (the database records it, so a reload keeps it).
-// Each PDF deck has its own minimum reading time (course.read_seconds), counted while that deck
+// Each PDF deck has its own minimum reading time (the deck's read_seconds, or the course's
+// read_seconds when the deck has none: migration 019), counted while that deck
 // is open. The clock keeps running while a reading question is waiting for an answer.
 // `review` is set once the learner has finished the material: the page is then for looking
 // back at it, with no new session, timer or questions.
@@ -58,7 +52,8 @@ export default function ReadingGateClient({ course, materials, review = false, c
   // Saving can be retried, unlike failing to load the session or checkpoints.
   const [saveError, setSaveError] = useState("");
 
-  const perDeck = course.read_seconds;
+  // Minimum seconds for a PDF deck: its own time if an admin set one, else the course's.
+  const needFor = (material) => material?.read_seconds ?? course.read_seconds;
   const videos = materials.filter(isVideo);
   const pdfDecks = materials.map((material, index) => ({ material, index })).filter(({ material }) => !isVideo(material));
   const viewOnly = course.view_only;
@@ -66,22 +61,22 @@ export default function ReadingGateClient({ course, materials, review = false, c
   const onPdf = Boolean(deck) && !isVideo(deck);
   const multiDeck = materials.length > 1;
   const multiPdf = pdfDecks.length > 1;
-  const timeOn = (material) => Math.min(deckSeconds[material.id] || 0, perDeck);
+  const timeOn = (material) => Math.min(deckSeconds[material.id] || 0, needFor(material));
   // A deck is read once it has been opened and has had its minimum time.
-  const decksRead = pdfDecks.filter(({ material, index }) => openedDecks.includes(index) && timeOn(material) >= perDeck).length;
+  const decksRead = pdfDecks.filter(({ material, index }) => openedDecks.includes(index) && timeOn(material) >= needFor(material)).length;
   const decksLeft = pdfDecks.length - decksRead;
-  const deckTimeLeft = onPdf ? perDeck - timeOn(deck) : 0;
+  const deckTimeLeft = onPdf ? needFor(deck) - timeOn(deck) : 0;
   const timing = !review && deckTimeLeft > 0;
   const unopenedVideos = videos.filter((video) => !openedVideos.includes(video.id)).length;
   const remainingQuestions = readingQuestions.length - answeredIds.length;
-  // Reading left to do apart from opening videos: deck time, checkpoints and unread decks.
-  const readingLeft = decksLeft > 0 || remainingQuestions > 0;
   const orderedQuestions = useMemo(() => [...readingQuestions].sort((a, b) => a.page_number - b.page_number), [readingQuestions]);
   // The next checkpoint is the earliest unanswered one in the deck being read.
   const unanswered = orderedQuestions.find((question) => question.material_id === deck?.id && !answeredIds.includes(question.id));
   // The checkpoint stays open until answered, even if the reader scrolls back.
   const activeQuestion = unanswered && furthestPage >= unanswered.page_number ? unanswered : null;
-  const done = decksLeft === 0 && remainingQuestions === 0 && unopenedVideos === 0;
+  // A course with no material yet can't be finished: there's nothing to have gone through.
+  const empty = materials.length === 0;
+  const done = !empty && decksLeft === 0 && remainingQuestions === 0 && unopenedVideos === 0;
   const questionProgress = questionsLoading ? 0 : readingQuestions.length ? Math.round((answeredIds.length / readingQuestions.length) * 100) : 100;
 
   // Saves that a video was opened (mark_video_watched, migration 014). A failure can be
@@ -89,7 +84,7 @@ export default function ReadingGateClient({ course, materials, review = false, c
   async function recordVideoOpened(session, material) {
     const { data, error } = await supabase.rpc("mark_video_watched", { p_session_id: session, p_material_id: material.id });
     if (error) {
-      setSaveError("We couldn’t save that you opened this video. Refresh the page to try again.");
+      setSaveError("Couldn’t save that. Refresh the page.");
       return;
     }
     setSaveError("");
@@ -110,7 +105,7 @@ export default function ReadingGateClient({ course, materials, review = false, c
         // The first material is open from the start, so a video there counts right away.
         if (isVideo(materials[0]) && !opened.includes(materials[0].id)) recordVideoOpened(data.session_id, materials[0]);
       })
-      .catch(() => setProgressError("We couldn’t start your session. Refresh the page to try again."))
+      .catch(() => setProgressError("Couldn’t start. Refresh the page."))
       .finally(() => setQuestionsLoading(false));
     // Runs once per mount; recordVideoOpened only uses values fixed for this page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,11 +113,12 @@ export default function ReadingGateClient({ course, materials, review = false, c
 
   // Counts time on the open deck until it has had its minimum.
   const timedDeckId = timing ? deck.id : null;
+  const timedDeckNeed = timing ? needFor(deck) : 0;
   useEffect(() => {
     if (!timedDeckId) return;
-    const timer = setInterval(() => setDeckSeconds((seconds) => ({ ...seconds, [timedDeckId]: Math.min((seconds[timedDeckId] || 0) + 1, perDeck) })), 1000);
+    const timer = setInterval(() => setDeckSeconds((seconds) => ({ ...seconds, [timedDeckId]: Math.min((seconds[timedDeckId] || 0) + 1, timedDeckNeed) })), 1000);
     return () => clearInterval(timer);
-  }, [timedDeckId, perDeck]);
+  }, [timedDeckId, timedDeckNeed]);
 
   function openDeck(index) {
     if (index === deckIndex || activeQuestion) return;
@@ -132,7 +128,7 @@ export default function ReadingGateClient({ course, materials, review = false, c
     if (!review && isVideo(materials[index]) && sessionId && !openedVideos.includes(materials[index].id)) recordVideoOpened(sessionId, materials[index]);
   }
 
-  // Previous / Next sit below the reader, so bring the new material's top back into view.
+  // Bring the new material's top back into view.
   function goTo(index) {
     openDeck(index);
     sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -144,9 +140,9 @@ export default function ReadingGateClient({ course, materials, review = false, c
     setSaveError("");
     const { data, error } = await supabase.rpc("finish_reading", { p_session_id: sessionId });
     if (error) {
-      setSaveError(/minimum reading time/i.test(error.message) ? "The minimum reading time for the decks isn’t complete yet. Keep reading, then try again."
+      setSaveError(/minimum reading time/i.test(error.message) ? "Not enough reading time yet."
         : /watch every video/i.test(error.message) ? "Open every video, then try again."
-        : "We couldn’t save your progress. Please try again.");
+        : "Couldn’t save. Try again.");
       setCompleting(false);
       return;
     }
@@ -165,7 +161,7 @@ export default function ReadingGateClient({ course, materials, review = false, c
       const { data, error } = await supabase.rpc("answer_reading_question", { p_session_id: sessionId, p_question_id: activeQuestion.id, p_selected_index: selectedAnswer });
       setChecking(false);
       if (error) {
-        setSaveError("We couldn’t check your answer. Please try again.");
+        setSaveError("Couldn’t check that. Try again.");
         return;
       }
       setSaveError("");
@@ -182,27 +178,22 @@ export default function ReadingGateClient({ course, materials, review = false, c
     return `${multiDeck ? `deck ${deckNumber}, ` : ""}page ${question.page_number}`;
   }
 
-  const timeLeftLabel = timing ? `${formatMinutes(deckTimeLeft)} left${multiPdf ? " on this deck" : ""}` : "";
+  const timeLeftLabel = timing ? `${formatMinutes(deckTimeLeft)} left` : "";
 
+  // The footer button says what's left, in a few words; it becomes the way on once done.
   function footerLabel() {
-    if (completing) return "Saving progress…";
-    if (done) return viewOnly ? "Finish and get certificate →" : "Start assessment →";
-    if (activeQuestion) return "Answer the reading question to continue";
-    if (timing) return `Keep reading · ${timeLeftLabel}`;
-    if (remainingQuestions > 0) return `Answer ${plural(remainingQuestions, "more reading question")}`;
-    if (decksLeft > 0) return `Read ${plural(decksLeft, "more deck")} · ${formatMinutes(perDeck)} each`;
-    return `Open ${plural(unopenedVideos, "more video")}`;
+    if (completing) return "Saving…";
+    if (done) return viewOnly ? "Get certificate →" : "Start assessment →";
+    if (empty) return "No material yet";
+    if (activeQuestion) return "Answer the question";
+    if (timing) return timeLeftLabel;
+    if (remainingQuestions > 0) return `${plural(remainingQuestions, "question")} left`;
+    if (decksLeft > 0) return `${plural(decksLeft, "deck")} left`;
+    return `${plural(unopenedVideos, "video")} to open`;
   }
 
-  // What's still left, in words: deck work (time, checkpoints, decks), videos to open, or both.
-  function pendingMessage() {
-    const goal = viewOnly ? "get your certificate" : "unlock the assessment";
-    if (readingLeft && unopenedVideos > 0) return `Finish the decks and open every video to ${goal}.`;
-    if (unopenedVideos > 0) return `Open ${videos.length === 1 ? "the video" : plural(unopenedVideos, "more video")} to ${goal}.`;
-    return `Finish the course material to ${goal}.`;
-  }
-
-  const footerMessage = progressError || saveError || (done ? "Course material complete" : pendingMessage());
+  // Beside the button: only errors, or a tick once everything's done.
+  const footerMessage = progressError || saveError || (done ? "Done" : "");
 
   const checkpointCard = (
     <CheckpointCard
@@ -226,9 +217,9 @@ export default function ReadingGateClient({ course, materials, review = false, c
 
   return (
     <main className="reading-shell tp-fade-in">
-      <BackToCourses />
       <header className="reading-header">
         <div>
+          <BackToCourses />
           <h1 className="tp-display">{course.title}</h1>
         </div>
         {!review && <div className="reading-header__step"><span>1</span> Course material <b>→</b> <span>2</span> {viewOnly ? "Certificate" : "Assessment"}</div>}
@@ -236,30 +227,41 @@ export default function ReadingGateClient({ course, materials, review = false, c
 
       <div className={`reading-workspace${review ? " is-review" : ""}`}>
         <section ref={sectionRef}>
-          <div className="reader-heading">
-            <span className="reader-heading__hint">
-              {review ? "You’ve finished this course material. Look back over it any time." : readingHint(materials)}
-              {!review && readingQuestions.length > 0 && " · questions appear as you read"}
-            </span>
-          </div>
+          {/* Material tabs with Previous/Next on the same row, above the reader, so they're visible
+              without scrolling. What's left to do is in the footer, not repeated up here. */}
           {multiDeck && (
-            <div className="deck-tabs" role="group" aria-label="Course materials">
-              {materials.map((material, index) => (
-                <button
-                  key={material.id}
-                  type="button"
-                  aria-current={index === deckIndex ? "true" : undefined}
-                  className={index === deckIndex ? "deck-tab is-active" : "deck-tab"}
-                  disabled={Boolean(activeQuestion) && index !== deckIndex}
-                  title={activeQuestion ? "Answer the reading question first" : material.title}
-                  onClick={() => openDeck(index)}
-                >
-                  {!review && index !== deckIndex && (isVideo(material) ? openedVideos.includes(material.id) : openedDecks.includes(index) && timeOn(material) >= perDeck)
-                    ? <span className="deck-tab__number is-done" aria-label="Done">✓</span>
-                    : <span className="deck-tab__number">{index + 1}</span>}
-                  <span className="deck-tab__title">{material.title}</span>
+            <div className="deck-bar">
+              <div className="deck-tabs" role="group" aria-label="Course materials">
+                {materials.map((material, index) => (
+                  <button
+                    key={material.id}
+                    type="button"
+                    aria-current={index === deckIndex ? "true" : undefined}
+                    className={index === deckIndex ? "deck-tab is-active" : "deck-tab"}
+                    disabled={Boolean(activeQuestion) && index !== deckIndex}
+                    title={activeQuestion ? "Answer the reading question first" : material.title}
+                    onClick={() => openDeck(index)}
+                  >
+                    {!review && index !== deckIndex && (isVideo(material) ? openedVideos.includes(material.id) : openedDecks.includes(index) && timeOn(material) >= needFor(material))
+                      ? <span className="deck-tab__number is-done" aria-label="Done">✓</span>
+                      : <span className="deck-tab__number">{index + 1}</span>}
+                    <span className="deck-tab__title">{material.title}</span>
+                  </button>
+                ))}
+              </div>
+              <nav className="deck-nav" aria-label="Move between course materials">
+                <button type="button" className="tp-btn tp-btn-ghost tp-btn--compact" disabled={deckIndex === 0 || Boolean(activeQuestion)} onClick={() => goTo(deckIndex - 1)}>
+                  ← Previous
                 </button>
-              ))}
+                <span className="deck-nav__count">{deckIndex + 1} of {materials.length}</span>
+                {deckIndex < materials.length - 1
+                  ? (
+                    <button type="button" className="tp-btn tp-btn-primary tp-btn--compact deck-nav__next" disabled={Boolean(activeQuestion)} title={`Next: ${materials[deckIndex + 1].title}`} onClick={() => goTo(deckIndex + 1)}>
+                      Next →
+                    </button>
+                  )
+                  : <span className="deck-nav__last">Last one</span>}
+              </nav>
             </div>
           )}
           <div className="tp-card reader-frame">
@@ -276,29 +278,14 @@ export default function ReadingGateClient({ course, materials, review = false, c
                 />
               )}
           </div>
-          {multiDeck && (
-            <nav className="deck-nav" aria-label="Move between course materials">
-              <button type="button" className="tp-btn tp-btn-ghost" disabled={deckIndex === 0 || Boolean(activeQuestion)} onClick={() => goTo(deckIndex - 1)}>
-                ← Previous
-              </button>
-              <span className="deck-nav__count">{deckIndex + 1} of {materials.length}</span>
-              {deckIndex < materials.length - 1
-                ? (
-                  <button type="button" className="tp-btn tp-btn-primary deck-nav__next" disabled={Boolean(activeQuestion)} title={materials[deckIndex + 1].title} onClick={() => goTo(deckIndex + 1)}>
-                    <span className="deck-nav__next-title">Next: {materials[deckIndex + 1].title}</span> →
-                  </button>
-                )
-                : <span className="deck-nav__last">Last one</span>}
-            </nav>
-          )}
         </section>
 
         {!review && (
           <aside className="reading-question-panel">
             <ReadingProgressCard
-              status={done ? "Complete" : activeQuestion ? "Answer the question" : "In progress"}
-              time={onPdf && perDeck > 0 ? { label: multiPdf ? "Reading time · this deck" : "Reading time", left: deckTimeLeft, percent: Math.round((timeOn(deck) / perDeck) * 100) } : null}
-              timePercent={pdfDecks.length && perDeck > 0 ? Math.round(pdfDecks.reduce((sum, { material }) => sum + timeOn(material) / perDeck, 0) / pdfDecks.length * 100) : null}
+              status={empty ? "No material yet" : done ? "Complete" : activeQuestion ? "Answer the question" : "In progress"}
+              time={onPdf && needFor(deck) > 0 ? { label: multiPdf ? "Time on this deck" : "Time", left: deckTimeLeft, percent: Math.round((timeOn(deck) / needFor(deck)) * 100) } : null}
+              timePercent={empty ? 0 : pdfDecks.length ? Math.round(pdfDecks.reduce((sum, { material }) => sum + (needFor(material) > 0 ? timeOn(material) / needFor(material) : 1), 0) / pdfDecks.length * 100) : null}
               questionProgress={questionProgress}
               answeredCount={answeredIds.length}
               questionCount={readingQuestions.length}
@@ -310,16 +297,19 @@ export default function ReadingGateClient({ course, materials, review = false, c
         )}
       </div>
 
+      {/* The bar only appears when there's something to do (move on) or something went wrong;
+          what's left while reading is in the Progress card. */}
+      {(review || done || completing || progressError || saveError) && (
       <div className="reading-footer">
         {review ? (
           <>
-            <span className="reading-footer__done"><BigTick size={40} label="Course material complete" /> Course material complete</span>
+            <span className="reading-footer__done"><BigTick size={28} label="Course material complete" /> Done</span>
             <button type="button" className="tp-btn tp-btn-primary" onClick={() => router.push(reviewNext.href)}>{reviewNext.label}</button>
           </>
         ) : (
           <>
             {done && !progressError && !saveError
-              ? <span className="reading-footer__done"><BigTick size={40} label="Course material complete" /> {footerMessage}</span>
+              ? <span className="reading-footer__done"><BigTick size={28} label="Course material complete" /> {footerMessage}</span>
               : <span>{footerMessage}</span>}
             <button type="button" className="tp-btn tp-btn-primary" disabled={!done || !sessionId || completing || Boolean(progressError)} onClick={proceed}>
               {footerLabel()}
@@ -327,6 +317,7 @@ export default function ReadingGateClient({ course, materials, review = false, c
           </>
         )}
       </div>
+      )}
     </main>
   );
 }

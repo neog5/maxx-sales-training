@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AddAsSelect, REQUIRED_HINT, RequiredSelect, requiredMessage } from "@/components/AssignmentControls";
+import { REQUIRED_HINT, RequiredSelect, requiredMessage } from "@/components/AssignmentControls";
 import MemberList from "@/components/MemberList";
 import MultiPicker from "@/components/MultiPicker";
 import { byName } from "@/lib/people";
@@ -35,7 +35,6 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   const [selectedId, setSelectedId] = useState(initialGroups.some((group) => group.id === initialGroupId) ? initialGroupId : initialGroups[0]?.id);
   const [newGroup, setNewGroup] = useState("");
   const [edit, setEdit] = useState(null);
-  const [addAs, setAddAs] = useState("required");
 
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const coursesById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
@@ -78,7 +77,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
   }
 
   async function deleteGroup() {
-    const warning = `Delete the training group “${selected.name}”? Its members stay in the portal, but courses given through this group will no longer be required for them, or visible to them.`;
+    const warning = `Delete the training group “${selected.name}”? Courses given through it are removed from its members.`;
     if (!window.confirm(warning)) return;
     const deletedId = selectedId;
     if (!await run("delete", () => supabase.from("groups").delete().eq("id", deletedId), { success: "Deleted." })) return;
@@ -103,8 +102,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
     setMemberships((current) => current.filter((membership) => !(membership.group_id === groupId && membership.user_id === person.id)));
   }
 
-  async function assignCourses(courseIds) {
-    const required = addAs === "required";
+  async function assignCourses(courseIds, required) {
     const created = await run("courses", () => supabase
       .from("course_assignments")
       .insert(courseIds.map((courseId) => ({ course_id: courseId, group_id: selectedId, required })))
@@ -128,7 +126,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
     <main className="tp-page tp-fade-in">
       <div className="page-heading">
         <h1 className="tp-display">Training groups</h1>
-        <p>Training groups decide which courses people can see and which they must complete. Put people in a group, such as Titan Distributors or a region, then give courses to the whole group. A person can belong to several training groups.</p>
+        <p>Give courses to a whole group at once. A person can be in several groups.</p>
       </div>
 
       {notices}
@@ -198,8 +196,7 @@ export default function GroupsClient({ initialGroups, initialMemberships, people
                 })}
               </div>
             ) : <div className="chip-list__empty member-list__empty">No courses given to this group</div>}
-            <AddAsSelect value={addAs} onChange={setAddAs} />
-            <MultiPicker items={courseOptions} excludeIds={groupAssignments.map((assignment) => assignment.course_id)} onAdd={assignCourses} placeholder="Add courses by title or code…" addLabel="Add" noun="course" busy={busy} />
+            <MultiPicker items={courseOptions} excludeIds={groupAssignments.map((assignment) => assignment.course_id)} onAdd={assignCourses} placeholder="Find courses by title or code…" noun="course" busy={busy} chooseRequired />
           </section>
         ) : (
           <section className="tp-card admin-insight-empty">Create a training group to get started.</section>

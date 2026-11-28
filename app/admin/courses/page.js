@@ -29,9 +29,9 @@ function CourseStatus({ course, assignmentCount }) {
   }
   const access = courseAccess(course);
   if (access === "hidden") return <span className="course-status course-status--hidden">Draft<small>Only admins</small></span>;
-  if (access === "everyone") return <span className="course-status course-status--everyone">Everyone<small>Every learner</small></span>;
+  if (access === "everyone") return <span className="course-status course-status--everyone">Everyone<small>{course.everyone_required ? "Required for all" : "Optional for all"}</small></span>;
   return assignmentCount
-    ? <span className="course-status course-status--live">Chosen groups<small>Only those it’s given to</small></span>
+    ? <span className="course-status course-status--live">Given to groups or people<small>Only those it’s given to</small></span>
     : <span className="course-status course-status--hidden">Nobody yet<small>Not given to anyone</small></span>;
 }
 
@@ -65,7 +65,7 @@ export default async function CoursesAdminPage() {
   const [courses, attempts, questions, assignments] = await Promise.all([
     supabase
       .from("courses")
-      .select("id, code, title, is_active, audience, view_only, created_at, archived_at, archiver:profiles!courses_archived_by_fkey(full_name)")
+      .select("id, code, title, is_active, audience, everyone_required, view_only, created_at, archived_at, archiver:profiles!courses_archived_by_fkey(full_name)")
       .order("code")
       .then((result) => must(result, "courses")),
     fetchCourseIds(supabase, "quiz_attempts", "completed attempts", (query) => query.eq("status", "completed")),

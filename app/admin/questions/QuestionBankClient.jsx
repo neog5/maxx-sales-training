@@ -14,8 +14,8 @@ import { readingLabel } from "./reading-label";
 import { removeStoredFiles } from "@/lib/storage";
 import { isVideo } from "@/lib/course-materials";
 
-const IMPORT_FAILED = { fallback: "We couldn’t add the selected questions. Please try again." };
-const DELETE_FAILED = { fallback: "We couldn’t delete that question. Please try again." };
+const IMPORT_FAILED = { fallback: "Couldn’t add them. Try again." };
+const DELETE_FAILED = { fallback: "Couldn’t delete it. Try again." };
 
 // Asks the server for suggested questions from one deck.
 async function requestSuggestions({ courseId, materialId, counts, signal }) {
@@ -36,7 +36,7 @@ function QuestionItem({ question, materials, readOnly, deleting, onEdit, onDelet
     <div className="tp-card question-item">
       <div className="question-item__body">
         <div className="question-item__badges">
-          <StatusBadge tone={reading ? "warn" : "accent"}>{reading ? readingLabel(question, materials) : "Main test"}</StatusBadge>
+          <StatusBadge tone={reading ? "warn" : "accent"}>{reading ? readingLabel(question, materials) : "Assessment"}</StatusBadge>
           <StatusBadge>{question.options?.length || 0} options</StatusBadge>
           {question.is_mandatory && <span className="tp-badge question-mandatory-badge">Mandatory</span>}
           {question.image_url && <span className="tp-badge">Image</span>}
@@ -207,17 +207,17 @@ export default function QuestionBankClient({ course, materials = [], initialQues
       <div className="bank-heading">
         <div>
           <div className="tp-label">Question bank</div>
-          <span className="bank-heading__counts">{mainQuestions.length} main test · {questions.length - mainQuestions.length} reading{mix.mandatoryCount ? ` · ${mix.mandatoryCount} mandatory` : ""}</span>
+          <span className="bank-heading__counts">{mainQuestions.length} assessment · {questions.length - mainQuestions.length} reading {questions.length - mainQuestions.length === 1 ? "checkpoint" : "checkpoints"}{mix.mandatoryCount ? ` · ${mix.mandatoryCount} mandatory` : ""}</span>
         </div>
         {!readOnly && <button type="button" className="tp-btn tp-btn-primary" onClick={() => openEditor(emptyDraft(course.id))}>+ Add question</button>}
       </div>
 
-      {readOnly && <Notice>This course is archived, so its questions are read-only. Restore the course to edit them.</Notice>}
+      {readOnly && <Notice>Archived. Restore the course to edit questions.</Notice>}
 
       <Notice tone="error">{deleter.error}</Notice>
 
       {!readOnly && materials.length > 0 && pdfMaterials.length === 0 && (
-        <Notice>AI question suggestions work from PDF decks, so they aren’t available for a video-only course yet. Add main test questions by hand.</Notice>
+        <Notice>AI suggestions need a PDF deck. Add questions by hand.</Notice>
       )}
 
       {!readOnly && !suggestions && !generating && !suggestionError && generationDeckId && (
@@ -249,7 +249,7 @@ export default function QuestionBankClient({ course, materials = [], initialQues
 
       {!readOnly && mix.isShort && (
         <Notice>
-          This course needs {mix.targetCount} main-test questions ({mix.mandatoryCount} mandatory and at least {mix.requiredOptionalCount} non-mandatory) for the 60/40 assessment mix. Currently it has {mix.total} total and {mix.optionalCount} non-mandatory.
+          Add {mix.requiredOptionalCount - mix.optionalCount} more non-mandatory {mix.requiredOptionalCount - mix.optionalCount === 1 ? "question" : "questions"}. Mandatory questions can be at most about 60% of an assessment.
         </Notice>
       )}
 

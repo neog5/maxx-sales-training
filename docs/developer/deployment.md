@@ -49,24 +49,55 @@ Changing a build variable needs a rebuild.
 
 Next 16 renamed middleware to `proxy`, but `proxy.js` always runs on the Node.js runtime, which OpenNext supports only experimentally. It also bundles a second copy of the Next.js server, adding about 1.2 MB compressed and pushing the build over the Free plan limit. The Edge `middleware.js` is supported and small. Next prints a deprecation warning for it during builds. Don't run the `middleware-to-proxy` codemod.
 
-## Production launch checklist
+## Production launch plan
 
-Not done yet. When moving to training.maxxorthoportal.com:
+Not done yet (updated 27 Nov 2026). Production is training.maxxorthoportal.com. Its database is built from scratch: there is no production data to migrate. Work through the phases in order. Each phase lists who does it.
 
-1. Create the production Supabase project on the business account. Run `supabase/setup.sql`, `supabase/requested-changes.sql`, then every `supabase/migrations/NNN_*.sql` in order (not the `.undo.sql` files, and not `seed.sql`). Set Authentication → URL Configuration → Site URL to `https://training.maxxorthoportal.com` and add `https://training.maxxorthoportal.com/reset-password` to Redirect URLs (for forgot password).
-2. Create a Worker named exactly `maxx-sales-training` from this repo: branch `main`, build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`.
-3. Build variables: the production `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Do **not** set `NEXT_PUBLIC_APP_ENV`.
-4. Runtime secret: `OPENROUTER_API_KEY`.
-5. Set up [admin email alerts](operations.md#admin-email-alerts) in the production project (no `[DEV]` subject prefix).
-   Also set up [sign-in emails (SMTP)](operations.md#sign-in-emails-smtp), or confirmation and forgot-password emails won't reach anyone outside the Supabase organisation.
-6. Sign up and [make the first super admin](operations.md#the-first-super-admin).
-7. Read [Security](security.md) and decide whether any open points must be closed first (for example, private storage for confidential PDFs).
-8. Merge `dev` into `main`; the push builds and deploys production.
-9. **Restrict the dev site with Cloudflare Access** so employees can't land on it by mistake. Production users are also `@maxxortho.com`, so allow a named list of testers, not the whole domain:
+### Phase 0 · Decisions and content (before any production setup)
+
+1. **Close the open decisions.** Go through the security open points in [Security](security.md#still-open) and decide which must be fixed before launch. Also decide whether to move AI suggestions off OpenRouter first (GitHub issue #7). *Owner: product owner.*
+2. **Certificate template.** Swap in the final template if it's changing, then check that a very long name and a long course title still fit ([Changing the certificate template](operations.md#changing-the-certificate-template)). *Owner: product owner, then developer.*
+3. **Course content.** Every course from the old WordPress site goes to production. That means the 7 quiz courses already imported to dev, plus the view-only courses still waiting for their Google Slides PDFs, plus the 11 courses without quizzes. Collect every missing PDF and decide how the no-quiz courses are set up (No assessment, or questions added). See [wordpress-import.md](../wordpress-import.md). *Owner: product owner.*
+4. **Docs refresh.** Bring the developer docs and user guides up to date with the late-November changes (the list is in the pre-launch review notes). *Owner: developer.*
+5. **Freeze dev.** `npm run check` and `npm run test:db` pass, the review checklist is ticked, and nothing else merges into `dev` until launch. *Owner: developer.*
+
+### Phase 1 · Production Supabase (business account)
+
+6. Create the production project on the business account, on the **Pro** plan (needed for video storage), in the same region as dev.
+7. Build the schema: run `supabase/setup.sql`, `supabase/requested-changes.sql`, then every `supabase/migrations/NNN_*.sql` in order, from `001` to the newest (`020` at the time of writing). Don't run the `.undo.sql` files or `seed.sql`. Then check that the buckets `course-pdfs`, `course-videos` and `question-images` exist, and that `course-pdfs` and `course-videos` are private.
+8. Point a scratch copy of `SUPABASE_DB_URL` at the new project and run `npm run test:db` once. It runs inside a transaction that is rolled back, so it leaves nothing behind. Then remove the scratch value.
+9. Storage → Settings: raise the global upload limit to **2 GB** (needs the Owner or Administrator role), or video uploads fail.
+10. Authentication → URL Configuration: Site URL `https://training.maxxorthoportal.com`. Add `https://training.maxxorthoportal.com/reset-password` to Redirect URLs.
+11. Set up [sign-in emails (SMTP)](operations.md#sign-in-emails-smtp). Without it, confirmation and forgot-password emails don't reach anyone outside the Supabase organisation.
+12. Set up [admin email alerts](operations.md#admin-email-alerts) in Vault: `resend_api_key`, `portal_url` = `https://training.maxxorthoportal.com`, and `alert_from_email` = `Maxx Ortho Sales Training <alerts@maxxorthoportal.com>`. Leave out `alert_subject_prefix`, so there's no `[DEV]` prefix. To send from `sales-training-alerts@maxxortho.com` instead, IT must first verify `maxxortho.com` in Resend (DNS records).
+
+### Phase 2 · Production Worker (Cloudflare)
+
+13. Create a Worker named exactly `maxx-sales-training` from this repo. Branch `main`, build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`. Don't connect it until step 19, so nothing deploys early.
+14. Build variables: the production `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Do **not** set `NEXT_PUBLIC_APP_ENV`, so there's no DEV banner.
+15. Runtime secret `OPENROUTER_API_KEY` (or the new provider's key if issue #7 was done first).
+
+### Phase 3 · People and content in production
+
+16. Sign up with your own address and [make the first super admin](operations.md#the-first-super-admin). Invite-only sign-up means the very first account needs the one-off step described there.
+17. Import the courses. Run `scripts/wp-import/load.mjs` against production with the production service-role key in your shell only (never in a file in the repo). Then upload the remaining decks and videos by hand. Every course starts as "Only the groups and people you give it to", so nobody sees anything yet.
+18. Create the training groups, give each course to its groups (Required or Optional, or "Everyone"), and check every course's questions.
+
+### Phase 4 · Go live
+
+19. Merge `dev` into `main` (only on the product owner's go-ahead). The push builds and deploys production.
+20. Smoke test on training.maxxorthoportal.com with a test learner you invite yourself: sign up from the invite email, finish one course to a certificate, check the admin emails arrive, then archive the test learner.
+21. Send the real invites (People → Invites), in batches by training group.
+
+### Phase 5 · After launch
+
+22. **Restrict the dev site with Cloudflare Access** so employees can't land on it by mistake. Production users are also `@maxxortho.com`, so allow a named list of testers, not the whole domain:
    - Zero Trust → Settings → Authentication: confirm the One-time PIN login method.
    - Access → Access Groups → add `Training portal – dev testers`, Include → Emails → each tester.
    - Access → Applications → Add → Self-hosted: domain `training-dev.maxxorthoportal.com` (empty path), session 24 hours, policy Allow → Include → Access Group `Training portal – dev testers`.
    - Test in a private window with an allowed and a non-allowed email. Make sure the application doesn't cover `training.maxxorthoportal.com`.
+23. Disconnect the old Vercel app from the GitHub repo. It still runs a failing check on every pull request.
+24. Watch the first week: Worker logs (error 1102 means the Free plan's CPU limit was hit, so move to Paid), Resend delivery, and the Dashboard.
 
 ## Before every release
 

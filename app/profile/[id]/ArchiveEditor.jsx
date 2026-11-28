@@ -12,8 +12,8 @@ export default function ArchiveEditor({ profileId, name, archived }) {
 
   function toggle() {
     const prompt = archived
-      ? `Restore ${name}? They will be able to sign in again and will count towards compliance.`
-      : `Archive ${name}? They will lose access to the portal straight away. Their training records, attempts and certificates are kept, and you can restore them later.`;
+      ? `Restore ${name}? They can sign in again.`
+      : `Archive ${name}? They lose access. Records are kept, and you can restore them.`;
     if (!window.confirm(prompt)) return;
     run("archive", () => createClient()
       .from("profiles")

@@ -5,9 +5,19 @@ import Skeleton from "@/components/Skeleton";
 import { loadPdfjs } from "@/components/pdfjs";
 
 const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2;
+const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
+// Pinch zoom previews instantly with a CSS scale, then re-draws the pages sharply once the
+// fingers stop for this long.
+const PINCH_SETTLE_MS = 220;
+// Keep each page canvas within what browsers draw reliably (and within memory) at high zoom.
+const MAX_CANVAS_SIDE = 4096;
 const noSubscribe = () => () => {};
+const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+// The + and − buttons move between 25% steps, so after a pinch they land back on round numbers.
+const stepZoom = (zoom, direction) => clampZoom(direction > 0
+  ? (Math.floor(zoom / ZOOM_STEP + 1e-6) + 1) * ZOOM_STEP
+  : (Math.ceil(zoom / ZOOM_STEP - 1e-6) - 1) * ZOOM_STEP);
 
 function ToolbarButton({ children, className = "", ...props }) {
   return <button type="button" className={`pdf-toolbar-button ${className}`} {...props}>{children}</button>;
@@ -120,7 +130,7 @@ export default function PdfReader({ url, title, onPageChange, fullscreenPanel = 
           const baseViewport = page.getViewport({ scale: 1 });
           const scale = (availableWidth / baseViewport.width) * zoom;
           const viewport = page.getViewport({ scale });
-          const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+          const outputScale = Math.min(window.devicePixelRatio || 1, 2, MAX_CANVAS_SIDE / Math.max(viewport.width, viewport.height));
           const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d");
           canvas.width = Math.floor(viewport.width * outputScale);
@@ -157,6 +167,68 @@ export default function PdfReader({ url, title, onPageChange, fullscreenPanel = 
     };
     // Full screen and the question panel change the reader's width, so pages are re-rendered to fit.
   }, [pdfDocument, zoom, isFullscreen, hasSidePanel]);
+
+  // Pinch to zoom: a trackpad pinch arrives as a wheel event with ctrlKey (Chrome, Edge, Firefox,
+  // Safari), a touch screen pinch as two touches. While the gesture runs the pages are scaled with
+  // CSS; when it settles the zoom is committed and the pages are re-drawn at the new size.
+  const zoomRef = useRef(zoom);
+  const pinchRef = useRef({ target: null, timer: 0, touchStart: null });
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+
+  const previewZoom = useEffectEvent((target) => {
+    const pinch = pinchRef.current;
+    const pages = pagesRef.current;
+    if (!pages || status !== "ready") return;
+    pinch.target = clampZoom(target);
+    pages.style.transformOrigin = "top center";
+    pages.style.transform = `scale(${pinch.target / zoomRef.current})`;
+    window.clearTimeout(pinch.timer);
+    pinch.timer = window.setTimeout(() => {
+      if (pagesRef.current) pagesRef.current.style.transform = "";
+      if (pinch.target !== null) setZoom(Math.round(pinch.target * 100) / 100);
+      pinch.target = null;
+    }, PINCH_SETTLE_MS);
+  });
+
+  useEffect(() => {
+    const reader = scrollRef.current;
+    if (!reader) return;
+    const pinch = pinchRef.current;
+    const touchDistance = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+
+    function onWheel(event) {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      const from = pinch.target ?? zoomRef.current;
+      previewZoom(from * Math.exp(-event.deltaY * 0.01));
+    }
+    function onTouchStart(event) {
+      if (event.touches.length !== 2) return;
+      pinch.touchStart = { distance: touchDistance(event.touches), zoom: pinch.target ?? zoomRef.current };
+    }
+    function onTouchMove(event) {
+      if (event.touches.length !== 2 || !pinch.touchStart) return;
+      event.preventDefault();
+      previewZoom(pinch.touchStart.zoom * (touchDistance(event.touches) / pinch.touchStart.distance));
+    }
+    function onTouchEnd(event) {
+      if (event.touches.length < 2) pinch.touchStart = null;
+    }
+
+    reader.addEventListener("wheel", onWheel, { passive: false });
+    reader.addEventListener("touchstart", onTouchStart, { passive: true });
+    reader.addEventListener("touchmove", onTouchMove, { passive: false });
+    reader.addEventListener("touchend", onTouchEnd);
+    reader.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      window.clearTimeout(pinch.timer);
+      reader.removeEventListener("wheel", onWheel);
+      reader.removeEventListener("touchstart", onTouchStart);
+      reader.removeEventListener("touchmove", onTouchMove);
+      reader.removeEventListener("touchend", onTouchEnd);
+      reader.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
 
   function selectPage(pageNumber) {
     if (pageNumber === currentPageRef.current) return;
@@ -226,8 +298,8 @@ export default function PdfReader({ url, title, onPageChange, fullscreenPanel = 
     return (
       <div className="pdf-empty-state">
         <div className="pdf-state-icon" aria-hidden="true">▤</div>
-        <strong>No document yet</strong>
-        <span>No PDF has been added to this course.</span>
+        <strong>No course material yet</strong>
+        <span>Check back later.</span>
       </div>
     );
   }
@@ -254,9 +326,9 @@ export default function PdfReader({ url, title, onPageChange, fullscreenPanel = 
           </div>
           <div className="pdf-toolbar-divider" />
           <div className="pdf-control-group" aria-label="Zoom controls">
-            <ToolbarButton aria-label="Zoom out" title="Zoom out" disabled={status !== "ready" || zoom <= MIN_ZOOM} onClick={() => setZoom((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP))}>−</ToolbarButton>
+            <ToolbarButton aria-label="Zoom out" title="Zoom out (or pinch)" disabled={status !== "ready" || zoom <= MIN_ZOOM} onClick={() => setZoom((value) => stepZoom(value, -1))}>−</ToolbarButton>
             <ToolbarButton className="pdf-zoom-value" aria-label="Fit page to width" title="Fit to width" disabled={status !== "ready" || zoom === 1} onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</ToolbarButton>
-            <ToolbarButton aria-label="Zoom in" title="Zoom in" disabled={status !== "ready" || zoom >= MAX_ZOOM} onClick={() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP))}>+</ToolbarButton>
+            <ToolbarButton aria-label="Zoom in" title="Zoom in (or pinch)" disabled={status !== "ready" || zoom >= MAX_ZOOM} onClick={() => setZoom((value) => stepZoom(value, 1))}>+</ToolbarButton>
           </div>
           {canFullscreen && (
             <button type="button" className="pdf-open-link pdf-fullscreen-button" onClick={toggleFullscreen} aria-pressed={isFullscreen} title={isFullscreen ? "Exit full screen (Esc)" : "View full screen"}>

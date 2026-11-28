@@ -26,7 +26,7 @@ export default function RoleEditor({ profileId, initialRole, roles }) {
     if (error) {
       setMessage(`Role could not be updated: ${error.message}`);
     } else if (!data) {
-      setMessage("Role update was blocked by database permissions.");
+      setMessage("You can’t change this role.");
     } else {
       setRole(data.role);
       setSavedRole(data.role);

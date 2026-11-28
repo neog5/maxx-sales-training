@@ -544,3 +544,39 @@ test("videos: admin-only, no reading questions, no minimum time, finished once e
   await call(users.learner, "public.mark_video_watched($1, $2)", [mixed.session_id, second]);
   assert.match((await call(users.learner, "public.finish_reading($1)", [mixed.session_id])).error, /minimum reading time/);
 });
+
+test("required for everyone (019): counts for every active person only while open to everyone", { skip }, async () => {
+  const course = await makeCourse({ optional: 5 });
+  const required = async (userId) => (await as(users.admin, "select count(*)::int as n from public.required_courses() where user_id = $1 and course_id = $2", [userId, course])).rows[0].n;
+
+  // Open to everyone but optional: nobody has to do it.
+  assert.equal(await required(users.learner), 0);
+
+  // Required for everyone: every person, admins included, has to; learners see it as their own.
+  await as(users.admin, "update public.courses set everyone_required = true where id = $1", [course]);
+  assert.equal(await required(users.learner), 1);
+  assert.equal(await required(users.other), 1);
+  assert.equal(await required(users.admin), 1);
+  assert.equal((await as(users.learner, "select count(*)::int as n from public.required_courses() where course_id = $1", [course])).rows[0].n, 1);
+
+  // Not while it's only given to chosen people, or archived.
+  await asOwner("update public.courses set audience = 'assigned' where id = $1", [course]);
+  assert.equal(await required(users.learner), 0);
+  await asOwner("update public.courses set audience = 'everyone', archived_at = now() where id = $1", [course]);
+  assert.equal(await required(users.learner), 0);
+});
+
+test("per-deck reading time (019): a deck's own time replaces the course's, and they add up", { skip }, async () => {
+  const course = await makeCourse({ viewOnly: true, readSeconds: 60 });
+  await asOwner("insert into public.course_materials (course_id, position, title, pdf_url, read_seconds) values ($1, 2, 'Long deck', '/long.pdf', 600)", [course]);
+  // Deck 1 uses the course's 60 s, deck 2 its own 600 s.
+  assert.equal((await asOwner("select public.course_min_reading_seconds($1) as s", [course])).rows[0].s, 660);
+  // Videos can't have a reading time.
+  assert.match((await asOwner("insert into public.course_materials (course_id, position, title, kind, video_path, read_seconds) values ($1, 3, 'Clip', 'video', 'x/clip.mp4', 30)", [course])).error, /read_seconds_check/);
+
+  const { session_id: session } = await call(users.other, "public.start_reading($1)", [course]);
+  await asOwner("update public.reading_sessions set started_at = now() - interval '5 minutes' where id = $1", [session]);
+  assert.match((await call(users.other, "public.finish_reading($1)", [session])).error, /minimum reading time/);
+  await asOwner("update public.reading_sessions set started_at = now() - interval '12 minutes' where id = $1", [session]);
+  assert.ok((await call(users.other, "public.finish_reading($1)", [session])).certificate_id);
+});

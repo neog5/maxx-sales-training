@@ -27,7 +27,7 @@ function ReviewCard({ question, number }) {
               );
             })}
           </div>
-          <div className="assessment-review-card__explanation">{question.explanation}</div>
+          {question.explanation?.trim() && <div className="assessment-review-card__explanation">{question.explanation}</div>}
         </div>
       </div>
     </div>
@@ -47,14 +47,14 @@ export default function QuizResults({ course, result, attemptsLeft, onRetake }) 
           : <Dial pct={result.score} size={120} color="var(--danger)" label={`${result.score}%`} sub="score" />}
         <div className="assessment-result-card__copy">
           <StatusBadge tone={result.passed ? "success" : "danger"}>{result.passed ? "Passed" : "Not passed"}</StatusBadge>
-          <h2 className="tp-display">{result.passed ? "Well done — you passed. This course is complete." : "Not passed this time"}</h2>
+          <h2 className="tp-display">{result.passed ? "You passed" : "Not passed"}</h2>
           <div className="assessment-result-card__detail">
             Your score: {result.score}% ({result.correctCount} of {result.total} correct) · Passing score: {course.pass_threshold}%
           </div>
           {result.mandatoryCount > 0 && (
             <div className={`assessment-requirement ${result.mandatoryPassed ? "is-met" : "is-unmet"}`}>
               <strong>Mandatory questions: {result.mandatoryCorrectCount} of {result.mandatoryCount} correct</strong>
-              <span>{result.mandatoryPassed ? "Requirement met" : "Every mandatory question must be right to pass"}</span>
+              <span>{result.mandatoryPassed ? "Requirement met" : "All mandatory questions must be right"}</span>
             </div>
           )}
           {result.passed && result.certificateId && (
@@ -64,13 +64,13 @@ export default function QuizResults({ course, result, attemptsLeft, onRetake }) 
           )}
           {!result.passed && attemptsLeft > 0 && (
             <div className="assessment-result-card__actions">
-              <div className="assessment-result-card__detail assessment-result-card__attempts">You have {attemptsLeft} of {MAX_ATTEMPTS} attempts left. Review the answers below, then try again.</div>
+              <div className="assessment-result-card__detail assessment-result-card__attempts">{attemptsLeft} of {MAX_ATTEMPTS} attempts left</div>
               <button type="button" className="tp-btn tp-btn-primary" onClick={onRetake}>Retake assessment</button>
             </div>
           )}
           {!result.passed && attemptsLeft <= 0 && (
             <div className="assessment-result-card__detail assessment-result-card__actions">
-              You have used all {MAX_ATTEMPTS} attempts. Ask your admin to give you more attempts.
+              No attempts left. Ask your admin for more.
             </div>
           )}
         </div>

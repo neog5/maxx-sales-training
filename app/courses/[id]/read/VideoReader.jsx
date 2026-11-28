@@ -39,7 +39,7 @@ export default function VideoReader({ url, title }) {
       <div className="pdf-empty-state">
         <div className="pdf-state-icon" aria-hidden="true">▶</div>
         <strong>This video isn’t available</strong>
-        <span>Refresh the page to try again. If it still won’t load, contact your administrator.</span>
+        <span>Refresh the page, or ask your admin.</span>
       </div>
     );
   }
@@ -73,7 +73,7 @@ export default function VideoReader({ url, title }) {
         <div className="pdf-error-state" role="alert">
           <div className="pdf-state-icon" aria-hidden="true">!</div>
           <strong>We couldn’t play this video</strong>
-          <span>Check your connection, then try again. Links expire after a few hours, so refreshing the page can also help.</span>
+          <span>Check your connection, or refresh the page.</span>
           <button type="button" className="pdf-retry-button" onClick={() => { setFailed(false); videoRef.current?.load(); }}>Try again</button>
         </div>
       ) : null}

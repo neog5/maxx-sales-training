@@ -4,14 +4,14 @@ import StatusBadge from "@/components/StatusBadge";
 
 function CheckpointSkeleton() {
   return (
-    <div className="checkpoint-skeleton" aria-busy="true" aria-label="Loading reading questions">
+    <div className="checkpoint-skeleton" aria-busy="true" aria-label="Loading course material">
       <Skeleton className="checkpoint-skeleton__count" />
       <Skeleton className="checkpoint-skeleton__badge" />
       <Skeleton className="checkpoint-skeleton__question" />
       <Skeleton className="checkpoint-skeleton__option" />
       <Skeleton className="checkpoint-skeleton__option" />
       <Skeleton className="checkpoint-skeleton__option" />
-      <span className="tp-sr-only" role="status">Loading reading questions…</span>
+      <span className="tp-sr-only" role="status">Loading course material…</span>
     </div>
   );
 }
@@ -87,12 +87,12 @@ export default function CheckpointCard({ loading, questionCount, answeredCount, 
       ) : questionCount > 0 && answeredCount === questionCount ? (
         <div className="reading-question-complete tp-fade-in">
           <BigTick size={64} />
-          <div className="tp-display">All reading questions answered</div>
+          <div className="tp-display">All questions answered</div>
         </div>
       ) : (
         <div className="tp-fade-in">
           <div className="checkpoint-idle__copy">
-            The next question will appear here when you reach its page.
+            Questions appear here as you read.
           </div>
         </div>
       )}

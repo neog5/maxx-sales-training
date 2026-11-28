@@ -29,7 +29,7 @@ export default async function CoursesPage() {
         .order("submitted_at", { ascending: false }),
       "your attempts"
     ),
-    rows(supabase.from("reading_sessions").select("course_id, checkpoint_passed").eq("user_id", user.id), "your reading progress"),
+    rows(supabase.from("reading_sessions").select("course_id, checkpoint_passed").eq("user_id", user.id), "your course progress"),
     // Admins can read everyone's rows, so filter to this person.
     rows(supabase.rpc("required_courses").eq("user_id", user.id), "your required courses"),
     rows(supabase.from("certificates").select("id, user_id, course_id").eq("user_id", user.id), "your certificates"),

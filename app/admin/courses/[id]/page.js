@@ -5,6 +5,7 @@ import { fetchAll, must } from "@/lib/db";
 import { fetchCourseMaterials, fetchPeople } from "@/lib/queries";
 import { isAdmin } from "@/lib/roles";
 import AdminPage from "../../AdminPage";
+import CourseActions from "./CourseActions";
 import CourseAdminClient from "./CourseAdminClient";
 import CourseHeader from "./CourseHeader";
 import { loadCourseHeader } from "./course-data";
@@ -38,11 +39,10 @@ export default async function CourseAdminPage({ params }) {
   return (
     <AdminPage profile={profile}>
       <main className="tp-page tp-fade-in">
-        <CourseHeader {...header} active="overview" />
+        <CourseHeader {...header} active="overview"
+          actions={<CourseActions course={header.course} viewerRole={profile.role} recordCount={header.recordCount} materials={materials} />} />
         <CourseAdminClient
           course={header.course}
-          viewerRole={profile.role}
-          recordCount={header.recordCount}
           materials={materials}
           readingCounts={readingCounts}
           assignments={assignments}

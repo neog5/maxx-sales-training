@@ -28,15 +28,15 @@ export default function ReadingProgressCard({ status, time, timePercent, questio
     <div className="tp-card reading-status-card">
       <div className="reading-status-card__heading">
         <div>
-          <span className="tp-label">Your progress</span>
+          <span className="tp-label">Progress</span>
           <strong className="tp-display">{status}</strong>
         </div>
         <span className="reading-status-card__percent">{overall}%</span>
       </div>
       {time && <ProgressRow label={time.label} value={time.left > 0 ? `${formatMinutes(time.left)} left` : "Done"} percent={time.percent} />}
-      {questionCount > 0 && <ProgressRow label="Reading questions" value={`${answeredCount} of ${questionCount}`} percent={questionProgress} />}
-      {deckRow && <ProgressRow label="Decks read" value={`${deckRow.done} of ${deckRow.total}`} percent={percentOf(deckRow)} />}
-      {videoRow && <ProgressRow label="Videos opened" value={`${videoRow.done} of ${videoRow.total}`} percent={percentOf(videoRow)} />}
+      {questionCount > 0 && <ProgressRow label="Questions" value={`${answeredCount} of ${questionCount}`} percent={questionProgress} />}
+      {deckRow && <ProgressRow label="Decks" value={`${deckRow.done} of ${deckRow.total}`} percent={percentOf(deckRow)} />}
+      {videoRow && <ProgressRow label="Videos" value={`${videoRow.done} of ${videoRow.total}`} percent={percentOf(videoRow)} />}
     </div>
   );
 }

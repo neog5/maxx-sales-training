@@ -16,7 +16,7 @@ function LockedNotice({ course }) {
     <div className="assessment-page assessment-locked tp-fade-in">
       <div className="tp-display assessment-locked__title">Assessment locked</div>
       <p className="assessment-locked__copy">
-        You have used all {MAX_ATTEMPTS} attempts for {course.title}. Ask your admin to give you more attempts. In the meantime, you can review the course material again.
+        No attempts left. Ask your admin for more.
       </p>
       <BackToCourses />
     </div>
@@ -55,7 +55,7 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
         setLoadError(!error ? ""
           // The database says "Finish the reading…"; the app calls that step the course material.
           : /finish the reading/i.test(error.message) ? "Finish the course material before starting the assessment."
-          : "We couldn’t load the assessment questions. Refresh the page to try again.");
+          : "Couldn’t load the questions. Refresh the page.");
         setAttemptId(data?.attempt_id || null);
         setQuestions((data?.questions || []).map((question) => shuffleOptions(question)));
       }
@@ -72,8 +72,8 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
     const { data, error } = await supabase.rpc("submit_attempt", { p_attempt_id: attemptId, p_answers: answers });
     if (error) {
       setSubmitError(OUT_OF_ATTEMPTS.test(error.message)
-        ? "You have no attempts left for this course. Ask your admin to give you more attempts."
-        : "Your attempt could not be saved. Please try again.");
+        ? "No attempts left. Ask your admin for more."
+        : "Couldn’t save your answers. Try again.");
       setSubmitting(false);
       return;
     }
@@ -111,14 +111,12 @@ export default function QuizClient({ course, attemptsLeft: initialAttemptsLeft }
           <span style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} />
         </div>
         <p>
-          Choose the best answer for each question. To pass, you need a score of at least {course.pass_threshold}%
-          {questions.some((question) => question.is_mandatory) && <> and every question marked <b>Mandatory</b> answered correctly</>}.
-          {" "}You have {attemptsLeft} of {MAX_ATTEMPTS} attempts left.
+          Pass: {course.pass_threshold}%{questions.some((question) => question.is_mandatory) && <> and every <b>Mandatory</b> question right</>} · {attemptsLeft} of {MAX_ATTEMPTS} attempts left
         </p>
       </header>
 
       <Notice tone="error">{loadError}</Notice>
-      {!loadError && questions.length === 0 && <Notice>This assessment has no questions yet. Please check back later or ask your admin.</Notice>}
+      {!loadError && questions.length === 0 && <Notice>No questions yet. Check back later.</Notice>}
 
       <div className="assessment-list">
         {questions.map((question, index) => (

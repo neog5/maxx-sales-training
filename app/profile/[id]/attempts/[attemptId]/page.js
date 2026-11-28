@@ -67,7 +67,7 @@ export default async function AttemptPage({ params }) {
             <div className={`tp-card metric-card mandatory-metric ${mandatoryPassed ? "is-met" : "is-unmet"}`}>
               <div className="tp-label">Mandatory questions</div>
               <div className="tp-mono metric-value">{mandatoryCorrectCount} of {mandatoryCount}</div>
-              <small>{mandatoryPassed ? "All mandatory questions correct" : "Every mandatory question must be right to pass"}</small>
+              <small>{mandatoryPassed ? "All mandatory questions correct" : "All mandatory questions must be right"}</small>
             </div>
           )}
         </div>
@@ -111,13 +111,13 @@ export default async function AttemptPage({ params }) {
                     return (
                       <div key={optionIndex} className={`review-option ${isCorrect ? "is-correct" : ""} ${isSelected && !isCorrect ? "is-wrong" : ""}`}>
                         <span>{option}</span>
-                        <strong>{isCorrect ? "Correct answer" : isSelected ? "User answer" : ""}</strong>
+                        <strong>{isCorrect ? "Correct answer" : isSelected ? "Their answer" : ""}</strong>
                       </div>
                     );
                   })}
                 </div>
                 {question.selected_index === null && <div className="attempt-question__unanswered">No answer recorded</div>}
-                <div className="attempt-question__explanation"><strong>Explanation</strong>{question.explanation}</div>
+                {question.explanation?.trim() && <div className="attempt-question__explanation"><strong>Explanation</strong>{question.explanation}</div>}
               </article>
             ))}
             {questions.length === 0 && <div className="tp-card admin-insight-empty">No question snapshots were recorded for this attempt.</div>}

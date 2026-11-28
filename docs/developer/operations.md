@@ -17,7 +17,7 @@ update public.profiles set role = 'super_admin'
 where id = (select id from auth.users where email = 'you@maxxortho.com');
 ```
 
-The SQL Editor can change roles because it runs without a signed-in user. After that, change everyone else's role from their profile page.
+The SQL Editor can change roles because it runs without a signed-in user. After that, change everyone else's role from their profile page. The app only offers Learner and Admin, and shows super admins as "Admin". To make another super admin, use the same SQL with their email.
 
 ## Database changes
 

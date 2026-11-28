@@ -33,7 +33,7 @@ export default function SuggestionPanel({ materials, deckId, questions, selected
   return (
     <section className="tp-card suggestion-panel" aria-label="Question suggestions">
       <div className="suggestion-panel__header">
-        <div><div className="tp-label">Question suggestions</div><h2>Review suggested questions</h2><p>Select the accurate, relevant questions to add. Nothing is saved until you confirm.</p></div>
+        <div><div className="tp-label">Question suggestions</div><h2>Review suggested questions</h2><p>Untick any you don’t want.</p></div>
         <button type="button" className="tp-btn tp-btn-ghost" onClick={onGenerate} disabled={importing}>Regenerate</button>
       </div>
       <div className="suggestion-toolbar">
@@ -48,7 +48,7 @@ export default function SuggestionPanel({ materials, deckId, questions, selected
               <input type="checkbox" checked={isSelected} onChange={() => onToggle(index)} />
               <div className="suggestion-item__body">
                 <div className="suggestion-item__meta">
-                  <span className="tp-badge">{question.question_type === "reading_test" ? readingLabel({ ...question, material_id: deckId }, materials) : "Main test"}</span>
+                  <span className="tp-badge">{question.question_type === "reading_test" ? readingLabel({ ...question, material_id: deckId }, materials) : "Assessment"}</span>
                   {isTrueFalse(question) && <span className="tp-badge">True / False</span>}
                 </div>
                 <strong>{question.question_text}</strong>

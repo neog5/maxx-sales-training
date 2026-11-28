@@ -34,7 +34,7 @@ export default function ResetPasswordPage() {
     event.preventDefault();
     if (saving) return;
     if (password !== confirm) {
-      setError("The two passwords don’t match. Please type them again.");
+      setError("The passwords don’t match.");
       return;
     }
     setError("");

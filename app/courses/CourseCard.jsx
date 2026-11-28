@@ -80,13 +80,17 @@ export default function CourseCard({ course, enrolled, readingComplete, history,
         <Step number={steps.length + 1} title="Get your certificate" state={certificateId ? "done" : "later"} />
       </ol>
 
+      {/* Once the material is done the main button moves on (assessment or certificate), so a second
+          button keeps the material one click away. The two buttons share the row equally. */}
       <div className="course-card__actions">
         {action && (
           <Link href={action.href} className={`tp-btn ${complete ? "tp-btn-ghost" : "tp-btn-primary"} course-card__action`}>
             {action.label} <span aria-hidden="true">→</span>
           </Link>
         )}
-        {complete && <Link href={routes.read(course.id)} className="course-card__reread">Review material</Link>}
+        {readingDone && action?.href !== routes.read(course.id) && (
+          <Link href={routes.read(course.id)} className="tp-btn tp-btn-ghost course-card__action course-card__reread">Review course material</Link>
+        )}
       </div>
     </article>
   );

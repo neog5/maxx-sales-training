@@ -27,10 +27,10 @@ export function draftFromQuestion(question) {
 // Why a draft can't be saved yet, or "" when it can.
 export function draftError(draft, imageFile) {
   if (!draft.question_text.trim() || draft.options.length < 2 || draft.options.some((option) => !option.trim())) {
-    return "Enter the question text and at least two complete answer options.";
+    return "Add the question and at least two answers.";
   }
-  if (draft.question_type === "reading_test" && !draft.page_number) return "A reading-test question needs a PDF page number.";
-  if (draft.question_type === "reading_test" && !draft.material_id) return "Add a PDF deck to this course before adding reading-test questions. Videos don’t have reading questions.";
+  if (draft.question_type === "reading_test" && !draft.page_number) return "A reading checkpoint needs a PDF page number.";
+  if (draft.question_type === "reading_test" && !draft.material_id) return "Add a PDF deck first. Videos can’t have checkpoints.";
   return questionImageError(imageFile);
 }
 
@@ -91,10 +91,10 @@ export default function QuestionEditor({ materials, draft, setDraft, imageFile, 
     <div className={`tp-card question-editor tp-fade-in ${editing ? "is-inline" : ""}`}>
       <div className="tp-label form-section-label">{editing ? "Edit question" : "New question"}</div>
       <div className="question-editor__row">
-        <Field label="Question bank">
+        <Field label="Type of question">
           <select className="tp-input" value={draft.question_type} onChange={(event) => setDraft(withQuestionType(draft, event.target.value, materials))}>
-            <option value="main_test">Main test</option>
-            <option value="reading_test">Reading test</option>
+            <option value="main_test">Assessment question</option>
+            <option value="reading_test">Reading checkpoint (PDF)</option>
           </select>
         </Field>
       </div>
@@ -126,7 +126,7 @@ export default function QuestionEditor({ materials, draft, setDraft, imageFile, 
       {draft.question_type === "main_test" && (
         <label className="question-mandatory-toggle">
           <input type="checkbox" checked={draft.is_mandatory} onChange={(event) => set({ is_mandatory: event.target.checked })} />
-          <span><b>Mandatory assessment question</b><small>Always include this question in every main assessment.</small></span>
+          <span><b>Mandatory assessment question</b><small>In every assessment.</small></span>
         </label>
       )}
       <div className="tp-label form-label">Answer options — select the correct one</div>
@@ -140,7 +140,7 @@ export default function QuestionEditor({ materials, draft, setDraft, imageFile, 
         ))}
       </div>
       <button type="button" className="tp-btn tp-btn-ghost question-editor__add-option" onClick={() => set({ options: [...draft.options, ""] })}>+ Add option</button>
-      <Field label="Explanation (shown after submit)" className="question-editor__field--last">
+      <Field label="Explanation (optional, shown with the results)" className="question-editor__field--last">
         <textarea className="tp-input" rows={2} value={draft.explanation} onChange={(event) => set({ explanation: event.target.value })} />
       </Field>
       <div className="question-editor__actions">

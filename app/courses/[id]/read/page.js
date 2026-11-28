@@ -13,7 +13,7 @@ export default async function ReadPage({ params }) {
   const [rawMaterials, finishedReading, certificate] = await Promise.all([
     fetchCourseMaterials(supabase, course.id),
     supabase.from("reading_sessions").select("id").eq("user_id", profile.id).eq("course_id", course.id).eq("checkpoint_passed", true).limit(1)
-      .then((result) => must(result, "your reading progress")),
+      .then((result) => must(result, "your course progress")),
     supabase.from("certificates").select("id").eq("user_id", profile.id).eq("course_id", course.id).maybeSingle()
       .then((result) => must(result, "your certificate")),
   ]);

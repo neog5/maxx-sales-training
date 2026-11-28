@@ -9,7 +9,7 @@ export default function CourseUnavailable({ profile, course }) {
       <main className="tp-page tp-fade-in">
         <div className="page-heading">
           <h1 className="tp-display">{course.title}</h1>
-          <p>This course has been archived. Your past results are still on your profile.</p>
+          <p>This course is archived. Your results are on your profile.</p>
         </div>
         <Link href={routes.courses} className="tp-btn tp-btn-primary">Back to your courses</Link>
       </main>

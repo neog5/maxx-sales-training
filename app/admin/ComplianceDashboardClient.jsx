@@ -7,7 +7,6 @@ import { COMPLIANCE_LABELS, COMPLIANCE_STATUSES, complianceCsv } from "@/lib/com
 import { localDateStamp } from "@/lib/format";
 import { byName } from "@/lib/people";
 import { ROLE_LABELS } from "@/lib/roles";
-import WatchlistBar from "./WatchlistBar";
 
 function byStatusThenName(a, b) {
   return COMPLIANCE_STATUSES.indexOf(a.status) - COMPLIANCE_STATUSES.indexOf(b.status) || byName(a, b);
@@ -28,10 +27,10 @@ function GroupCard({ summary, selected, onSelect }) {
   );
 }
 
-export default function ComplianceDashboardClient({ rows, groupSummaries, watchlists = [], courseLabels, initialGroup = "all", initialStatus = "all" }) {
-  const viewSummaries = groupSummaries.filter((summary) => summary.kind === "view");
-  const centralSummaries = groupSummaries.filter((summary) => summary.kind !== "view");
-  const viewSummaryById = new Map(viewSummaries.map((summary) => [summary.id, summary]));
+// The group cards are the group filter (there's no separate dropdown); the search and status
+// buttons narrow the table further.
+export default function ComplianceDashboardClient({ rows, groupSummaries, courseLabels, initialGroup = "all", initialStatus = "all" }) {
+  const centralSummaries = groupSummaries;
   const trainingGroupNames = new Map(centralSummaries.map((summary) => [summary.id, summary.name]));
   const trainingGroupsOf = (row) => row.groupIds.map((id) => trainingGroupNames.get(id)).filter(Boolean).sort();
   const [query, setQuery] = useState("");
@@ -67,7 +66,7 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, watchl
       <div className="page-heading section-heading-row">
         <div>
           <h1 className="tp-display">Dashboard</h1>
-          <p>Compliant means every course assigned to the person or their training groups is passed.</p>
+          <p>Compliant: every required course done.</p>
         </div>
         <button type="button" className="tp-btn tp-btn-ghost" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</button>
       </div>
@@ -82,18 +81,8 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, watchl
         {centralSummaries.map((summary) => <GroupCard key={summary.id} summary={summary} selected={group === summary.id} onSelect={() => setGroup(summary.id)} />)}
       </section>
 
-      <WatchlistBar watchlists={watchlists} summaries={viewSummaryById} people={rows} selectedId={group} onSelect={setGroup} />
-
       <section className="tp-card directory-toolbar compliance-toolbar" aria-label="Dashboard filters">
         <SearchField value={query} onChange={setQuery} />
-        <label>
-          <span className="tp-sr-only">Filter by group</span>
-          <select className="tp-input" value={group} onChange={(event) => setGroup(event.target.value)}>
-            <option value="all">Everyone</option>
-            {viewSummaries.length > 0 && <optgroup label="My watchlists">{viewSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
-            {centralSummaries.length > 0 && <optgroup label="Training groups">{centralSummaries.map((summary) => <option key={summary.id} value={summary.id}>{summary.name}</option>)}</optgroup>}
-          </select>
-        </label>
         <div className="status-filter" role="group" aria-label="Filter by compliance">
           {[["all", `All ${inGroup.length}`], ...COMPLIANCE_STATUSES.map((value) => [value, `${COMPLIANCE_LABELS[value]} ${counts[value]}`])].map(([value, label]) => (
             <button type="button" key={value} className={status === value ? "is-selected" : ""} aria-pressed={status === value} onClick={() => setStatus(value)}>{label}</button>
@@ -101,7 +90,7 @@ export default function ComplianceDashboardClient({ rows, groupSummaries, watchl
         </div>
       </section>
 
-      <div className="directory-result-count" role="status">Showing {filtered.length} of {inGroup.length} people</div>
+      <div className="directory-result-count" role="status">Showing {filtered.length} of {inGroup.length} people{group !== "all" ? ` in ${trainingGroupNames.get(group) || "this group"}` : ""}</div>
 
       <section className="tp-card compliance-table">
         <div className="compliance-table__head">

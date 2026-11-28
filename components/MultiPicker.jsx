@@ -17,7 +17,9 @@ function normalize(value) {
 // items: [{ id, label, sublabel?, keywords? }]. With `pasteEmails`, people can also be
 // matched from a pasted list of email addresses (sublabel holds the email).
 // `onAdd(ids)` resolves to something truthy on success; the selection is kept on failure.
-export default function MultiPicker({ items, excludeIds = [], onAdd, placeholder = "Search…", addLabel = "Add", noun = "item", busy = false, pasteEmails = false }) {
+// With `chooseRequired` (giving courses), the one Add button becomes "Add as required" and
+// "Add as optional": pick first, then say how. `onAdd(ids, required)` gets the choice.
+export default function MultiPicker({ items, excludeIds = [], onAdd, placeholder = "Search…", addLabel = "Add", noun = "item", busy = false, pasteEmails = false, chooseRequired = false }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
@@ -82,10 +84,10 @@ export default function MultiPicker({ items, excludeIds = [], onAdd, placeholder
     }
   }
 
-  async function add() {
+  async function add(required) {
     const ids = [...selected].filter((id) => !excluded.has(id));
     if (!ids.length) return;
-    if (await onAdd(ids)) {
+    if (await onAdd(ids, required)) {
       setSelected(new Set());
       setQuery("");
       setOpen(false);
@@ -113,9 +115,20 @@ export default function MultiPicker({ items, excludeIds = [], onAdd, placeholder
             }
           }}
         />
-        <button type="button" className="tp-btn tp-btn-primary" disabled={!selectedCount || busy} onClick={add}>
-          {busy ? "Saving…" : selectedCount ? `${addLabel} ${selectedCount}` : addLabel}
-        </button>
+        {chooseRequired ? (
+          <span className="picker__add-choice">
+            <button type="button" className="tp-btn tp-btn-primary" disabled={!selectedCount || busy} onClick={() => add(true)}>
+              {busy ? "Saving…" : "Add as required"}
+            </button>
+            <button type="button" className="tp-btn tp-btn-ghost" disabled={!selectedCount || busy} onClick={() => add(false)}>
+              Add as optional
+            </button>
+          </span>
+        ) : (
+          <button type="button" className="tp-btn tp-btn-primary" disabled={!selectedCount || busy} onClick={() => add()}>
+            {busy ? "Saving…" : selectedCount ? `${addLabel} ${selectedCount}` : addLabel}
+          </button>
+        )}
       </div>
 
       {selectedCount > 0 && (

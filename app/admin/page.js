@@ -11,8 +11,9 @@ export default async function AdminDashboardPage({ searchParams }) {
   const { supabase, profile } = await requireViewer(isAdmin);
 
   // Who must complete what comes from required_courses(), which expands groups in the
-  // database. Filters use training groups plus the viewer's own private watchlists.
-  const [people, requiredPairs, courses, attempts, centralGroups, centralMembers, viewGroups, viewMembers, certificates] = await Promise.all([
+  // database. The cards filter by training group. (Watchlists were removed from the app on
+  // 2026-11-27; their tables are unused.)
+  const [people, requiredPairs, courses, attempts, groups, memberships, certificates] = await Promise.all([
     fetchPeople(supabase),
     fetchAll(() => supabase.rpc("required_courses").order("user_id").order("course_id"), "required courses"),
     supabase.from("courses").select("id, code, title, is_active, archived_at").then((result) => must(result, "courses")),
@@ -22,19 +23,9 @@ export default async function AdminDashboardPage({ searchParams }) {
     ),
     supabase.from("groups").select("id, name").order("name").then((result) => must(result, "training groups")),
     fetchAll(() => supabase.from("group_members").select("group_id, user_id").order("group_id").order("user_id"), "training group members"),
-    supabase.from("view_groups").select("id, name").order("name").then((result) => must(result, "watchlists")),
-    fetchAll(() => supabase.from("view_group_members").select("view_group_id, user_id").order("view_group_id").order("user_id"), "watchlist members"),
     fetchAll(() => supabase.from("certificates").select("user_id, course_id").order("id"), "certificates"),
   ]);
 
-  const groups = [
-    ...viewGroups.map((viewGroup) => ({ ...viewGroup, kind: "view" })),
-    ...centralGroups.map((centralGroup) => ({ ...centralGroup, kind: "central" })),
-  ];
-  const memberships = [
-    ...centralMembers,
-    ...viewMembers.map((member) => ({ group_id: member.view_group_id, user_id: member.user_id })),
-  ];
   const { rows, groupSummaries } = buildComplianceReport({
     people,
     groups,
@@ -45,10 +36,6 @@ export default async function AdminDashboardPage({ searchParams }) {
     certificates,
   });
   const courseLabels = Object.fromEntries(courses.map((course) => [course.id, `${course.code} · ${course.title}`]));
-  const watchlists = viewGroups.map((viewGroup) => ({
-    ...viewGroup,
-    memberIds: viewMembers.filter((member) => member.view_group_id === viewGroup.id).map((member) => member.user_id),
-  }));
 
   return (
     <AdminPage profile={profile}>
@@ -56,7 +43,6 @@ export default async function AdminDashboardPage({ searchParams }) {
         rows={rows}
         groupSummaries={groupSummaries}
         courseLabels={courseLabels}
-        watchlists={watchlists}
         initialGroup={groupSummaries.some((summary) => summary.id === group) ? group : "all"}
         initialStatus={COMPLIANCE_STATUSES.includes(status) ? status : "all"}
       />

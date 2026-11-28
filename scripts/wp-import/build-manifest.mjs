@@ -11,7 +11,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const dir = path.resolve("tmp/wp-import");
-const PLACEHOLDER_EXPLANATION = "Review the course material for this topic.";
+// LearnDash had no explanations. Leave them empty: the results screen hides an empty explanation,
+// and a generic line under every answer (right or wrong) read as a hint that the answer was wrong.
+const PLACEHOLDER_EXPLANATION = "";
 
 // One reading deck per entry. `file` is relative to tmp/wp-import/files.
 // Google Slides decks (`slides`) must be downloaded as PDFs by hand and saved as `file`.

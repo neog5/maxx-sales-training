@@ -42,7 +42,7 @@ export default async function ProfilePage({ params }) {
   const rows = async (query, what) => must(await query, what) || [];
 
   const [person, attempts, memberships, groups, courses, certificates, unlocks, requiredRows] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, role, archived_at, archived_by").eq("id", id).maybeSingle().then((result) => mustFind(result, "this person")),
+    supabase.from("profiles").select("id, full_name, email, role, archived_at, archived_by").eq("id", id).maybeSingle().then((result) => mustFind(result, "this person")),
     rows(
       supabase
         .from("quiz_attempts")
@@ -54,7 +54,7 @@ export default async function ProfilePage({ params }) {
     ),
     rows(supabase.from("group_members").select("group_id").eq("user_id", id), "training group memberships"),
     rows(supabase.from("groups").select("id, name").order("name"), "training groups"),
-    rows(supabase.from("courses").select("id, code, title, is_active, archived_at, view_only").order("code"), "courses"),
+    rows(supabase.from("courses").select("id, code, title, is_active, archived_at, view_only, audience, everyone_required").order("code"), "courses"),
     rows(supabase.from("certificates").select("id, user_id, course_id, course_title, course_code, issued_at").eq("user_id", id).order("issued_at", { ascending: false }), "certificates"),
     rows(supabase.from("attempt_unlocks").select("course_id, granted_at").eq("user_id", id), "attempt approvals"),
     rows(supabase.rpc("required_courses").eq("user_id", id), "required courses"),
@@ -81,9 +81,15 @@ export default async function ProfilePage({ params }) {
     if (allowance.locked) lockedCourses.push({ id: courseId, title: course?.title || "Course", code: course?.code || "", failed: allowance.failed });
   }
 
-  const passedAttempts = attempts.filter((attempt) => attempt.passed).length;
-  const averageScore = attempts.length ? Math.round(attempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / attempts.length) : null;
-  const passRate = attempts.length ? Math.round((passedAttempts / attempts.length) * 100) : null;
+  // The figures count only required courses; optional ones are listed below but don't count.
+  const requiredCourseIds = new Set(requiredRows.map((row) => row.course_id));
+  const statAttempts = attempts.filter((attempt) => requiredCourseIds.has(attempt.course_id));
+  const statAttemptIds = new Set(statAttempts.map((attempt) => attempt.id));
+  const statQuestions = attemptQuestions.filter((question) => statAttemptIds.has(question.attempt_id));
+  const passedAttempts = statAttempts.filter((attempt) => attempt.passed).length;
+  const averageScore = statAttempts.length ? Math.round(statAttempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / statAttempts.length) : null;
+  const passRate = statAttempts.length ? Math.round((passedAttempts / statAttempts.length) * 100) : null;
+  const attemptedCourseIds = [...new Set(attempts.map((attempt) => attempt.course_id))];
   const questionsByAttempt = groupBy(attemptQuestions, "attempt_id");
   const roleOptions = person.id === viewer.id ? [] : assignableRoles(viewer.role, person.role);
   const name = displayName(person);
@@ -110,7 +116,7 @@ export default async function ProfilePage({ params }) {
             <div className="profile-summary__avatar" aria-hidden="true">{initial(person.full_name)}</div>
             <div>
               <h2 className="profile-summary__name tp-display">{name}</h2>
-              <div className="profile-summary__role">{ROLE_LABELS[person.role] || person.role}</div>
+              <div className="profile-summary__role">{ROLE_LABELS[person.role] || person.role}{person.email && <> · <span className="profile-summary__email">{person.email}</span></>}</div>
             </div>
           </div>
           <div className="profile-summary__actions">
@@ -135,6 +141,7 @@ export default async function ProfilePage({ params }) {
           courses={courses.filter(isRequirableCourse)}
           initialAssignments={assignments}
           passedCourseIds={[...passedCourseIds]}
+          attemptedCourseIds={attemptedCourseIds}
         />
 
         <LockedAssessments personId={person.id} viewerId={viewer.id} courses={lockedCourses} canApprove={isAdmin(viewer.role) && !archived} />
@@ -159,13 +166,14 @@ export default async function ProfilePage({ params }) {
           </div>
         </section>
 
-        {hasAttempts && (
+        {statAttempts.length > 0 && (
         <>
+        <div className="tp-label profile-stats-label">Required courses</div>
         <div className="metric-grid metric-grid--profile">
-          <MetricCard label="Completed attempts" value={attempts.length} />
+          <MetricCard label="Completed attempts" value={statAttempts.length} />
           <MetricCard label="Average score" value={percent(averageScore)} />
           <MetricCard label="Pass rate" value={percent(passRate)} />
-          <MetricCard label="Questions answered" value={attemptQuestions.length} />
+          <MetricCard label="Questions answered" value={statQuestions.length} />
         </div>
 
         <section className="profile-report-section">
@@ -175,7 +183,7 @@ export default async function ProfilePage({ params }) {
             </div>
           </div>
           <div className="tp-card question-performance-card">
-            <QuestionPerformance groups={calculateQuestionPerformance(attemptQuestions)} />
+            <QuestionPerformance groups={calculateQuestionPerformance(statQuestions)} />
           </div>
         </section>
 
@@ -199,7 +207,7 @@ export default async function ProfilePage({ params }) {
                   <div key={attempt.id} className="profile-attempt-table__row">
                     <div>
                       <strong>{attempt.courses?.title || "Course"}</strong>
-                      <small>{summary.total} {summary.total === 1 ? "question" : "questions"}</small>
+                      <small>{summary.total} {summary.total === 1 ? "question" : "questions"}{!requiredCourseIds.has(attempt.course_id) && " · optional course"}</small>
                     </div>
                     <div className="tp-mono">{attempt.score}%</div>
                     <div><StatusBadge tone={attempt.passed ? "success" : "danger"}>{attempt.passed ? "Passed" : "Not passed"}</StatusBadge></div>

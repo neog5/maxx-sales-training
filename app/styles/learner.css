@@ -33,11 +33,13 @@
 
 /* Reading: layout, deck tabs and checkpoint panel */
 .reading-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
-.reading-question-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 12px; }
+/* Sticky beside the reader. On short screens it scrolls inside itself, so the question's
+   button never ends up hidden behind the sticky footer. */
+.reading-question-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 88px - 96px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .reading-question-card { padding: 20px; min-height: 190px; border-radius: 15px; }
-.reader-heading__hint { color: var(--faint); font-size: 14px; text-align: right; }
 .reader-frame { padding: 0; overflow: hidden; }
-.deck-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; }
+.deck-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 10px; }
+.deck-tabs { flex: 1 1 320px; min-width: 0; display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .deck-tab { min-width: 0; max-width: 240px; display: flex; align-items: center; gap: 8px; padding: 7px 12px 7px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--dim); font-size: 14.5px; cursor: pointer; flex: 0 0 auto; }
 .deck-tab:disabled { cursor: not-allowed; opacity: .55; }
 .deck-tab.is-active { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent) inset; }
@@ -45,11 +47,10 @@
 .deck-tab__number.is-done { background: var(--success); color: #fff; }
 .deck-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reading-workspace > section { min-width: 0; scroll-margin-top: 84px; }
-.deck-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.deck-nav { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
 .deck-nav__count { color: var(--faint); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.deck-nav__next { min-width: 0; max-width: 360px; display: inline-flex; align-items: center; gap: 6px; }
-.deck-nav__next-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deck-nav__last { color: var(--faint); font-size: 14px; }
+.deck-nav__next { display: inline-flex; align-items: center; gap: 6px; }
+.deck-nav__last { min-width: 74px; color: var(--faint); font-size: 14px; text-align: center; }
 .checkpoint-count { margin-bottom: 12px; color: var(--faint); font-size: 14px; }
 .checkpoint-badge { margin-bottom: 12px; }
 .checkpoint-question { margin-bottom: 16px; font-size: 18px; font-weight: 600; line-height: 1.5; }
@@ -65,7 +66,7 @@
 .checkpoint-skeleton__option { width: 100%; height: 43px; margin-bottom: 8px; }
 @media (max-width: 1100px) {
   .reading-workspace { grid-template-columns: 1fr; }
-  .reading-question-panel { position: static; }
+  .reading-question-panel { position: static; max-height: none; overflow: visible; }
 }
 
 /* PDF reader */
@@ -95,7 +96,10 @@
 .pdf-viewer-shell.is-fullscreen .pdf-scroll-region { flex: 1 1 auto; height: auto; min-height: 0; }
 .pdf-progress-track { height: 3px; background: #1B3A62; }
 .pdf-progress-track span { height: 100%; display: block; background: var(--accent); transition: width .2s ease; }
-.pdf-scroll-region { height: min(82vh, 960px); min-height: 640px; overflow: auto; overscroll-behavior: contain; scrollbar-color: #8e9bab transparent; scrollbar-width: thin; background-color: #dfe5ec; background-image: radial-gradient(rgba(17,35,69,.11) .7px, transparent .7px), linear-gradient(180deg, rgba(255,255,255,.42), transparent 150px); background-size: 16px 16px, 100% 100%; }
+/* The reader fills the screen below the page header, tabs and toolbar, so the whole page fits
+   without scrolling; the PDF scrolls inside it. touch-action keeps a two-finger pinch for the
+   reader's own zoom instead of zooming the whole page. */
+.pdf-scroll-region { height: clamp(440px, calc(100vh - 290px), 1100px); overflow: auto; touch-action: pan-x pan-y; overscroll-behavior: contain; scrollbar-color: #8e9bab transparent; scrollbar-width: thin; background-color: #dfe5ec; background-image: radial-gradient(rgba(17,35,69,.11) .7px, transparent .7px), linear-gradient(180deg, rgba(255,255,255,.42), transparent 150px); background-size: 16px 16px, 100% 100%; }
 .pdf-scroll-region::-webkit-scrollbar { width: 10px; height: 10px; }
 .pdf-scroll-region::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; background: #8e9bab; background-clip: padding-box; }
 .pdf-scroll-region.is-pannable { cursor: grab; }

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { COURSE_PDF_BUCKET, COURSE_VIDEO_BUCKET, deckFileError, formatDuration, isVideo, reorderedPositions, storedMaterialFile, titleFromFileName, uploadCourseDeck, videoFileError, withSignedMaterialUrls } from "@/lib/course-materials";
-import { FREE_PDF_PARSER_LIMIT_TEXT } from "@/lib/question-suggestions";
 import { createClient } from "@/lib/supabase/client";
 import { readVideoDuration, uploadCourseVideo } from "@/lib/video-upload";
 import useAdminMutation from "../../useAdminMutation";
@@ -17,6 +16,8 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
   const router = useRouter();
   const { run, busy, fail, notices } = useAdminMutation();
   const [titles, setTitles] = useState({});
+  // Typed per-deck minimum times, in minutes, before they're saved ("" = use the course's time).
+  const [times, setTimes] = useState({});
   const [videoProgress, setVideoProgress] = useState(0);
 
   async function change(label, action, messages, { refreshOnFailure = false } = {}) {
@@ -79,7 +80,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
       return;
     }
     change("upload-video", () => uploadVideo(file),
-      { success: "Video added. Give it a clear title below.", fallback: "The video couldn’t be uploaded. Check your connection and try again." },
+      { success: "Video added. Give it a clear title below.", fallback: "Upload failed. Check your connection and try again." },
       { refreshOnFailure: true });
   }
 
@@ -91,7 +92,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
     const url = isVideo(signed) ? signed.video_url : signed.pdf_url;
     if (!url) {
       tab?.close();
-      fail("This file couldn’t be opened. Try again, or remove it and upload it again.");
+      fail("Couldn’t open this file. Try again or re-upload it.");
       return;
     }
     if (tab) tab.location = url;
@@ -108,6 +109,20 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
     change(`title-${material.id}`, () => supabase.from("course_materials").update({ title }).eq("id", material.id), { success: "Title saved." });
   }
 
+  // A deck's own minimum reading time (migration 019). Empty uses the course's time.
+  function saveTime(material) {
+    const typed = times[material.id];
+    if (typed === undefined) return;
+    const seconds = typed === "" ? null : Math.round(Number(typed) * 60);
+    if (seconds !== null && (!Number.isFinite(seconds) || seconds < 0)) {
+      setTimes((current) => ({ ...current, [material.id]: undefined }));
+      return;
+    }
+    if (seconds === (material.read_seconds ?? null)) return;
+    change(`time-${material.id}`, () => supabase.from("course_materials").update({ read_seconds: seconds }).eq("id", material.id),
+      { success: seconds === null ? "This deck now uses the course’s reading time." : "Reading time for this deck saved." });
+  }
+
   // Writes the new positions one material at a time and stops at the first failure. The page
   // refreshes either way so it shows the order actually saved.
   function move(index, toIndex) {
@@ -119,7 +134,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
         if (result.error) return result;
       }
       return { data: true };
-    }, { fallback: "The new order couldn’t be fully saved. Check the order below and try again." }, { refreshOnFailure: true });
+    }, { fallback: "Couldn’t save the new order. Try again." }, { refreshOnFailure: true });
   }
 
   async function remove(material) {
@@ -136,7 +151,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
   return (
     <section className="tp-card tp-form-card course-decks">
       <div className="tp-label form-section-label--tight">Course material</div>
-      <p className="course-admin__hint">Learners open every deck and every video before the assessment. Videos have no reading questions or minimum time. AI suggestions need PDF decks under {FREE_PDF_PARSER_LIMIT_TEXT}.</p>
+      <p className="course-admin__hint">“min” sets one deck’s own reading time.</p>
       {notices}
 
       <ol className="course-decks__list">
@@ -150,8 +165,21 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
             <span className="course-decks__meta">
               {isVideo(material)
                 ? ["Video", formatDuration(material.duration_seconds)].filter(Boolean).join(" · ")
-                : `PDF · ${readingCounts[material.id] || 0} reading q.`}
+                : `PDF · ${readingCounts[material.id] || 0} reading ${readingCounts[material.id] === 1 ? "question" : "questions"}`}
             </span>
+            {isVideo(material) ? <span /> : (
+              <label className="course-decks__time" title="Minimum reading time for this deck. Leave empty to use the course’s time.">
+                <input className="tp-input" type="number" min="0" step="0.5" inputMode="decimal"
+                  aria-label={`Minimum reading minutes for ${material.title}`}
+                  placeholder={String(course.read_seconds / 60)}
+                  value={times[material.id] ?? (material.read_seconds == null ? "" : String(material.read_seconds / 60))}
+                  disabled={readOnly || Boolean(busy)}
+                  onChange={(event) => setTimes((current) => ({ ...current, [material.id]: event.target.value }))}
+                  onBlur={() => saveTime(material)}
+                  onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+                <span>min</span>
+              </label>
+            )}
             <button type="button" className="tp-btn tp-btn-ghost" onClick={() => open(material)}>Open</button>
             {!readOnly && <>
               <button type="button" className="tp-btn tp-btn-ghost" aria-label={`Move ${material.title} up`} disabled={Boolean(busy) || index === 0} onClick={() => move(index, index - 1)}>↑</button>
@@ -160,7 +188,7 @@ export default function CourseMaterialsClient({ course, materials, readingCounts
             </>}
           </li>
         ))}
-        {materials.length === 0 && <li className="chip-list__empty">Nothing yet. Learners will see an empty reader until you add a PDF deck or a video.</li>}
+        {materials.length === 0 && <li className="chip-list__empty">Nothing yet.</li>}
       </ol>
 
       {!readOnly && (
